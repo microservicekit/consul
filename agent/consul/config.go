@@ -396,7 +396,6 @@ func (c *Config) ToTLSUtilConfig() tlsutil.Config {
 		TLSMinVersion:            c.TLSMinVersion,
 		CipherSuites:             c.TLSCipherSuites,
 		PreferServerCipherSuites: c.TLSPreferServerCipherSuites,
-		AutoEncryptTLS:           c.AutoEncryptTLS,
 	}
 }
 
