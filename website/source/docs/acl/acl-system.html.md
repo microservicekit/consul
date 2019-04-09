@@ -27,8 +27,27 @@ At the highest level, there are two major components to the ACL system:
  Accessor ID which is used to name a token, and a Secret ID which is used as the bearer token used to
  make requests to Consul.
 
- ACL tokens and policies are managed by Consul operators via Consul's
-[ACL API](/api/acl/acl.html), [ACL CLI](/docs/commands/acl.html), or systems like
+For many scenarios policies and tokens are sufficient, but more advanced setups
+may benefit from additional components in the ACL system:
+
+ * **ACL Service Identities** - Service Identities allow for an abbreviated
+   syntax for expressing a kind of policy needed for an token to be usable with
+   [Consul Connect](/docs/connect/index.html). At authorization time this acts
+   like an additional policy were attached, the contents of which are described
+   further below. These are directly attached to tokens and roles and not
+   independently configured. (Added in Consul 1.5)
+
+ * **ACL Roles** - Roles allow the grouping of a set of policies and service
+   identities into a reusable higher-level entity that can be reused and linked
+   with many tokens. (Added in Consul 1.5)
+
+ * **ACL Identity Providers** - TODO
+
+ * **ACL Role Binding Rules** - TODO
+
+ACL tokens, policies, roles, identity providers, and role binding rules are
+managed by Consul operators via Consul's [ACL API](/api/acl/acl.html), 
+[ACL CLI](/docs/commands/acl.html), or systems like 
 [HashiCorp's Vault](https://www.vaultproject.io/docs/secrets/consul/index.html).
 
 ### ACL Policies
@@ -37,6 +56,7 @@ An ACL policy is a named set of rules and is composed of the following elements:
 
 * **ID** - The policies auto-generated public identifier.
 * **Name** - A unique meaningful name for the policy.
+* **Description** - A human readable description of the policy. (Optional)
 * **Rules** - Set of rules granting or denying permissions. See the [Rule Specification](/docs/acl/acl-rules.html#rule-specification) documentation for more details.
 * **Datacenters** - A list of datacenters the policy is valid within.
 
@@ -45,6 +65,42 @@ An ACL policy is a named set of rules and is composed of the following elements:
 * **Global Management** - Grants unrestricted privileges to any token that uses it. When created it will be named `global-management`
 and will be assigned the reserved ID of `00000000-0000-0000-0000-000000000001`. This policy can be renamed but modification
 of anything else including the rule set and datacenter scoping will be prevented by Consul.
+
+### ACL Service Identities
+
+-> (Added in Consul 1.5)
+
+An ACL Service Identity is an abbreviated syntax for expressing a link to a
+policy suitable for use in [Consul Connect](/docs/connect/index.html). They are
+usable on both Tokens and Roles and are composed of the following elements:
+
+* **Service Name** - The name of the service.
+* **Datacenters** - A list of datacenters the effective policy is valid within. (Optional)
+
+At authorization time a service identity acts like an additional policy were
+attached to the token with the following contents:
+
+```
+// Allow the service and its sidecar proxy to register into the catalog.
+service "{{ SERVICE_NAME_FIELD }}" {
+	policy = "write"
+}
+service "{{ SERVICE_NAME_FIELD }}-sidecar-proxy" {
+	policy = "write"
+}
+
+// Allow for any potential upstreams to be resolved.
+service_prefix "" {
+	policy = "read"
+}
+node_prefix "" {
+	policy = "read"
+}
+```
+
+### ACL Roles
+
+An ACL role is a named 
 
 ### ACL Tokens
 
@@ -55,8 +111,11 @@ elements:
 * **Secret ID** -The bearer token used when making requests to Consul.
 * **Description** - A human readable description of the token. (Optional)
 * **Policy Set** - The list of policies that are applicable for the token.
+* **Role Set** - The list of roles that are applicable for the token. (Added in Consul 1.5)
+* **Service Identity Set** - The list of service identities that are applicable for the token. (Added in Consul 1.5)
 * **Locality** - Indicates whether the token should be local to the datacenter it was created within or created in
 the primary datacenter and globally replicated.
+* **Expiration Time** - The time at which this token is revoked. (Optional; Added in Consul 1.5)
 
 #### Builtin Tokens
 

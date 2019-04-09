@@ -231,7 +231,7 @@ The table below shows this endpoint's support for
 ### Sample Request
 
 ```text
-$ curl -X DELETE
+$ curl -X DELETE \
     http://127.0.0.1:8500/v1/acl/policy/8f246b77-f3e1-ff88-5b48-8ec93abf3e05
 ```
 
