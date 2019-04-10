@@ -90,7 +90,7 @@ The table below shows this endpoint's support for
 
 ### Sample Request
 
-```text
+```sh
 $ curl \
     --request PUT \
     --data @payload.json \
