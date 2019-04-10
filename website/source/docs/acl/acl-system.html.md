@@ -80,7 +80,7 @@ usable on both Tokens and Roles and are composed of the following elements:
 At authorization time a service identity acts like an additional policy were
 attached to the token with the following contents:
 
-```
+```hcl
 // Allow the service and its sidecar proxy to register into the catalog.
 service "{{ SERVICE_NAME_FIELD }}" {
 	policy = "write"
@@ -215,7 +215,7 @@ All of these tokens except the `master` token can all be introduced or updated v
 
 Since the [`acl.tokens.agent_master`](/docs/agent/options.html#acl_tokens_agent_master) is designed to be used when the Consul servers are not available, its policy is managed locally on the agent and does not need to have a token defined on the Consul servers via the ACL API. Once set, it implicitly has the following policy associated with it
 
-```text
+```hcl
 agent "<node name of agent>" {
   policy = "write"
 }
@@ -234,7 +234,7 @@ The [`acl.tokens.agent`](/docs/agent/options.html#acl_tokens_agent) is a special
 
 Here's an example policy sufficient to accomplish the above for a node called `mynode`:
 
-```text
+```hcl
 node "mynode" {
   policy = "write"
 }
