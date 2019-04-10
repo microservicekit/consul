@@ -263,3 +263,107 @@ agent_prefix "" {
    policy = "read"
 }
 ```
+
+## Login to Identity Provider
+
+This endpoint was added in Consul 1.5.0 and is used to exchange Identity
+Provider credentials for a newly-created Consul ACL token.
+
+| Method | Path                         | Produces                   |
+| ------ | ---------------------------- | -------------------------- |
+| `POST` | `/acl/login`                 | `application/json`         |
+
+The table below shows this endpoint's support for
+[blocking queries](/api/index.html#blocking-queries),
+[consistency modes](/api/index.html#consistency-modes),
+[agent caching](/api/index.html#agent-caching), and
+[required ACLs](/api/index.html#acls).
+
+| Blocking Queries | Consistency Modes | Agent Caching | ACL Required |
+| ---------------- | ----------------- | ------------- | ------------ |
+| `NO`             | `none`            | `none`        | `none`       |
+
+### Parameters
+
+- `IDPType` `(string: <required>)` - The type of the identity provider that
+  referred to by `IDPName`. This must match what is configured for the identity
+  provider.
+
+- `IDPName` `(string: <required>)` - The name of the identity provider to use for login.
+
+- `IDPToken` `(string: <required>)` - The bearer token to present to the
+  identity provider during login. For `IDPType=kubernetes` this is a
+  [Service Account Token (JWT)](https://kubernetes.io/docs/reference/access-authn-authz/authentication/#service-account-tokens).
+
+- `Meta` `(map<string|string>: nil)` - Specifies arbitrary KV metadata
+  linked to the token. Can be useful to track origins.
+
+### Sample Payload
+
+```json
+{
+  "IDPType": "kubernetes",
+  "IDPName": "minikube",
+  "IDPToken": "eyJhbGciOiJSUzI1NiIsImtpZCI6IiJ9.eyJpc3MiOiJrdWJlcm5ldGVzL3NlcnZpY2VhY2NvdW50Iiwia3ViZXJuZXRlcy5pby9zZXJ2aWNlYWNjb3VudC9uYW1lc3BhY2UiOiJkZWZhdWx0Iiwia3ViZXJuZXRlcy5pby9zZXJ2aWNlYWNjb3VudC9zZWNyZXQubmFtZSI6ImRlbW8tdG9rZW4tbTljdm4iLCJrdWJlcm5ldGVzLmlvL3NlcnZpY2VhY2NvdW50L3NlcnZpY2UtYWNjb3VudC5uYW1lIjoiZGVtbyIsImt1YmVybmV0ZXMuaW8vc2VydmljZWFjY291bnQvc2VydmljZS1hY2NvdW50LnVpZCI6IjlmZjUxZmY0LTU1N2UtMTFlOS05Njg3LTQ4ZTZjOGI4ZWNiNSIsInN1YiI6InN5c3RlbTpzZXJ2aWNlYWNjb3VudDpkZWZhdWx0OmRlbW8ifQ.UJEphtrN261gy9WCl4ZKjm2PRDLDkc3Xg9VcDGfzyroOqFQ6sog5dVAb9voc5Nc0-H5b1yGwxDViEMucwKvZpA5pi7VEx_OskK-KTWXSmafM0Xg_AvzpU9Ed5TSRno-OhXaAraxdjXoC4myh1ay2DMeHUusJg_ibqcYJrWx-6MO1bH_ObORtAKhoST_8fzkqNAlZmsQ87FinQvYN5mzDXYukl-eeRdBgQUBkWvEb-Ju6cc0-QE4sUQ4IH_fs0fUyX_xc0om0SZGWLP909FTz4V8LxV8kr6L7irxROiS1jn3Fvyc9ur1PamVf3JOPPrOyfmKbaGRiWJM32b3buQw7cg"
+}
+```
+
+### Sample Request
+
+```sh
+$ curl \
+    --request POST \
+    --data @payload.json \
+    http://127.0.0.1:8500/v1/acl/login
+```
+
+### Sample Response
+
+```json
+{
+    "AccessorID": "87675b6d-92d4-e66c-7e07-a4be2f9bee2e",
+    "SecretID": "ebd930c0-f484-871f-3d27-b1d9d8d4215d",
+    "Description": "token created via login",
+    "Roles": [
+        {
+            "BoundName": "demo"
+        }
+    ],
+    "Local": true,
+    "IDPName": "minikube",
+    "CreateTime": "2019-04-10T14:16:16.629679569-05:00",
+    "Hash": "Hs9sG4BuS+SBjHJFAYF8Sw8D2faatpfNPVSAih3+Uvo=",
+    "CreateIndex": 48,
+    "ModifyIndex": 48
+}
+```
+
+## Logout from Identity Provider
+
+This endpoint was added in Consul 1.5.0 and is used to destroy a token created
+via the [login endpoint](#login-to-identity-provider). The token deleted is
+specified with the `X-Consul-Token` header or the `token` query parameter.
+
+| Method | Path                         | Produces                   |
+| ------ | ---------------------------- | -------------------------- |
+| `POST` | `/acl/logout`                | `application/json`         |
+
+The table below shows this endpoint's support for
+[blocking queries](/api/index.html#blocking-queries),
+[consistency modes](/api/index.html#consistency-modes),
+[agent caching](/api/index.html#agent-caching), and
+[required ACLs](/api/index.html#acls).
+
+| Blocking Queries | Consistency Modes | Agent Caching | ACL Required |
+| ---------------- | ----------------- | ------------- | ------------ |
+| `NO`             | `none`            | `none`        | `none`       |
+
+-> **Note** - This endpoint requires no specific privileges as it is just
+deleting a token for which you already must possess its secret.
+
+### Sample Request
+
+```sh
+$ curl -H "X-Consul-Token: ebd930c0-f484-871f-3d27-b1d9d8d4215d" \
+   http://127.0.0.1:8500/v1/acl/token/self
+```

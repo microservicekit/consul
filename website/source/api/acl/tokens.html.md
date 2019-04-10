@@ -49,12 +49,12 @@ The table below shows this endpoint's support for
    role. With the RoleLink, tokens can be linked to roles either by the role
    name or by the role ID. When roles are linked by name they will be internally
    resolved to the role ID. With linking tokens internally by IDs, Consul
-   enables role renaming without breaking tokens.
+   enables role renaming without breaking tokens. Added on Consul 1.5.0.
 
 ~> TODO:where is the best place to mention RoleLink.BoundName?
 
 - `ServiceIdentities` `(array<ServiceIdentity>)` - The list of service
-  identities that should be applied to the token. 
+  identities that should be applied to the token.  Added on Consul 1.5.0.
 
   - `ServiceName` `(string: <required>)` - The name of the service.
 
@@ -69,7 +69,7 @@ The table below shows this endpoint's support for
 
 - `ExpirationTime` `(time: "")`- If set this represents the point after which a
   token should be considered revoked and is eligible for destruction. The default
-  unset value represents NO expiration.
+  unset value represents NO expiration. Added on Consul 1.5.0.
 
 ~> TODO: mention hard coded min/max limits
 ~> TODO: indicate this is a pointer?
@@ -78,7 +78,7 @@ The table below shows this endpoint's support for
   initialize the `ExpirationTime` field to a value of `CreateTime +
   ExpirationTTL`. This field is not persisted beyond its initial use. Can be
   specified in the form of `"10s"` or `"5m"` (i.e., 10 seconds or 5 minutes,
-  respectively).
+  respectively). Added on Consul 1.5.0.
 
 ~> TODO: mention hard coded min/max limits
 
