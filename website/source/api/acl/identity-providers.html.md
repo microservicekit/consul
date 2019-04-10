@@ -80,9 +80,8 @@ The table below shows this endpoint's support for
 
 ### Sample Request
 
-```text
-$ curl \
-    --request PUT \
+```sh
+$ curl -X PUT \
     --data @payload.json \
     http://127.0.0.1:8500/v1/acl/idp
 ```
@@ -129,7 +128,7 @@ The table below shows this endpoint's support for
 
 ### Sample Request
 
-```text
+```sh
 $ curl -X GET http://127.0.0.1:8500/v1/acl/idp/minikube
 ```
 
@@ -210,9 +209,8 @@ The table below shows this endpoint's support for
 
 ### Sample Request
 
-```text
-$ curl \
-    --request PUT \
+```sh
+$ curl -X PUT \
     --data @payload.json \
     http://127.0.0.1:8500/v1/acl/idp/minikube
 ```
@@ -266,7 +264,7 @@ The table below shows this endpoint's support for
 
 ### Sample Request
 
-```text
+```sh
 $ curl -X DELETE \
     http://127.0.0.1:8500/v1/acl/idp/minikube
 ```
@@ -296,7 +294,7 @@ The table below shows this endpoint's support for
 
 ## Sample Request
 
-```text
+```sh
 $ curl -X GET http://127.0.0.1:8500/v1/acl/idps
 ```
 

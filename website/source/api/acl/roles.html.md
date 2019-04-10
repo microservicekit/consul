@@ -91,8 +91,7 @@ The table below shows this endpoint's support for
 ### Sample Request
 
 ```sh
-$ curl \
-    --request PUT \
+$ curl -X PUT \
     --data @payload.json \
     http://127.0.0.1:8500/v1/acl/role
 ```
@@ -213,7 +212,7 @@ The table below shows this endpoint's support for
 
 ### Sample Request
 
-```text
+```sh
 $ curl -X GET http://127.0.0.1:8500/v1/acl/role/name/example-role
 ```
 
@@ -318,9 +317,8 @@ The table below shows this endpoint's support for
 
 ### Sample Request
 
-```text
-$ curl \
-    --request PUT \
+```sh
+$ curl -X PUT \
     --data @payload.json \
     http://127.0.0.1:8500/v1/acl/role/8bec74a4-5ced-45ed-9c9d-bca6153490bb
 ```
@@ -376,7 +374,7 @@ The table below shows this endpoint's support for
 
 ### Sample Request
 
-```text
+```sh
 $ curl -X DELETE \
     http://127.0.0.1:8500/v1/acl/role/8f246b77-f3e1-ff88-5b48-8ec93abf3e05
 ```
@@ -411,7 +409,7 @@ The table below shows this endpoint's support for
 
 ## Sample Request
 
-```text
+```sh
 $ curl -X GET http://127.0.0.1:8500/v1/acl/roles
 ```
 

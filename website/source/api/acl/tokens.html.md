@@ -101,9 +101,8 @@ The table below shows this endpoint's support for
 
 ### Sample Request
 
-```text
-$ curl \
-    --request PUT \
+```sh
+$ curl -X PUT \
     --data @payload.json \
     http://127.0.0.1:8500/v1/acl/token
 ```
@@ -159,7 +158,7 @@ The table below shows this endpoint's support for
 
 ### Sample Request
 
-```text
+```sh
 $ curl -X GET http://127.0.0.1:8500/v1/acl/token/6a1253d2-1785-24fd-91c2-f8e78c745511
 ```
 
@@ -218,7 +217,7 @@ retrieving the data for a token that you must already possess its secret.
 
 ### Sample Request
 
-```text
+```sh
 $ curl -H "X-Consul-Token: 6a1253d2-1785-24fd-91c2-f8e78c745511" \
    http://127.0.0.1:8500/v1/acl/token/self
 ```
@@ -344,9 +343,8 @@ The table below shows this endpoint's support for
 
 ### Sample Request
 
-```text
-$ curl \
-    --request PUT \
+```sh
+$ curl -X PUT \
     --data @payload.json \
     http://127.0.0.1:8500/v1/acl/token/6a1253d2-1785-24fd-91c2-f8e78c745511
 ```
@@ -415,9 +413,8 @@ The table below shows this endpoint's support for
 
 ### Sample Request
 
-```text
-$ curl \
-    --request PUT \
+```sh
+$ curl -X PUT \
     --data @payload.json \
     http://127.0.0.1:8500/v1/acl/token/6a1253d2-1785-24fd-91c2-f8e78c745511/clone
 ```
@@ -479,7 +476,7 @@ The table below shows this endpoint's support for
 
 ### Sample Request
 
-```text
+```sh
 $ curl -X DELETE \
     http://127.0.0.1:8500/v1/acl/token/8f246b77-f3e1-ff88-5b48-8ec93abf3e05
 ```
@@ -520,7 +517,7 @@ The table below shows this endpoint's support for
 
 ## Sample Request
 
-```text
+```sh
 $ curl -X GET http://127.0.0.1:8500/v1/acl/tokens
 ```
 

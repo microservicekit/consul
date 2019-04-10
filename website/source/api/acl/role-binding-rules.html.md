@@ -86,9 +86,8 @@ The table below shows this endpoint's support for
 
 ### Sample Request
 
-```text
-$ curl \
-    --request PUT \
+```sh
+$ curl -X PUT \
     --data @payload.json \
     http://127.0.0.1:8500/v1/acl/rolebindingrule
 ```
@@ -146,7 +145,7 @@ The table below shows this endpoint's support for
 
 ### Sample Request
 
-```text
+```sh
 $ curl -X GET http://127.0.0.1:8500/v1/acl/rolebindingrule/000ed53c-e2d3-e7e6-31a5-c19bc3518a3d
 ```
 
@@ -246,9 +245,8 @@ The table below shows this endpoint's support for
 
 ### Sample Request
 
-```text
-$ curl \
-    --request PUT \
+```sh
+$ curl -X PUT \
     --data @payload.json \
     http://127.0.0.1:8500/v1/acl/rolebindingrule/000ed53c-e2d3-e7e6-31a5-c19bc3518a3d
 ```
@@ -301,7 +299,7 @@ The table below shows this endpoint's support for
 
 ### Sample Request
 
-```text
+```sh
 $ curl -X DELETE \
     http://127.0.0.1:8500/v1/acl/rolebindingrule/000ed53c-e2d3-e7e6-31a5-c19bc3518a3d
 ```
@@ -336,7 +334,7 @@ The table below shows this endpoint's support for
 
 ## Sample Request
 
-```text
+```sh
 $ curl -X GET http://127.0.0.1:8500/v1/acl/rolebindingrules
 ```
 
