@@ -33,7 +33,7 @@ may benefit from additional components in the ACL system:
  * **ACL Service Identities** - Service Identities allow for an abbreviated
    syntax for expressing a kind of policy needed for an token to be usable with
    [Consul Connect](/docs/connect/index.html). At authorization time this acts
-   like an additional policy were attached, the contents of which are described
+   like an additional policy was attached, the contents of which are described
    further below. These are directly attached to tokens and roles and not
    independently configured. (Added in Consul 1.5)
 
@@ -77,7 +77,7 @@ usable on both Tokens and Roles and are composed of the following elements:
 * **Service Name** - The name of the service.
 * **Datacenters** - A list of datacenters the effective policy is valid within. (Optional)
 
-At authorization time a service identity acts like an additional policy were
+At authorization time a service identity acts like an additional policy was
 attached to the token with the following contents:
 
 ```hcl
