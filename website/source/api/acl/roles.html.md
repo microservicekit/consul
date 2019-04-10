@@ -153,7 +153,7 @@ The table below shows this endpoint's support for
 
 ### Sample Request
 
-```text
+```sh
 $ curl -X GET http://127.0.0.1:8500/v1/acl/role/aa770e5b-8b0b-7fcf-e5a1-8535fcc388b4
 ```
 
