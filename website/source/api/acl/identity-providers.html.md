@@ -6,7 +6,7 @@ description: |-
   The /acl/idp endpoints manage Consul's ACL Identity Providers.
 ---
 
--> **1.5.0+:**  The APIs are available in Consul versions 1.5.0 and later. The documentation for the legacy ACL API is [here](/api/acl/legacy.html)
+-> **1.5.0+:**  The APIs are available in Consul versions 1.5.0 and later.
 
 # ACL Identity Provider HTTP API
 
