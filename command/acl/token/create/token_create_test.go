@@ -8,8 +8,8 @@ import (
 	"github.com/hashicorp/consul/agent"
 	"github.com/hashicorp/consul/api"
 	"github.com/hashicorp/consul/logger"
-	"github.com/hashicorp/consul/testrpc"
 	"github.com/hashicorp/consul/sdk/testutil"
+	"github.com/hashicorp/consul/testrpc"
 	"github.com/mitchellh/cli"
 	"github.com/stretchr/testify/require"
 )
@@ -79,8 +79,8 @@ func TestTokenCreateCommand(t *testing.T) {
 		}
 
 		code := cmd.Run(args)
-		require.Equal(code, 0)
 		require.Empty(ui.ErrorWriter.String())
+		require.Equal(code, 0)
 	}
 
 	// create with accessor and secret
