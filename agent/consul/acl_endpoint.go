@@ -1296,13 +1296,6 @@ func (a *ACL) RoleSet(args *structs.ACLRoleSetRequest, reply *structs.ACLRole) e
 		if svcid.ServiceName == "" {
 			return fmt.Errorf("Service identity is missing the service name field on this role")
 		}
-		// TODO(rb): ugh if a local token gets a role that has a service
-		// identity that has datacenters set, we won't be anble to enforce this
-		// next blob here. This makes me lean more towards nuking ServiceIdentity.Datacenters again
-		//
-		// if token.Local && len(svcid.Datacenters) > 0 {
-		// 	return fmt.Errorf("Service identity %q cannot specify a list of datacenters on a local token", svcid.ServiceName)
-		// }
 		if !isValidServiceIdentityName(svcid.ServiceName) {
 			return fmt.Errorf("Service identity %q has an invalid name. Only alphanumeric characters, '-' and '_' are allowed", svcid.ServiceName)
 		}
