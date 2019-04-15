@@ -2989,8 +2989,8 @@ func TestACLEndpoint_IdentityProviderSet(t *testing.T) {
 		name string
 		ok   bool
 	}{
-		{strings.Repeat("x", 257), false},
-		{strings.Repeat("x", 256), true},
+		{strings.Repeat("x", 129), false},
+		{strings.Repeat("x", 128), true},
 		{"-abc", true},
 		{"abc-", true},
 		{"a-bc", true},

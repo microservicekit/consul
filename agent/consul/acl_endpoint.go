@@ -31,7 +31,7 @@ var (
 	validServiceIdentityName     = regexp.MustCompile(`^[a-z0-9]([a-z0-9\-_]*[a-z0-9])?$`)
 	serviceIdentityNameMaxLength = 256
 	validRoleName                = regexp.MustCompile(`^[A-Za-z0-9\-_]{1,256}$`)
-	validIDPName                 = regexp.MustCompile(`^[A-Za-z0-9\-_]{1,256}$`)
+	validIDPName                 = regexp.MustCompile(`^[A-Za-z0-9\-_]{1,128}$`)
 )
 
 // ACL endpoint is used to manipulate ACLs
