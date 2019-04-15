@@ -1780,49 +1780,19 @@ func (s *Store) ACLRoleBindingRuleGetByID(ws memdb.WatchSet, id string) (uint64,
 	return s.aclRoleBindingRuleGet(ws, id, "id")
 }
 
-func (s *Store) ACLRoleBindingRuleBatchGet(ws memdb.WatchSet, ids []string) (uint64, structs.ACLRoleBindingRules, error) {
-	tx := s.db.Txn(false)
-	defer tx.Abort()
-
-	rules := make(structs.ACLRoleBindingRules, 0)
-	for _, rid := range ids {
-		rule, err := s.getRoleBindingRuleWithTxn(tx, ws, rid, "id")
-		if err != nil {
-			return 0, nil, err
-		}
-
-		if rule != nil {
-			rules = append(rules, rule)
-		}
-	}
-
-	idx := maxIndexTxn(tx, "acl-role-binding-rules")
-
-	return idx, rules, nil
-}
-
-func (s *Store) getRoleBindingRuleWithTxn(tx *memdb.Txn, ws memdb.WatchSet, value, index string) (*structs.ACLRoleBindingRule, error) {
-	watchCh, rawRule, err := tx.FirstWatch("acl-role-binding-rules", index, value)
-	if err != nil {
-		return nil, fmt.Errorf("failed acl role binding rule lookup: %v", err)
-	}
-	ws.Add(watchCh)
-
-	if rawRule != nil {
-		// TODO(rb): deep clone?
-		return rawRule.(*structs.ACLRoleBindingRule), nil
-	}
-
-	return nil, nil
-}
-
 func (s *Store) aclRoleBindingRuleGet(ws memdb.WatchSet, value, index string) (uint64, *structs.ACLRoleBindingRule, error) {
 	tx := s.db.Txn(false)
 	defer tx.Abort()
 
-	rule, err := s.getRoleBindingRuleWithTxn(tx, ws, value, index)
+	watchCh, rawRule, err := tx.FirstWatch("acl-role-binding-rules", index, value)
 	if err != nil {
-		return 0, nil, err
+		return 0, nil, fmt.Errorf("failed acl role binding rule lookup: %v", err)
+	}
+	ws.Add(watchCh)
+
+	var rule *structs.ACLRoleBindingRule
+	if rawRule != nil {
+		rule = rawRule.(*structs.ACLRoleBindingRule)
 	}
 
 	idx := maxIndexTxn(tx, "acl-role-binding-rules")
@@ -1850,7 +1820,6 @@ func (s *Store) ACLRoleBindingRuleList(ws memdb.WatchSet, idpName string) (uint6
 
 	var result structs.ACLRoleBindingRules
 	for raw := iter.Next(); raw != nil; raw = iter.Next() {
-		// TODO(rb): deep copy
 		rule := raw.(*structs.ACLRoleBindingRule)
 		result = append(result, rule)
 	}
@@ -2010,25 +1979,18 @@ func (s *Store) ACLIdentityProviderGetByName(ws memdb.WatchSet, name string) (ui
 	return s.aclIdentityProviderGet(ws, name, "id")
 }
 
-func (s *Store) ACLIdentityProviderBatchGet(ws memdb.WatchSet, names []string) (uint64, structs.ACLIdentityProviders, error) {
+func (s *Store) aclIdentityProviderGet(ws memdb.WatchSet, value, index string) (uint64, *structs.ACLIdentityProvider, error) {
 	tx := s.db.Txn(false)
 	defer tx.Abort()
 
-	idps := make(structs.ACLIdentityProviders, 0)
-	for _, name := range names {
-		idp, err := s.getIdentityProviderWithTxn(tx, ws, name, "id")
-		if err != nil {
-			return 0, nil, err
-		}
-
-		if idp != nil {
-			idps = append(idps, idp)
-		}
+	idp, err := s.getIdentityProviderWithTxn(tx, ws, value, index)
+	if err != nil {
+		return 0, nil, err
 	}
 
 	idx := maxIndexTxn(tx, "acl-identity-providers")
 
-	return idx, idps, nil
+	return idx, idp, nil
 }
 
 func (s *Store) getIdentityProviderWithTxn(tx *memdb.Txn, ws memdb.WatchSet, value, index string) (*structs.ACLIdentityProvider, error) {
@@ -2044,20 +2006,6 @@ func (s *Store) getIdentityProviderWithTxn(tx *memdb.Txn, ws memdb.WatchSet, val
 	}
 
 	return nil, nil
-}
-
-func (s *Store) aclIdentityProviderGet(ws memdb.WatchSet, value, index string) (uint64, *structs.ACLIdentityProvider, error) {
-	tx := s.db.Txn(false)
-	defer tx.Abort()
-
-	idp, err := s.getIdentityProviderWithTxn(tx, ws, value, index)
-	if err != nil {
-		return 0, nil, err
-	}
-
-	idx := maxIndexTxn(tx, "acl-identity-providers")
-
-	return idx, idp, nil
 }
 
 func (s *Store) ACLIdentityProviderList(ws memdb.WatchSet) (uint64, structs.ACLIdentityProviders, error) {

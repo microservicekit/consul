@@ -1508,34 +1508,6 @@ func (a *ACL) RoleBindingRuleRead(args *structs.ACLRoleBindingRuleGetRequest, re
 		})
 }
 
-// TODO (DEPRECATE?)
-func (a *ACL) RoleBindingRuleBatchRead(args *structs.ACLRoleBindingRuleBatchGetRequest, reply *structs.ACLRoleBindingRuleBatchResponse) error {
-	if err := a.aclPreCheck(); err != nil {
-		return err
-	}
-
-	if done, err := a.srv.forward("ACL.RoleBindingRuleBatchRead", args, args, reply); done {
-		return err
-	}
-
-	if rule, err := a.srv.ResolveToken(args.Token); err != nil {
-		return err
-	} else if rule == nil || !rule.ACLRead() {
-		return acl.ErrPermissionDenied
-	}
-
-	return a.srv.blockingQuery(&args.QueryOptions, &reply.QueryMeta,
-		func(ws memdb.WatchSet, state *state.Store) error {
-			index, rules, err := state.ACLRoleBindingRuleBatchGet(ws, args.RoleBindingRuleIDs)
-			if err != nil {
-				return err
-			}
-
-			reply.Index, reply.RoleBindingRules = index, rules
-			return nil
-		})
-}
-
 func (a *ACL) RoleBindingRuleSet(args *structs.ACLRoleBindingRuleSetRequest, reply *structs.ACLRoleBindingRule) error {
 	if err := a.aclPreCheck(); err != nil {
 		return err
@@ -1783,34 +1755,6 @@ func (a *ACL) IdentityProviderRead(args *structs.ACLIdentityProviderGetRequest, 
 			}
 
 			reply.Index, reply.IdentityProvider = index, idp
-			return nil
-		})
-}
-
-// TODO (DEPRECATE?)
-func (a *ACL) IdentityProviderBatchRead(args *structs.ACLIdentityProviderBatchGetRequest, reply *structs.ACLIdentityProviderBatchResponse) error {
-	if err := a.aclPreCheck(); err != nil {
-		return err
-	}
-
-	if done, err := a.srv.forward("ACL.IdentityProviderBatchRead", args, args, reply); done {
-		return err
-	}
-
-	if rule, err := a.srv.ResolveToken(args.Token); err != nil {
-		return err
-	} else if rule == nil || !rule.ACLRead() {
-		return acl.ErrPermissionDenied
-	}
-
-	return a.srv.blockingQuery(&args.QueryOptions, &reply.QueryMeta,
-		func(ws memdb.WatchSet, state *state.Store) error {
-			index, idps, err := state.ACLIdentityProviderBatchGet(ws, args.IdentityProviderNames)
-			if err != nil {
-				return err
-			}
-
-			reply.Index, reply.IdentityProviders = index, idps
 			return nil
 		})
 }

@@ -1412,26 +1412,9 @@ type ACLRoleBindingRuleListResponse struct {
 	QueryMeta
 }
 
-// ACLRoleBindingRuleBatchGetRequest is used at the RPC layer to request a subset of
-// the rules associated with the token used for retrieval
-type ACLRoleBindingRuleBatchGetRequest struct {
-	RoleBindingRuleIDs []string // List of rule ids to fetch
-	Datacenter         string   // The datacenter to perform the request within
-	QueryOptions
-}
-
-func (r *ACLRoleBindingRuleBatchGetRequest) RequestDatacenter() string {
-	return r.Datacenter
-}
-
 // ACLRoleBindingRuleResponse returns a single binding + metadata
 type ACLRoleBindingRuleResponse struct {
 	RoleBindingRule *ACLRoleBindingRule
-	QueryMeta
-}
-
-type ACLRoleBindingRuleBatchResponse struct {
-	RoleBindingRules []*ACLRoleBindingRule
 	QueryMeta
 }
 
@@ -1495,27 +1478,9 @@ type ACLIdentityProviderListResponse struct {
 	QueryMeta
 }
 
-// ACLIdentityProviderBatchGetRequest is used at the RPC layer to request a subset of
-// the idps associated with the token used for retrieval
-// TODO: remove?
-type ACLIdentityProviderBatchGetRequest struct {
-	IdentityProviderNames []string // List of idp names to fetch
-	Datacenter            string   // The datacenter to perform the request within
-	QueryOptions
-}
-
-func (r *ACLIdentityProviderBatchGetRequest) RequestDatacenter() string {
-	return r.Datacenter
-}
-
 // ACLIdentityProviderResponse returns a single idp + metadata
 type ACLIdentityProviderResponse struct {
 	IdentityProvider *ACLIdentityProvider
-	QueryMeta
-}
-
-type ACLIdentityProviderBatchResponse struct {
-	IdentityProviders []*ACLIdentityProvider
 	QueryMeta
 }
 

@@ -2730,7 +2730,7 @@ func TestStateStore_ACLIdentityProviders_UpsertBatchRead(t *testing.T) {
 
 		require.NoError(t, s.ACLIdentityProviderBatchSet(2, idps))
 
-		idx, ridps, err := s.ACLIdentityProviderBatchGet(nil, []string{"k8s-1", "k8s-2"})
+		idx, ridps, err := s.ACLIdentityProviderList(nil)
 		require.NoError(t, err)
 		require.Equal(t, uint64(2), idx)
 		require.Len(t, ridps, 2)
@@ -2780,7 +2780,7 @@ func TestStateStore_ACLIdentityProviders_UpsertBatchRead(t *testing.T) {
 
 		require.NoError(t, s.ACLIdentityProviderBatchSet(3, updates))
 
-		idx, ridps, err := s.ACLIdentityProviderBatchGet(nil, []string{"k8s-1", "k8s-2"})
+		idx, ridps, err := s.ACLIdentityProviderList(nil)
 		require.NoError(t, err)
 		require.Equal(t, uint64(3), idx)
 		require.Len(t, ridps, 2)
@@ -3109,7 +3109,7 @@ func TestStateStore_ACLRoleBindingRules_UpsertBatchRead(t *testing.T) {
 
 		require.NoError(t, s.ACLRoleBindingRuleBatchSet(2, rules))
 
-		idx, rrules, err := s.ACLRoleBindingRuleBatchGet(nil, []string{rules[0].ID, rules[1].ID})
+		idx, rrules, err := s.ACLRoleBindingRuleList(nil, "k8s")
 		require.NoError(t, err)
 		require.Equal(t, uint64(2), idx)
 		require.Len(t, rrules, 2)
@@ -3160,7 +3160,7 @@ func TestStateStore_ACLRoleBindingRules_UpsertBatchRead(t *testing.T) {
 
 		require.NoError(t, s.ACLRoleBindingRuleBatchSet(3, updates))
 
-		idx, rrules, err := s.ACLRoleBindingRuleBatchGet(nil, []string{rules[0].ID, rules[1].ID})
+		idx, rrules, err := s.ACLRoleBindingRuleList(nil, "k8s")
 		require.NoError(t, err)
 		require.Equal(t, uint64(3), idx)
 		require.Len(t, rrules, 2)
