@@ -1,4 +1,4 @@
-package rolebindingruledelete
+package bindingruleread
 
 import (
 	"flag"
@@ -22,16 +22,26 @@ type cmd struct {
 	help  string
 
 	ruleID string
+
+	showMeta bool
 }
 
 func (c *cmd) init() {
 	c.flags = flag.NewFlagSet("", flag.ContinueOnError)
 
+	c.flags.BoolVar(
+		&c.showMeta,
+		"meta",
+		false,
+		"Indicates that role binding rule metadata such "+
+			"as the content hash and raft indices should be shown for each entry.",
+	)
+
 	c.flags.StringVar(
 		&c.ruleID,
 		"id",
 		"",
-		"The ID of the role binding rule to delete. "+
+		"The ID of the role binding rule to read. "+
 			"It may be specified as a unique ID prefix but will error if the prefix "+
 			"matches multiple role binding rule IDs",
 	)
@@ -48,7 +58,7 @@ func (c *cmd) Run(args []string) int {
 	}
 
 	if c.ruleID == "" {
-		c.UI.Error(fmt.Sprintf("Must specify the -id parameter"))
+		c.UI.Error(fmt.Sprintf("Must specify the -id parameter."))
 		return 1
 	}
 
@@ -64,12 +74,16 @@ func (c *cmd) Run(args []string) int {
 		return 1
 	}
 
-	if _, err := client.ACL().RoleBindingRuleDelete(ruleID, nil); err != nil {
-		c.UI.Error(fmt.Sprintf("Error deleting role binding rule %q: %v", ruleID, err))
+	rule, _, err := client.ACL().RoleBindingRuleRead(ruleID, nil)
+	if err != nil {
+		c.UI.Error(fmt.Sprintf("Error reading role binding rule %q: %v", ruleID, err))
+		return 1
+	} else if rule == nil {
+		c.UI.Error(fmt.Sprintf("Role binding rule not found with ID %q", ruleID))
 		return 1
 	}
 
-	c.UI.Info(fmt.Sprintf("Role binding rule %q deleted successfully", ruleID))
+	acl.PrintRoleBindingRule(rule, c.UI, c.showMeta)
 	return 0
 }
 
@@ -81,18 +95,14 @@ func (c *cmd) Help() string {
 	return flags.Usage(c.help, nil)
 }
 
-const synopsis = "Delete an ACL Role Binding Rule"
+const synopsis = "Read an ACL Role Binding Rule"
 const help = `
-Usage: consul acl rolebindingrule delete -id ID [options]
+Usage: consul acl rolebindingrule read -id ID [options]
 
-    Deletes an ACL role binding rule by providing the ID or a unique ID prefix.
+  This command will retrieve and print out the details of a single
+  role binding rule.
 
-    Delete by prefix:
+    Read:
 
-        $ consul acl rolebindingrule delete -id b6b85
-
-    Delete by full ID:
-
-        $ consul acl rolebindingrule delete -id b6b856da-5193-4e78-845a-7d61ca8371ba
-
+     $ consul acl rolebindingrule read -id fdabbcb5-9de5-4b1a-961f-77214ae88cba
 `

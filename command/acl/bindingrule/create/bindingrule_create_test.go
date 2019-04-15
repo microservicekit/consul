@@ -1,4 +1,4 @@
-package rolebindingrulecreate
+package bindingrulecreate
 
 import (
 	"os"

@@ -939,7 +939,7 @@ func (a *ACL) RoleBindingRuleCreate(rule *ACLRoleBindingRule, q *WriteOptions) (
 		return nil, nil, fmt.Errorf("Cannot specify an ID in Role Binding Rule Creation")
 	}
 
-	r := a.c.newRequest("PUT", "/v1/acl/rolebindingrule")
+	r := a.c.newRequest("PUT", "/v1/acl/bindingrule")
 	r.setWriteOptions(q)
 	r.obj = rule
 	rtt, resp, err := requireOK(a.c.doRequest(r))
@@ -964,7 +964,7 @@ func (a *ACL) RoleBindingRuleUpdate(rule *ACLRoleBindingRule, q *WriteOptions) (
 		return nil, nil, fmt.Errorf("Must specify an ID in Role Binding Rule Update")
 	}
 
-	r := a.c.newRequest("PUT", "/v1/acl/rolebindingrule/"+rule.ID)
+	r := a.c.newRequest("PUT", "/v1/acl/bindingrule/"+rule.ID)
 	r.setWriteOptions(q)
 	r.obj = rule
 	rtt, resp, err := requireOK(a.c.doRequest(r))
@@ -984,7 +984,7 @@ func (a *ACL) RoleBindingRuleUpdate(rule *ACLRoleBindingRule, q *WriteOptions) (
 
 // RoleBindingRuleDelete deletes a role binding rule given its ID.
 func (a *ACL) RoleBindingRuleDelete(roleBindingRuleID string, q *WriteOptions) (*WriteMeta, error) {
-	r := a.c.newRequest("DELETE", "/v1/acl/rolebindingrule/"+roleBindingRuleID)
+	r := a.c.newRequest("DELETE", "/v1/acl/bindingrule/"+roleBindingRuleID)
 	r.setWriteOptions(q)
 	rtt, resp, err := requireOK(a.c.doRequest(r))
 	if err != nil {
@@ -998,7 +998,7 @@ func (a *ACL) RoleBindingRuleDelete(roleBindingRuleID string, q *WriteOptions) (
 
 // RoleBindingRuleRead retrieves the role binding rule details. Returns nil if not found.
 func (a *ACL) RoleBindingRuleRead(roleBindingRuleID string, q *QueryOptions) (*ACLRoleBindingRule, *QueryMeta, error) {
-	r := a.c.newRequest("GET", "/v1/acl/rolebindingrule/"+roleBindingRuleID)
+	r := a.c.newRequest("GET", "/v1/acl/bindingrule/"+roleBindingRuleID)
 	r.setQueryOptions(q)
 	found, rtt, resp, err := requireNotFoundOrOK(a.c.doRequest(r))
 	if err != nil {
@@ -1024,7 +1024,7 @@ func (a *ACL) RoleBindingRuleRead(roleBindingRuleID string, q *QueryOptions) (*A
 
 // RoleBindingRuleList retrieves a listing of all role binding rules.
 func (a *ACL) RoleBindingRuleList(idpName string, q *QueryOptions) ([]*ACLRoleBindingRule, *QueryMeta, error) {
-	r := a.c.newRequest("GET", "/v1/acl/rolebindingrules")
+	r := a.c.newRequest("GET", "/v1/acl/bindingrules")
 	if idpName != "" {
 		r.params.Set("idp", idpName)
 	}

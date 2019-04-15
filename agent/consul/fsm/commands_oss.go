@@ -463,7 +463,7 @@ func (c *FSM) applyACLRoleBindingRuleSetOperation(buf []byte, index uint64) inte
 	if err := structs.Decode(buf, &req); err != nil {
 		panic(fmt.Errorf("failed to decode request: %v", err))
 	}
-	defer metrics.MeasureSinceWithLabels([]string{"fsm", "acl", "rolebindingrule"}, time.Now(),
+	defer metrics.MeasureSinceWithLabels([]string{"fsm", "acl", "bindingrule"}, time.Now(),
 		[]metrics.Label{{Name: "op", Value: "upsert"}})
 
 	return c.state.ACLRoleBindingRuleBatchSet(index, req.RoleBindingRules)
@@ -474,7 +474,7 @@ func (c *FSM) applyACLRoleBindingRuleDeleteOperation(buf []byte, index uint64) i
 	if err := structs.Decode(buf, &req); err != nil {
 		panic(fmt.Errorf("failed to decode request: %v", err))
 	}
-	defer metrics.MeasureSinceWithLabels([]string{"fsm", "acl", "rolebindingrule"}, time.Now(),
+	defer metrics.MeasureSinceWithLabels([]string{"fsm", "acl", "bindingrule"}, time.Now(),
 		[]metrics.Label{{Name: "op", Value: "delete"}})
 
 	return c.state.ACLRoleBindingRuleBatchDelete(index, req.RoleBindingRuleIDs)

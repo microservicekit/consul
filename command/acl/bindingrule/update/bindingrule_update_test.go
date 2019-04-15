@@ -1,4 +1,4 @@
-package rolebindingruleupdate
+package bindingruleupdate
 
 import (
 	"os"

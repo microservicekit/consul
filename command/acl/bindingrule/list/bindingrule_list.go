@@ -1,4 +1,4 @@
-package rolebindingrulelist
+package bindingrulelist
 
 import (
 	"flag"

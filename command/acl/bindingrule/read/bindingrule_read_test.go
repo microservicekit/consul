@@ -1,4 +1,4 @@
-package rolebindingruledelete
+package bindingruleread
 
 import (
 	"fmt"
@@ -13,11 +13,12 @@ import (
 	"github.com/hashicorp/consul/logger"
 	"github.com/hashicorp/consul/sdk/testutil"
 	"github.com/hashicorp/consul/testrpc"
+	"github.com/hashicorp/go-uuid"
 	"github.com/mitchellh/cli"
 	"github.com/stretchr/testify/require"
 )
 
-func TestRoleBindingRuleDeleteCommand_noTabs(t *testing.T) {
+func TestRoleBindingRuleReadCommand_noTabs(t *testing.T) {
 	t.Parallel()
 
 	if strings.ContainsRune(New(cli.NewMockUi()).Help(), '\t') {
@@ -25,7 +26,7 @@ func TestRoleBindingRuleDeleteCommand_noTabs(t *testing.T) {
 	}
 }
 
-func TestRoleBindingRuleDeleteCommand(t *testing.T) {
+func TestRoleBindingRuleReadCommand(t *testing.T) {
 	t.Parallel()
 
 	testDir := testutil.TempDir(t, "acl")
@@ -84,29 +85,6 @@ func TestRoleBindingRuleDeleteCommand(t *testing.T) {
 		return rule.ID
 	}
 
-	createDupe := func(t *testing.T) string {
-		for {
-			// Check for 1-char duplicates.
-			rules, _, err := client.ACL().RoleBindingRuleList(
-				"k8s",
-				&api.QueryOptions{Token: "root"},
-			)
-			require.NoError(t, err)
-
-			m := make(map[byte]struct{})
-			for _, rule := range rules {
-				c := rule.ID[0]
-
-				if _, ok := m[c]; ok {
-					return string(c)
-				}
-				m[c] = struct{}{}
-			}
-
-			_ = createRule(t)
-		}
-	}
-
 	t.Run("id required", func(t *testing.T) {
 		ui := cli.NewMockUi()
 		cmd := New(ui)
@@ -121,36 +99,9 @@ func TestRoleBindingRuleDeleteCommand(t *testing.T) {
 		require.Contains(t, ui.ErrorWriter.String(), "Must specify the -id parameter")
 	})
 
-	t.Run("delete works", func(t *testing.T) {
-		id := createRule(t)
-
-		ui := cli.NewMockUi()
-		cmd := New(ui)
-
-		args := []string{
-			"-http-addr=" + a.HTTPAddr(),
-			"-token=root",
-			"-id", id,
-		}
-
-		code := cmd.Run(args)
-		require.Equal(t, code, 0)
-		require.Empty(t, ui.ErrorWriter.String())
-
-		output := ui.OutputWriter.String()
-		require.Contains(t, output, fmt.Sprintf("deleted successfully"))
-		require.Contains(t, output, id)
-
-		rule, _, err := client.ACL().RoleBindingRuleRead(
-			id,
-			&api.QueryOptions{Token: "root"},
-		)
+	t.Run("read by id not found", func(t *testing.T) {
+		fakeID, err := uuid.GenerateUUID()
 		require.NoError(t, err)
-		require.Nil(t, rule)
-	})
-
-	t.Run("delete works via prefixes", func(t *testing.T) {
-		id := createRule(t)
 
 		ui := cli.NewMockUi()
 		cmd := New(ui)
@@ -158,39 +109,53 @@ func TestRoleBindingRuleDeleteCommand(t *testing.T) {
 		args := []string{
 			"-http-addr=" + a.HTTPAddr(),
 			"-token=root",
-			"-id", id[0:5],
-		}
-
-		code := cmd.Run(args)
-		require.Equal(t, code, 0)
-		require.Empty(t, ui.ErrorWriter.String())
-
-		output := ui.OutputWriter.String()
-		require.Contains(t, output, fmt.Sprintf("deleted successfully"))
-		require.Contains(t, output, id)
-
-		rule, _, err := client.ACL().RoleBindingRuleRead(
-			id,
-			&api.QueryOptions{Token: "root"},
-		)
-		require.NoError(t, err)
-		require.Nil(t, rule)
-	})
-
-	t.Run("delete fails when prefix matches more than one rule", func(t *testing.T) {
-		prefix := createDupe(t)
-
-		ui := cli.NewMockUi()
-		cmd := New(ui)
-
-		args := []string{
-			"-http-addr=" + a.HTTPAddr(),
-			"-token=root",
-			"-id=" + prefix,
+			"-id=" + fakeID,
 		}
 
 		code := cmd.Run(args)
 		require.Equal(t, code, 1)
-		require.Contains(t, ui.ErrorWriter.String(), "Error determining role binding rule ID")
+		require.Contains(t, ui.ErrorWriter.String(), "Role binding rule not found with ID")
+	})
+
+	t.Run("read by id", func(t *testing.T) {
+		id := createRule(t)
+
+		ui := cli.NewMockUi()
+		cmd := New(ui)
+
+		args := []string{
+			"-http-addr=" + a.HTTPAddr(),
+			"-token=root",
+			"-id=" + id,
+		}
+
+		code := cmd.Run(args)
+		require.Equal(t, code, 0)
+		require.Empty(t, ui.ErrorWriter.String())
+
+		output := ui.OutputWriter.String()
+		require.Contains(t, output, fmt.Sprintf("test rule"))
+		require.Contains(t, output, id)
+	})
+
+	t.Run("read by id prefix", func(t *testing.T) {
+		id := createRule(t)
+
+		ui := cli.NewMockUi()
+		cmd := New(ui)
+
+		args := []string{
+			"-http-addr=" + a.HTTPAddr(),
+			"-token=root",
+			"-id=" + id[0:5],
+		}
+
+		code := cmd.Run(args)
+		require.Equal(t, code, 0)
+		require.Empty(t, ui.ErrorWriter.String())
+
+		output := ui.OutputWriter.String()
+		require.Contains(t, output, fmt.Sprintf("test rule"))
+		require.Contains(t, output, id)
 	})
 }

@@ -3,6 +3,12 @@ package command
 import (
 	"github.com/hashicorp/consul/command/acl"
 	aclagent "github.com/hashicorp/consul/command/acl/agenttokens"
+	aclbr "github.com/hashicorp/consul/command/acl/bindingrule"
+	aclbrcreate "github.com/hashicorp/consul/command/acl/bindingrule/create"
+	aclbrdelete "github.com/hashicorp/consul/command/acl/bindingrule/delete"
+	aclbrlist "github.com/hashicorp/consul/command/acl/bindingrule/list"
+	aclbrread "github.com/hashicorp/consul/command/acl/bindingrule/read"
+	aclbrupdate "github.com/hashicorp/consul/command/acl/bindingrule/update"
 	aclbootstrap "github.com/hashicorp/consul/command/acl/bootstrap"
 	aclidp "github.com/hashicorp/consul/command/acl/idp"
 	aclidpcreate "github.com/hashicorp/consul/command/acl/idp/create"
@@ -24,12 +30,6 @@ import (
 	aclrlist "github.com/hashicorp/consul/command/acl/role/list"
 	aclrread "github.com/hashicorp/consul/command/acl/role/read"
 	aclrupdate "github.com/hashicorp/consul/command/acl/role/update"
-	aclrbr "github.com/hashicorp/consul/command/acl/rolebindingrule"
-	aclrbrcreate "github.com/hashicorp/consul/command/acl/rolebindingrule/create"
-	aclrbrdelete "github.com/hashicorp/consul/command/acl/rolebindingrule/delete"
-	aclrbrlist "github.com/hashicorp/consul/command/acl/rolebindingrule/list"
-	aclrbrread "github.com/hashicorp/consul/command/acl/rolebindingrule/read"
-	aclrbrupdate "github.com/hashicorp/consul/command/acl/rolebindingrule/update"
 	aclrules "github.com/hashicorp/consul/command/acl/rules"
 	acltoken "github.com/hashicorp/consul/command/acl/token"
 	acltclone "github.com/hashicorp/consul/command/acl/token/clone"
@@ -138,12 +138,12 @@ func init() {
 	Register("acl idp read", func(ui cli.Ui) (cli.Command, error) { return aclidpread.New(ui), nil })
 	Register("acl idp update", func(ui cli.Ui) (cli.Command, error) { return aclidpupdate.New(ui), nil })
 	Register("acl idp delete", func(ui cli.Ui) (cli.Command, error) { return aclidpdelete.New(ui), nil })
-	Register("acl rolebindingrule", func(cli.Ui) (cli.Command, error) { return aclrbr.New(), nil })
-	Register("acl rolebindingrule create", func(ui cli.Ui) (cli.Command, error) { return aclrbrcreate.New(ui), nil })
-	Register("acl rolebindingrule list", func(ui cli.Ui) (cli.Command, error) { return aclrbrlist.New(ui), nil })
-	Register("acl rolebindingrule read", func(ui cli.Ui) (cli.Command, error) { return aclrbrread.New(ui), nil })
-	Register("acl rolebindingrule update", func(ui cli.Ui) (cli.Command, error) { return aclrbrupdate.New(ui), nil })
-	Register("acl rolebindingrule delete", func(ui cli.Ui) (cli.Command, error) { return aclrbrdelete.New(ui), nil })
+	Register("acl binding-rule", func(cli.Ui) (cli.Command, error) { return aclbr.New(), nil })
+	Register("acl binding-rule create", func(ui cli.Ui) (cli.Command, error) { return aclbrcreate.New(ui), nil })
+	Register("acl binding-rule list", func(ui cli.Ui) (cli.Command, error) { return aclbrlist.New(ui), nil })
+	Register("acl binding-rule read", func(ui cli.Ui) (cli.Command, error) { return aclbrread.New(ui), nil })
+	Register("acl binding-rule update", func(ui cli.Ui) (cli.Command, error) { return aclbrupdate.New(ui), nil })
+	Register("acl binding-rule delete", func(ui cli.Ui) (cli.Command, error) { return aclbrdelete.New(ui), nil })
 	Register("acl login", func(ui cli.Ui) (cli.Command, error) { return acllogin.New(ui), nil })
 	Register("acl logout", func(ui cli.Ui) (cli.Command, error) { return acllogout.New(ui), nil })
 	Register("agent", func(ui cli.Ui) (cli.Command, error) {

@@ -1514,7 +1514,7 @@ func (a *ACL) RoleBindingRuleSet(args *structs.ACLRoleBindingRuleSetRequest, rep
 		return err
 	}
 
-	defer metrics.MeasureSince([]string{"acl", "rolebindingrule", "upsert"}, time.Now())
+	defer metrics.MeasureSince([]string{"acl", "bindingrule", "upsert"}, time.Now())
 
 	// Verify token is permitted to modify ACLs
 	if rule, err := a.srv.ResolveToken(args.Token); err != nil {
@@ -1661,7 +1661,7 @@ func (a *ACL) RoleBindingRuleDelete(args *structs.ACLRoleBindingRuleDeleteReques
 		return err
 	}
 
-	defer metrics.MeasureSince([]string{"acl", "rolebindingrule", "delete"}, time.Now())
+	defer metrics.MeasureSince([]string{"acl", "bindingrule", "delete"}, time.Now())
 
 	// Verify token is permitted to modify ACLs
 	if rule, err := a.srv.ResolveToken(args.Token); err != nil {

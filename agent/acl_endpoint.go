@@ -754,7 +754,7 @@ func (s *HTTPServer) ACLRoleBindingRuleCRUD(resp http.ResponseWriter, req *http.
 		return nil, MethodNotAllowedError{req.Method, []string{"GET", "PUT", "DELETE"}}
 	}
 
-	roleBindingRuleID := strings.TrimPrefix(req.URL.Path, "/v1/acl/rolebindingrule/")
+	roleBindingRuleID := strings.TrimPrefix(req.URL.Path, "/v1/acl/bindingrule/")
 	if roleBindingRuleID == "" && req.Method != "PUT" {
 		return nil, BadRequestError{Reason: "Missing role binding rule ID"}
 	}

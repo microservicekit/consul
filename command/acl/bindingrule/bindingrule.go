@@ -1,4 +1,4 @@
-package rolebindingrule
+package bindingrule
 
 import (
 	"github.com/hashicorp/consul/command/flags"
