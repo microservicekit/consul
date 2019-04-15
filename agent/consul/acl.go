@@ -870,10 +870,10 @@ func (r *ACLResolver) collectRolesForIdentity(identity structs.ACLIdentity, role
 	// on servers. Therefore we only attempt to resolve roles locally
 	roles := make([]*structs.ACLRole, 0, len(roleIDs)+len(boundRoleNames))
 
-	// TODO(rb): Perhaps we should deduplicate across normal+bound roles if a
-	// bound role resolves to a real role that is also directly linked. This is
-	// almost certainly not going to happen in practice and even if it did
-	// there would only be a negligible perf hit during policy compilation.
+	// Deduplicating across normal+bound roles if a bound role resolves to real
+	// role that is also directly linked is almost certainly not going to
+	// happen in practice and even if it did there would only be a negligible
+	// perf hit during policy compilation.
 
 	roles, err := r.collectNormalRolesForIdentityInto(roles, identity, roleIDs)
 	if err != nil {
@@ -893,14 +893,12 @@ func (r *ACLResolver) collectRolesForIdentity(identity structs.ACLIdentity, role
 			}
 		}
 		if includeSynthetic {
-			// TODO(rb): is there harm in omitting a Role.ID field below?
 			role := &structs.ACLRole{
 				Name:        boundRoleName,
 				Description: "synthetic role",
 				ServiceIdentities: []*structs.ACLServiceIdentity{
 					&structs.ACLServiceIdentity{
 						ServiceName: boundRoleName,
-						// TODO(rb): do role binding rule bind targets need datacenter lists for global login?
 					},
 				},
 			}
