@@ -21,18 +21,18 @@ import (
 
 type configCallback func(c *Config)
 
-func makeClient(t *testing.T) (*Client, *testutil.TestServer) {
-	return makeClientWithConfig(t, nil, nil)
+func MakeClient(t *testing.T) (*Client, *testutil.TestServer) {
+	return MakeClientWithConfig(t, nil, nil)
 }
 
-func makeClientWithoutConnect(t *testing.T) (*Client, *testutil.TestServer) {
-	return makeClientWithConfig(t, nil, func(serverConfig *testutil.TestServerConfig) {
+func MakeClientWithoutConnect(t *testing.T) (*Client, *testutil.TestServer) {
+	return MakeClientWithConfig(t, nil, func(serverConfig *testutil.TestServerConfig) {
 		serverConfig.Connect = nil
 	})
 }
 
-func makeACLClient(t *testing.T) (*Client, *testutil.TestServer) {
-	return makeClientWithConfig(t, func(clientConfig *Config) {
+func MakeACLClient(t *testing.T) (*Client, *testutil.TestServer) {
+	return MakeClientWithConfig(t, func(clientConfig *Config) {
 		clientConfig.Token = "root"
 	}, func(serverConfig *testutil.TestServerConfig) {
 		serverConfig.PrimaryDatacenter = "dc1"
@@ -42,7 +42,7 @@ func makeACLClient(t *testing.T) (*Client, *testutil.TestServer) {
 	})
 }
 
-func makeClientWithConfig(
+func MakeClientWithConfig(
 	t *testing.T,
 	cb1 configCallback,
 	cb2 testutil.ServerConfigCallback) (*Client, *testutil.TestServer) {
@@ -272,7 +272,7 @@ func TestAPI_SetupTLSConfig(t *testing.T) {
 func TestAPI_ClientTLSOptions(t *testing.T) {
 	t.Parallel()
 	// Start a server that verifies incoming HTTPS connections
-	_, srvVerify := makeClientWithConfig(t, nil, func(conf *testutil.TestServerConfig) {
+	_, srvVerify := MakeClientWithConfig(t, nil, func(conf *testutil.TestServerConfig) {
 		conf.CAFile = "../test/client_certs/rootca.crt"
 		conf.CertFile = "../test/client_certs/server.crt"
 		conf.KeyFile = "../test/client_certs/server.key"
@@ -281,7 +281,7 @@ func TestAPI_ClientTLSOptions(t *testing.T) {
 	defer srvVerify.Stop()
 
 	// Start a server without VerifyIncomingHTTPS
-	_, srvNoVerify := makeClientWithConfig(t, nil, func(conf *testutil.TestServerConfig) {
+	_, srvNoVerify := MakeClientWithConfig(t, nil, func(conf *testutil.TestServerConfig) {
 		conf.CAFile = "../test/client_certs/rootca.crt"
 		conf.CertFile = "../test/client_certs/server.crt"
 		conf.KeyFile = "../test/client_certs/server.key"
@@ -380,7 +380,7 @@ func TestAPI_ClientTLSOptions(t *testing.T) {
 
 func TestAPI_SetQueryOptions(t *testing.T) {
 	t.Parallel()
-	c, s := makeClient(t)
+	c, s := MakeClient(t)
 	defer s.Stop()
 
 	assert := assert.New(t)
@@ -435,7 +435,7 @@ func TestAPI_SetQueryOptions(t *testing.T) {
 
 func TestAPI_SetWriteOptions(t *testing.T) {
 	t.Parallel()
-	c, s := makeClient(t)
+	c, s := MakeClient(t)
 	defer s.Stop()
 
 	r := c.newRequest("GET", "/v1/kv/foo")
@@ -455,7 +455,7 @@ func TestAPI_SetWriteOptions(t *testing.T) {
 
 func TestAPI_RequestToHTTP(t *testing.T) {
 	t.Parallel()
-	c, s := makeClient(t)
+	c, s := MakeClient(t)
 	defer s.Stop()
 
 	r := c.newRequest("DELETE", "/v1/kv/foo")
@@ -515,7 +515,7 @@ func TestAPI_UnixSocket(t *testing.T) {
 	defer os.RemoveAll(tempDir)
 	socket := filepath.Join(tempDir, "test.sock")
 
-	c, s := makeClientWithConfig(t, func(c *Config) {
+	c, s := MakeClientWithConfig(t, func(c *Config) {
 		c.Address = "unix://" + socket
 	}, func(c *testutil.TestServerConfig) {
 		c.Addresses = &testutil.TestAddressConfig{
