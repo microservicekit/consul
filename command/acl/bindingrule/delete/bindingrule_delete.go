@@ -31,9 +31,9 @@ func (c *cmd) init() {
 		&c.ruleID,
 		"id",
 		"",
-		"The ID of the role binding rule to delete. "+
+		"The ID of the binding rule to delete. "+
 			"It may be specified as a unique ID prefix but will error if the prefix "+
-			"matches multiple role binding rule IDs",
+			"matches multiple binding rule IDs",
 	)
 
 	c.http = &flags.HTTPFlags{}
@@ -58,18 +58,18 @@ func (c *cmd) Run(args []string) int {
 		return 1
 	}
 
-	ruleID, err := acl.GetRoleBindingRuleIDFromPartial(client, c.ruleID)
+	ruleID, err := acl.GetBindingRuleIDFromPartial(client, c.ruleID)
 	if err != nil {
-		c.UI.Error(fmt.Sprintf("Error determining role binding rule ID: %v", err))
+		c.UI.Error(fmt.Sprintf("Error determining binding rule ID: %v", err))
 		return 1
 	}
 
-	if _, err := client.ACL().RoleBindingRuleDelete(ruleID, nil); err != nil {
-		c.UI.Error(fmt.Sprintf("Error deleting role binding rule %q: %v", ruleID, err))
+	if _, err := client.ACL().BindingRuleDelete(ruleID, nil); err != nil {
+		c.UI.Error(fmt.Sprintf("Error deleting binding rule %q: %v", ruleID, err))
 		return 1
 	}
 
-	c.UI.Info(fmt.Sprintf("Role binding rule %q deleted successfully", ruleID))
+	c.UI.Info(fmt.Sprintf("Binding rule %q deleted successfully", ruleID))
 	return 0
 }
 
@@ -81,18 +81,18 @@ func (c *cmd) Help() string {
 	return flags.Usage(c.help, nil)
 }
 
-const synopsis = "Delete an ACL Role Binding Rule"
+const synopsis = "Delete an ACL Binding Rule"
 const help = `
-Usage: consul acl rolebindingrule delete -id ID [options]
+Usage: consul acl binding-rule delete -id ID [options]
 
-    Deletes an ACL role binding rule by providing the ID or a unique ID prefix.
+    Deletes an ACL binding rule by providing the ID or a unique ID prefix.
 
     Delete by prefix:
 
-        $ consul acl rolebindingrule delete -id b6b85
+        $ consul acl binding-rule delete -id b6b85
 
     Delete by full ID:
 
-        $ consul acl rolebindingrule delete -id b6b856da-5193-4e78-845a-7d61ca8371ba
+        $ consul acl binding-rule delete -id b6b856da-5193-4e78-845a-7d61ca8371ba
 
 `

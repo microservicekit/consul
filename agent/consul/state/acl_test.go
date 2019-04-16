@@ -2930,29 +2930,29 @@ func TestStateStore_ACLIdentityProvider_Delete_RuleCascade(t *testing.T) {
 		idp2_rule2 = "9ebae132-f1f1-4b72-b1d9-a4313ac22075"
 	)
 
-	rules := structs.ACLRoleBindingRules{
-		&structs.ACLRoleBindingRule{
+	rules := structs.ACLBindingRules{
+		&structs.ACLBindingRule{
 			ID:          idp1_rule1,
 			IDPName:     "k8s-1",
 			Description: "test-i1-r1",
 		},
-		&structs.ACLRoleBindingRule{
+		&structs.ACLBindingRule{
 			ID:          idp1_rule2,
 			IDPName:     "k8s-1",
 			Description: "test-i1-r2",
 		},
-		&structs.ACLRoleBindingRule{
+		&structs.ACLBindingRule{
 			ID:          idp2_rule1,
 			IDPName:     "k8s-2",
 			Description: "test-i2-r1",
 		},
-		&structs.ACLRoleBindingRule{
+		&structs.ACLBindingRule{
 			ID:          idp2_rule2,
 			IDPName:     "k8s-2",
 			Description: "test-i2-r2",
 		},
 	}
-	require.NoError(t, s.ACLRoleBindingRuleBatchSet(3, rules))
+	require.NoError(t, s.ACLBindingRuleBatchSet(3, rules))
 
 	// Delete one idp.
 	require.NoError(t, s.ACLIdentityProviderDeleteByName(4, "k8s-1"))
@@ -2964,20 +2964,20 @@ func TestStateStore_ACLIdentityProvider_Delete_RuleCascade(t *testing.T) {
 
 	// Make sure the rules are gone.
 	for _, ruleID := range []string{idp1_rule1, idp1_rule2} {
-		_, rrule, err := s.ACLRoleBindingRuleGetByID(nil, ruleID)
+		_, rrule, err := s.ACLBindingRuleGetByID(nil, ruleID)
 		require.NoError(t, err)
 		require.Nil(t, rrule)
 	}
 
 	// Make sure the rules for the untouched IDP are still there.
 	for _, ruleID := range []string{idp2_rule1, idp2_rule2} {
-		_, rrule, err := s.ACLRoleBindingRuleGetByID(nil, ruleID)
+		_, rrule, err := s.ACLBindingRuleGetByID(nil, ruleID)
 		require.NoError(t, err)
 		require.NotNil(t, rrule)
 	}
 }
 
-func TestStateStore_ACLRoleBindingRule_SetGet(t *testing.T) {
+func TestStateStore_ACLBindingRule_SetGet(t *testing.T) {
 	t.Parallel()
 
 	// The state store only validates key pieces of data, so we only have to
@@ -2988,13 +2988,13 @@ func TestStateStore_ACLRoleBindingRule_SetGet(t *testing.T) {
 		s := testACLStateStore(t)
 		setupExtraIDPs(t, s)
 
-		rule := structs.ACLRoleBindingRule{
+		rule := structs.ACLBindingRule{
 			ID:          "",
 			IDPName:     "k8s",
 			Description: "test",
 		}
 
-		require.Error(t, s.ACLRoleBindingRuleSet(3, &rule))
+		require.Error(t, s.ACLBindingRuleSet(3, &rule))
 	})
 
 	t.Run("Missing IDPName", func(t *testing.T) {
@@ -3002,13 +3002,13 @@ func TestStateStore_ACLRoleBindingRule_SetGet(t *testing.T) {
 		s := testACLStateStore(t)
 		setupExtraIDPs(t, s)
 
-		rule := structs.ACLRoleBindingRule{
+		rule := structs.ACLBindingRule{
 			ID:          "9669b2d7-455c-4d70-b0ac-457fd7969a2e",
 			IDPName:     "",
 			Description: "test",
 		}
 
-		require.Error(t, s.ACLRoleBindingRuleSet(3, &rule))
+		require.Error(t, s.ACLBindingRuleSet(3, &rule))
 	})
 
 	t.Run("Unknown IDPName", func(t *testing.T) {
@@ -3016,13 +3016,13 @@ func TestStateStore_ACLRoleBindingRule_SetGet(t *testing.T) {
 		s := testACLStateStore(t)
 		setupExtraIDPs(t, s)
 
-		rule := structs.ACLRoleBindingRule{
+		rule := structs.ACLBindingRule{
 			ID:          "9669b2d7-455c-4d70-b0ac-457fd7969a2e",
 			IDPName:     "unknown",
 			Description: "test",
 		}
 
-		require.Error(t, s.ACLRoleBindingRuleSet(3, &rule))
+		require.Error(t, s.ACLBindingRuleSet(3, &rule))
 	})
 
 	t.Run("New", func(t *testing.T) {
@@ -3030,15 +3030,15 @@ func TestStateStore_ACLRoleBindingRule_SetGet(t *testing.T) {
 		s := testACLStateStore(t)
 		setupExtraIDPs(t, s)
 
-		rule := structs.ACLRoleBindingRule{
+		rule := structs.ACLBindingRule{
 			ID:          "9669b2d7-455c-4d70-b0ac-457fd7969a2e",
 			IDPName:     "k8s",
 			Description: "test",
 		}
 
-		require.NoError(t, s.ACLRoleBindingRuleSet(3, &rule))
+		require.NoError(t, s.ACLBindingRuleSet(3, &rule))
 
-		idx, rrule, err := s.ACLRoleBindingRuleGetByID(nil, rule.ID)
+		idx, rrule, err := s.ACLBindingRuleGetByID(nil, rule.ID)
 		require.NoError(t, err)
 		require.Equal(t, uint64(3), idx)
 		require.NotNil(t, rrule)
@@ -3055,25 +3055,25 @@ func TestStateStore_ACLRoleBindingRule_SetGet(t *testing.T) {
 		setupExtraIDPs(t, s)
 
 		// Create the initial rule
-		rule := structs.ACLRoleBindingRule{
+		rule := structs.ACLBindingRule{
 			ID:          "9669b2d7-455c-4d70-b0ac-457fd7969a2e",
 			IDPName:     "k8s",
 			Description: "test",
 		}
 
-		require.NoError(t, s.ACLRoleBindingRuleSet(2, &rule))
+		require.NoError(t, s.ACLBindingRuleSet(2, &rule))
 
 		// Now make sure we can update it
-		update := structs.ACLRoleBindingRule{
+		update := structs.ACLBindingRule{
 			ID:          "9669b2d7-455c-4d70-b0ac-457fd7969a2e",
 			IDPName:     "k8s",
 			Description: "modified",
 			RoleName:    "web",
 		}
 
-		require.NoError(t, s.ACLRoleBindingRuleSet(3, &update))
+		require.NoError(t, s.ACLBindingRuleSet(3, &update))
 
-		idx, rrule, err := s.ACLRoleBindingRuleGetByID(nil, rule.ID)
+		idx, rrule, err := s.ACLBindingRuleGetByID(nil, rule.ID)
 		require.NoError(t, err)
 		require.Equal(t, uint64(3), idx)
 		require.NotNil(t, rrule)
@@ -3086,7 +3086,7 @@ func TestStateStore_ACLRoleBindingRule_SetGet(t *testing.T) {
 	})
 }
 
-func TestStateStore_ACLRoleBindingRules_UpsertBatchRead(t *testing.T) {
+func TestStateStore_ACLBindingRules_UpsertBatchRead(t *testing.T) {
 	t.Parallel()
 
 	t.Run("Normal", func(t *testing.T) {
@@ -3094,22 +3094,22 @@ func TestStateStore_ACLRoleBindingRules_UpsertBatchRead(t *testing.T) {
 		s := testACLStateStore(t)
 		setupExtraIDPs(t, s)
 
-		rules := structs.ACLRoleBindingRules{
-			&structs.ACLRoleBindingRule{
+		rules := structs.ACLBindingRules{
+			&structs.ACLBindingRule{
 				ID:          "9669b2d7-455c-4d70-b0ac-457fd7969a2e",
 				IDPName:     "k8s",
 				Description: "test-1",
 			},
-			&structs.ACLRoleBindingRule{
+			&structs.ACLBindingRule{
 				ID:          "3ebcc27b-f8ba-4611-b385-79a065dfb983",
 				IDPName:     "k8s",
 				Description: "test-2",
 			},
 		}
 
-		require.NoError(t, s.ACLRoleBindingRuleBatchSet(2, rules))
+		require.NoError(t, s.ACLBindingRuleBatchSet(2, rules))
 
-		idx, rrules, err := s.ACLRoleBindingRuleList(nil, "k8s")
+		idx, rrules, err := s.ACLBindingRuleList(nil, "k8s")
 		require.NoError(t, err)
 		require.Equal(t, uint64(2), idx)
 		require.Len(t, rrules, 2)
@@ -3127,30 +3127,30 @@ func TestStateStore_ACLRoleBindingRules_UpsertBatchRead(t *testing.T) {
 		setupExtraIDPs(t, s)
 
 		// Seed initial data.
-		rules := structs.ACLRoleBindingRules{
-			&structs.ACLRoleBindingRule{
+		rules := structs.ACLBindingRules{
+			&structs.ACLBindingRule{
 				ID:          "9669b2d7-455c-4d70-b0ac-457fd7969a2e",
 				IDPName:     "k8s",
 				Description: "test-1",
 			},
-			&structs.ACLRoleBindingRule{
+			&structs.ACLBindingRule{
 				ID:          "3ebcc27b-f8ba-4611-b385-79a065dfb983",
 				IDPName:     "k8s",
 				Description: "test-2",
 			},
 		}
 
-		require.NoError(t, s.ACLRoleBindingRuleBatchSet(2, rules))
+		require.NoError(t, s.ACLBindingRuleBatchSet(2, rules))
 
 		// Update two rules at the same time.
-		updates := structs.ACLRoleBindingRules{
-			&structs.ACLRoleBindingRule{
+		updates := structs.ACLBindingRules{
+			&structs.ACLBindingRule{
 				ID:          "9669b2d7-455c-4d70-b0ac-457fd7969a2e",
 				IDPName:     "k8s",
 				Description: "test-1 modified",
 				RoleName:    "web-1",
 			},
-			&structs.ACLRoleBindingRule{
+			&structs.ACLBindingRule{
 				ID:          "3ebcc27b-f8ba-4611-b385-79a065dfb983",
 				IDPName:     "k8s",
 				Description: "test-2 modified",
@@ -3158,9 +3158,9 @@ func TestStateStore_ACLRoleBindingRules_UpsertBatchRead(t *testing.T) {
 			},
 		}
 
-		require.NoError(t, s.ACLRoleBindingRuleBatchSet(3, updates))
+		require.NoError(t, s.ACLBindingRuleBatchSet(3, updates))
 
-		idx, rrules, err := s.ACLRoleBindingRuleList(nil, "k8s")
+		idx, rrules, err := s.ACLBindingRuleList(nil, "k8s")
 		require.NoError(t, err)
 		require.Equal(t, uint64(3), idx)
 		require.Len(t, rrules, 2)
@@ -3173,27 +3173,27 @@ func TestStateStore_ACLRoleBindingRules_UpsertBatchRead(t *testing.T) {
 	})
 }
 
-func TestStateStore_ACLRoleBindingRule_List(t *testing.T) {
+func TestStateStore_ACLBindingRule_List(t *testing.T) {
 	t.Parallel()
 	s := testACLStateStore(t)
 	setupExtraIDPs(t, s)
 
-	rules := structs.ACLRoleBindingRules{
-		&structs.ACLRoleBindingRule{
+	rules := structs.ACLBindingRules{
+		&structs.ACLBindingRule{
 			ID:          "3ebcc27b-f8ba-4611-b385-79a065dfb983",
 			IDPName:     "k8s",
 			Description: "test-1",
 		},
-		&structs.ACLRoleBindingRule{
+		&structs.ACLBindingRule{
 			ID:          "9669b2d7-455c-4d70-b0ac-457fd7969a2e",
 			IDPName:     "k8s",
 			Description: "test-2",
 		},
 	}
 
-	require.NoError(t, s.ACLRoleBindingRuleBatchSet(2, rules))
+	require.NoError(t, s.ACLBindingRuleBatchSet(2, rules))
 
-	_, rrules, err := s.ACLRoleBindingRuleList(nil, "")
+	_, rrules, err := s.ACLBindingRuleList(nil, "")
 	require.NoError(t, err)
 
 	require.Len(t, rrules, 2)
@@ -3212,7 +3212,7 @@ func TestStateStore_ACLRoleBindingRule_List(t *testing.T) {
 	require.Equal(t, uint64(2), rrules[1].ModifyIndex)
 }
 
-func TestStateStore_ACLRoleBindingRule_Delete(t *testing.T) {
+func TestStateStore_ACLBindingRule_Delete(t *testing.T) {
 	t.Parallel()
 
 	t.Run("Name", func(t *testing.T) {
@@ -3220,22 +3220,22 @@ func TestStateStore_ACLRoleBindingRule_Delete(t *testing.T) {
 		s := testACLStateStore(t)
 		setupExtraIDPs(t, s)
 
-		rule := structs.ACLRoleBindingRule{
+		rule := structs.ACLBindingRule{
 			ID:          "9669b2d7-455c-4d70-b0ac-457fd7969a2e",
 			IDPName:     "k8s",
 			Description: "test",
 		}
 
-		require.NoError(t, s.ACLRoleBindingRuleSet(2, &rule))
+		require.NoError(t, s.ACLBindingRuleSet(2, &rule))
 
-		_, rrule, err := s.ACLRoleBindingRuleGetByID(nil, rule.ID)
+		_, rrule, err := s.ACLBindingRuleGetByID(nil, rule.ID)
 		require.NoError(t, err)
 		require.NotNil(t, rrule)
 
-		require.NoError(t, s.ACLRoleBindingRuleDeleteByID(3, rule.ID))
+		require.NoError(t, s.ACLBindingRuleDeleteByID(3, rule.ID))
 		require.NoError(t, err)
 
-		_, rrule, err = s.ACLRoleBindingRuleGetByID(nil, rule.ID)
+		_, rrule, err = s.ACLBindingRuleGetByID(nil, rule.ID)
 		require.NoError(t, err)
 		require.Nil(t, rrule)
 	})
@@ -3245,34 +3245,34 @@ func TestStateStore_ACLRoleBindingRule_Delete(t *testing.T) {
 		s := testACLStateStore(t)
 		setupExtraIDPs(t, s)
 
-		rules := structs.ACLRoleBindingRules{
-			&structs.ACLRoleBindingRule{
+		rules := structs.ACLBindingRules{
+			&structs.ACLBindingRule{
 				ID:          "3ebcc27b-f8ba-4611-b385-79a065dfb983",
 				IDPName:     "k8s",
 				Description: "test-1",
 			},
-			&structs.ACLRoleBindingRule{
+			&structs.ACLBindingRule{
 				ID:          "9669b2d7-455c-4d70-b0ac-457fd7969a2e",
 				IDPName:     "k8s",
 				Description: "test-2",
 			},
 		}
 
-		require.NoError(t, s.ACLRoleBindingRuleBatchSet(2, rules))
+		require.NoError(t, s.ACLBindingRuleBatchSet(2, rules))
 
-		_, rrule, err := s.ACLRoleBindingRuleGetByID(nil, rules[0].ID)
+		_, rrule, err := s.ACLBindingRuleGetByID(nil, rules[0].ID)
 		require.NoError(t, err)
 		require.NotNil(t, rrule)
-		_, rrule, err = s.ACLRoleBindingRuleGetByID(nil, rules[1].ID)
+		_, rrule, err = s.ACLBindingRuleGetByID(nil, rules[1].ID)
 		require.NoError(t, err)
 		require.NotNil(t, rrule)
 
-		require.NoError(t, s.ACLRoleBindingRuleBatchDelete(3, []string{rules[0].ID, rules[1].ID}))
+		require.NoError(t, s.ACLBindingRuleBatchDelete(3, []string{rules[0].ID, rules[1].ID}))
 
-		_, rrule, err = s.ACLRoleBindingRuleGetByID(nil, rules[0].ID)
+		_, rrule, err = s.ACLBindingRuleGetByID(nil, rules[0].ID)
 		require.NoError(t, err)
 		require.Nil(t, rrule)
-		_, rrule, err = s.ACLRoleBindingRuleGetByID(nil, rules[1].ID)
+		_, rrule, err = s.ACLBindingRuleGetByID(nil, rules[1].ID)
 		require.NoError(t, err)
 		require.Nil(t, rrule)
 	})
@@ -3282,7 +3282,7 @@ func TestStateStore_ACLRoleBindingRule_Delete(t *testing.T) {
 		s := testACLStateStore(t)
 
 		// deletion of non-existant rules is not an error
-		require.NoError(t, s.ACLRoleBindingRuleDeleteByID(3, "ed3ce1b8-3a16-4e2f-b82e-f92e3b92410d"))
+		require.NoError(t, s.ACLBindingRuleDeleteByID(3, "ed3ce1b8-3a16-4e2f-b82e-f92e3b92410d"))
 	})
 }
 
@@ -3831,18 +3831,18 @@ func TestStateStore_ACLIdentityProviders_Snapshot_Restore(t *testing.T) {
 	}()
 }
 
-func TestStateStore_ACLRoleBindingRules_Snapshot_Restore(t *testing.T) {
+func TestStateStore_ACLBindingRules_Snapshot_Restore(t *testing.T) {
 	s := testACLStateStore(t)
 	setupExtraIDPs(t, s)
 
-	rules := structs.ACLRoleBindingRules{
-		&structs.ACLRoleBindingRule{
+	rules := structs.ACLBindingRules{
+		&structs.ACLBindingRule{
 			ID:          "9669b2d7-455c-4d70-b0ac-457fd7969a2e",
 			IDPName:     "k8s",
 			Description: "test-1",
 			RaftIndex:   structs.RaftIndex{CreateIndex: 1, ModifyIndex: 2},
 		},
-		&structs.ACLRoleBindingRule{
+		&structs.ACLBindingRule{
 			ID:          "3ebcc27b-f8ba-4611-b385-79a065dfb983",
 			IDPName:     "k8s",
 			Description: "test-2",
@@ -3850,24 +3850,24 @@ func TestStateStore_ACLRoleBindingRules_Snapshot_Restore(t *testing.T) {
 		},
 	}
 
-	require.NoError(t, s.ACLRoleBindingRuleBatchSet(2, rules))
+	require.NoError(t, s.ACLBindingRuleBatchSet(2, rules))
 
 	// Snapshot the ACLs.
 	snap := s.Snapshot()
 	defer snap.Close()
 
 	// Alter the real state store.
-	require.NoError(t, s.ACLRoleBindingRuleDeleteByID(3, rules[0].ID))
+	require.NoError(t, s.ACLBindingRuleDeleteByID(3, rules[0].ID))
 
 	// Verify the snapshot.
 	require.Equal(t, uint64(2), snap.LastIndex())
 
-	iter, err := snap.ACLRoleBindingRules()
+	iter, err := snap.ACLBindingRules()
 	require.NoError(t, err)
 
-	var dump structs.ACLRoleBindingRules
+	var dump structs.ACLBindingRules
 	for rule := iter.Next(); rule != nil; rule = iter.Next() {
-		dump = append(dump, rule.(*structs.ACLRoleBindingRule))
+		dump = append(dump, rule.(*structs.ACLBindingRule))
 	}
 	require.ElementsMatch(t, dump, rules)
 
@@ -3878,15 +3878,15 @@ func TestStateStore_ACLRoleBindingRules_Snapshot_Restore(t *testing.T) {
 
 		restore := s.Restore()
 		for _, rule := range dump {
-			require.NoError(t, restore.ACLRoleBindingRule(rule))
+			require.NoError(t, restore.ACLBindingRule(rule))
 		}
 		restore.Commit()
 
 		// Read the restored rules back out and verify that they match.
-		idx, res, err := s.ACLRoleBindingRuleList(nil, "")
+		idx, res, err := s.ACLBindingRuleList(nil, "")
 		require.NoError(t, err)
 		require.Equal(t, uint64(2), idx)
 		require.ElementsMatch(t, rules, res)
-		require.Equal(t, uint64(2), s.maxIndex("acl-role-binding-rules"))
+		require.Equal(t, uint64(2), s.maxIndex("acl-binding-rules"))
 	}()
 }

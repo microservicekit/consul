@@ -28,7 +28,7 @@ func init() {
 	registerRestorer(structs.ACLTokenSetRequestType, restoreToken)
 	registerRestorer(structs.ACLPolicySetRequestType, restorePolicy)
 	registerRestorer(structs.ACLRoleSetRequestType, restoreRole)
-	registerRestorer(structs.ACLRoleBindingRuleSetRequestType, restoreRoleBindingRule)
+	registerRestorer(structs.ACLBindingRuleSetRequestType, restoreBindingRule)
 	registerRestorer(structs.ACLIdentityProviderSetRequestType, restoreIdentityProvider)
 }
 
@@ -216,16 +216,16 @@ func (s *snapshot) persistACLs(sink raft.SnapshotSink,
 		}
 	}
 
-	rules, err := s.state.ACLRoleBindingRules()
+	rules, err := s.state.ACLBindingRules()
 	if err != nil {
 		return err
 	}
 
 	for rule := rules.Next(); rule != nil; rule = rules.Next() {
-		if _, err := sink.Write([]byte{byte(structs.ACLRoleBindingRuleSetRequestType)}); err != nil {
+		if _, err := sink.Write([]byte{byte(structs.ACLBindingRuleSetRequestType)}); err != nil {
 			return err
 		}
-		if err := encoder.Encode(rule.(*structs.ACLRoleBindingRule)); err != nil {
+		if err := encoder.Encode(rule.(*structs.ACLBindingRule)); err != nil {
 			return err
 		}
 	}
@@ -621,12 +621,12 @@ func restoreRole(header *snapshotHeader, restore *state.Restore, decoder *codec.
 	return restore.ACLRole(&req)
 }
 
-func restoreRoleBindingRule(header *snapshotHeader, restore *state.Restore, decoder *codec.Decoder) error {
-	var req structs.ACLRoleBindingRule
+func restoreBindingRule(header *snapshotHeader, restore *state.Restore, decoder *codec.Decoder) error {
+	var req structs.ACLBindingRule
 	if err := decoder.Decode(&req); err != nil {
 		return err
 	}
-	return restore.ACLRoleBindingRule(&req)
+	return restore.ACLBindingRule(&req)
 }
 
 func restoreIdentityProvider(header *snapshotHeader, restore *state.Restore, decoder *codec.Decoder) error {

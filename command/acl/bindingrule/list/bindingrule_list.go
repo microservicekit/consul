@@ -33,7 +33,7 @@ func (c *cmd) init() {
 		&c.showMeta,
 		"meta",
 		false,
-		"Indicates that role binding rule metadata such "+
+		"Indicates that binding rule metadata such "+
 			"as the content hash and raft indices should be shown for each entry.",
 	)
 
@@ -61,14 +61,14 @@ func (c *cmd) Run(args []string) int {
 		return 1
 	}
 
-	rules, _, err := client.ACL().RoleBindingRuleList(c.idpName, nil)
+	rules, _, err := client.ACL().BindingRuleList(c.idpName, nil)
 	if err != nil {
-		c.UI.Error(fmt.Sprintf("Failed to retrieve the role binding rule list: %v", err))
+		c.UI.Error(fmt.Sprintf("Failed to retrieve the binding rule list: %v", err))
 		return 1
 	}
 
 	for _, rule := range rules {
-		acl.PrintRoleBindingRuleListEntry(rule, c.UI, c.showMeta)
+		acl.PrintBindingRuleListEntry(rule, c.UI, c.showMeta)
 	}
 
 	return 0
@@ -82,17 +82,17 @@ func (c *cmd) Help() string {
 	return flags.Usage(c.help, nil)
 }
 
-const synopsis = "Lists ACL Role Binding Rules"
+const synopsis = "Lists ACL Binding Rules"
 const help = `
-Usage: consul acl rolebindingrule list [options]
+Usage: consul acl binding-rule list [options]
 
-  Lists all the ACL role binding rules.
+  Lists all the ACL binding rules.
 
     Show all:
 
-        $ consul acl rolebindingrule list
+        $ consul acl binding-rule list
 
     Show all for a specific identity provider:
 
-        $ consul acl rolebindingrule list -idp-name="my-idp"
+        $ consul acl binding-rule list -idp-name="my-idp"
 `

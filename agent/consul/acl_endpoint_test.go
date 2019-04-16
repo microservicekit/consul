@@ -1083,7 +1083,7 @@ func TestACLEndpoint_TokenSet(t *testing.T) {
 
 	t.Run("Create it using bound Roles by faking login", func(t *testing.T) {
 		// This allows for testing things that are only possible via Login, but
-		// just cumbersome to wire up (multiple role binding rules, etc)
+		// just cumbersome to wire up (multiple binding rules, etc)
 		acl := ACL{
 			srv:                                   s1,
 			disableLoginOnlyRestrictionOnTokenSet: true,
@@ -3190,7 +3190,7 @@ func TestACLEndpoint_IdentityProviderDelete_RuleCascade(t *testing.T) {
 
 	idp1, err := upsertTestIDP(codec, "root", "dc1", ca.RootCert)
 	require.NoError(t, err)
-	i1_r1, err := upsertTestRoleBindingRule(
+	i1_r1, err := upsertTestBindingRule(
 		codec, "root", "dc1",
 		idp1.Name,
 		[]string{"serviceaccount.name=abc"},
@@ -3198,7 +3198,7 @@ func TestACLEndpoint_IdentityProviderDelete_RuleCascade(t *testing.T) {
 		false,
 	)
 	require.NoError(t, err)
-	i1_r2, err := upsertTestRoleBindingRule(
+	i1_r2, err := upsertTestBindingRule(
 		codec, "root", "dc1",
 		idp1.Name,
 		[]string{"serviceaccount.name=def"},
@@ -3209,7 +3209,7 @@ func TestACLEndpoint_IdentityProviderDelete_RuleCascade(t *testing.T) {
 
 	idp2, err := upsertTestIDP(codec, "root", "dc1", ca.RootCert)
 	require.NoError(t, err)
-	i2_r1, err := upsertTestRoleBindingRule(
+	i2_r1, err := upsertTestBindingRule(
 		codec, "root", "dc1",
 		idp2.Name,
 		[]string{"serviceaccount.name=abc"},
@@ -3217,7 +3217,7 @@ func TestACLEndpoint_IdentityProviderDelete_RuleCascade(t *testing.T) {
 		false,
 	)
 	require.NoError(t, err)
-	i2_r2, err := upsertTestRoleBindingRule(
+	i2_r2, err := upsertTestBindingRule(
 		codec, "root", "dc1",
 		idp2.Name,
 		[]string{"serviceaccount.name=def"},
@@ -3245,16 +3245,16 @@ func TestACLEndpoint_IdentityProviderDelete_RuleCascade(t *testing.T) {
 
 	// Make sure the rules are gone.
 	for _, id := range []string{i1_r1.ID, i1_r2.ID} {
-		ruleResp, err := retrieveTestRoleBindingRule(codec, "root", "dc1", id)
+		ruleResp, err := retrieveTestBindingRule(codec, "root", "dc1", id)
 		require.NoError(t, err)
-		require.Nil(t, ruleResp.RoleBindingRule)
+		require.Nil(t, ruleResp.BindingRule)
 	}
 
 	// Make sure the rules for the untouched IDP are still there.
 	for _, id := range []string{i2_r1.ID, i2_r2.ID} {
-		ruleResp, err := retrieveTestRoleBindingRule(codec, "root", "dc1", id)
+		ruleResp, err := retrieveTestBindingRule(codec, "root", "dc1", id)
 		require.NoError(t, err)
-		require.NotNil(t, ruleResp.RoleBindingRule)
+		require.NotNil(t, ruleResp.BindingRule)
 	}
 }
 
@@ -3295,7 +3295,7 @@ func TestACLEndpoint_IdentityProviderList(t *testing.T) {
 	require.ElementsMatch(t, gatherIDs(t, resp.IdentityProviders), []string{i1.Name, i2.Name})
 }
 
-func TestACLEndpoint_RoleBindingRuleSet(t *testing.T) {
+func TestACLEndpoint_BindingRuleSet(t *testing.T) {
 	t.Parallel()
 
 	dir1, s1 := testServerWithConfig(t, func(c *Config) {
@@ -3319,12 +3319,12 @@ func TestACLEndpoint_RoleBindingRuleSet(t *testing.T) {
 	otherTestIDP, err := upsertTestIDP(codec, "root", "dc1", ca.RootCert)
 	require.NoError(t, err)
 
-	newRule := func() structs.ACLRoleBindingRule {
-		return structs.ACLRoleBindingRule{
+	newRule := func() structs.ACLBindingRule {
+		return structs.ACLBindingRule{
 			Description: "foobar",
 			IDPName:     testIDP.Name,
-			Matches: []*structs.ACLRoleBindingRuleMatch{
-				&structs.ACLRoleBindingRuleMatch{
+			Matches: []*structs.ACLBindingRuleMatch{
+				&structs.ACLBindingRuleMatch{
 					Selector: []string{
 						"serviceaccount.name=abc",
 					},
@@ -3334,27 +3334,27 @@ func TestACLEndpoint_RoleBindingRuleSet(t *testing.T) {
 		}
 	}
 
-	requireSetErrors := func(t *testing.T, reqRule structs.ACLRoleBindingRule) {
-		req := structs.ACLRoleBindingRuleSetRequest{
-			Datacenter:      "dc1",
-			RoleBindingRule: reqRule,
-			WriteRequest:    structs.WriteRequest{Token: "root"},
+	requireSetErrors := func(t *testing.T, reqRule structs.ACLBindingRule) {
+		req := structs.ACLBindingRuleSetRequest{
+			Datacenter:   "dc1",
+			BindingRule:  reqRule,
+			WriteRequest: structs.WriteRequest{Token: "root"},
 		}
-		resp := structs.ACLRoleBindingRule{}
+		resp := structs.ACLBindingRule{}
 
-		err := acl.RoleBindingRuleSet(&req, &resp)
+		err := acl.BindingRuleSet(&req, &resp)
 		require.Error(t, err)
 	}
 
-	requireOK := func(t *testing.T, reqRule structs.ACLRoleBindingRule) *structs.ACLRoleBindingRule {
-		req := structs.ACLRoleBindingRuleSetRequest{
-			Datacenter:      "dc1",
-			RoleBindingRule: reqRule,
-			WriteRequest:    structs.WriteRequest{Token: "root"},
+	requireOK := func(t *testing.T, reqRule structs.ACLBindingRule) *structs.ACLBindingRule {
+		req := structs.ACLBindingRuleSetRequest{
+			Datacenter:   "dc1",
+			BindingRule:  reqRule,
+			WriteRequest: structs.WriteRequest{Token: "root"},
 		}
-		resp := structs.ACLRoleBindingRule{}
+		resp := structs.ACLBindingRule{}
 
-		err := acl.RoleBindingRuleSet(&req, &resp)
+		err := acl.BindingRuleSet(&req, &resp)
 		require.NoError(t, err)
 		require.NotEmpty(t, resp.ID)
 		return &resp
@@ -3363,21 +3363,21 @@ func TestACLEndpoint_RoleBindingRuleSet(t *testing.T) {
 	t.Run("Create it", func(t *testing.T) {
 		reqRule := newRule()
 
-		req := structs.ACLRoleBindingRuleSetRequest{
-			Datacenter:      "dc1",
-			RoleBindingRule: reqRule,
-			WriteRequest:    structs.WriteRequest{Token: "root"},
+		req := structs.ACLBindingRuleSetRequest{
+			Datacenter:   "dc1",
+			BindingRule:  reqRule,
+			WriteRequest: structs.WriteRequest{Token: "root"},
 		}
-		resp := structs.ACLRoleBindingRule{}
+		resp := structs.ACLBindingRule{}
 
-		err := acl.RoleBindingRuleSet(&req, &resp)
+		err := acl.BindingRuleSet(&req, &resp)
 		require.NoError(t, err)
 		require.NotNil(t, resp.ID)
 
 		// Get the rule directly to validate that it exists
-		ruleResp, err := retrieveTestRoleBindingRule(codec, "root", "dc1", resp.ID)
+		ruleResp, err := retrieveTestBindingRule(codec, "root", "dc1", resp.ID)
 		require.NoError(t, err)
-		rule := ruleResp.RoleBindingRule
+		rule := ruleResp.BindingRule
 
 		require.NotEmpty(t, rule.ID)
 		require.Equal(t, rule.Description, "foobar")
@@ -3402,8 +3402,8 @@ func TestACLEndpoint_RoleBindingRuleSet(t *testing.T) {
 		reqRule := newRule()
 		reqRule.ID = ruleID
 		reqRule.Description = "foobar modified"
-		reqRule.Matches = []*structs.ACLRoleBindingRuleMatch{
-			&structs.ACLRoleBindingRuleMatch{
+		reqRule.Matches = []*structs.ACLBindingRuleMatch{
+			&structs.ACLBindingRuleMatch{
 				Selector: []string{
 					"serviceaccount.namespace=def",
 				},
@@ -3412,21 +3412,21 @@ func TestACLEndpoint_RoleBindingRuleSet(t *testing.T) {
 		reqRule.RoleName = "def"
 		reqRule.MustExist = true
 
-		req := structs.ACLRoleBindingRuleSetRequest{
-			Datacenter:      "dc1",
-			RoleBindingRule: reqRule,
-			WriteRequest:    structs.WriteRequest{Token: "root"},
+		req := structs.ACLBindingRuleSetRequest{
+			Datacenter:   "dc1",
+			BindingRule:  reqRule,
+			WriteRequest: structs.WriteRequest{Token: "root"},
 		}
-		resp := structs.ACLRoleBindingRule{}
+		resp := structs.ACLBindingRule{}
 
-		err := acl.RoleBindingRuleSet(&req, &resp)
+		err := acl.BindingRuleSet(&req, &resp)
 		require.NoError(t, err)
 		require.NotNil(t, resp.ID)
 
 		// Get the rule directly to validate that it exists
-		ruleResp, err := retrieveTestRoleBindingRule(codec, "root", "dc1", resp.ID)
+		ruleResp, err := retrieveTestBindingRule(codec, "root", "dc1", resp.ID)
 		require.NoError(t, err)
-		rule := ruleResp.RoleBindingRule
+		rule := ruleResp.BindingRule
 
 		require.NotEmpty(t, rule.ID)
 		require.Equal(t, rule.Description, "foobar modified")
@@ -3461,8 +3461,8 @@ func TestACLEndpoint_RoleBindingRuleSet(t *testing.T) {
 	t.Run("Create fails; match contains no selector", func(t *testing.T) {
 		// If you don't want any selectors you should not provide any match.
 		reqRule := newRule()
-		reqRule.Matches = []*structs.ACLRoleBindingRuleMatch{
-			&structs.ACLRoleBindingRuleMatch{
+		reqRule.Matches = []*structs.ACLBindingRuleMatch{
+			&structs.ACLBindingRuleMatch{
 				Selector: nil,
 			},
 		}
@@ -3471,8 +3471,8 @@ func TestACLEndpoint_RoleBindingRuleSet(t *testing.T) {
 
 	t.Run("Create fails; match selector reuses vars", func(t *testing.T) {
 		reqRule := newRule()
-		reqRule.Matches = []*structs.ACLRoleBindingRuleMatch{
-			&structs.ACLRoleBindingRuleMatch{
+		reqRule.Matches = []*structs.ACLBindingRuleMatch{
+			&structs.ACLBindingRuleMatch{
 				Selector: []string{
 					"serviceaccount.name=a",
 					"serviceaccount.name=b",
@@ -3484,8 +3484,8 @@ func TestACLEndpoint_RoleBindingRuleSet(t *testing.T) {
 
 	t.Run("Create fails; match selector with unknown vars", func(t *testing.T) {
 		reqRule := newRule()
-		reqRule.Matches = []*structs.ACLRoleBindingRuleMatch{
-			&structs.ACLRoleBindingRuleMatch{
+		reqRule.Matches = []*structs.ACLBindingRuleMatch{
+			&structs.ACLBindingRuleMatch{
 				Selector: []string{
 					"serviceaccount.name=a",
 					"serviceaccount.bizarroname=b",
@@ -3497,8 +3497,8 @@ func TestACLEndpoint_RoleBindingRuleSet(t *testing.T) {
 
 	t.Run("Create fails; match selector invalid", func(t *testing.T) {
 		reqRule := newRule()
-		reqRule.Matches = []*structs.ACLRoleBindingRuleMatch{
-			&structs.ACLRoleBindingRuleMatch{
+		reqRule.Matches = []*structs.ACLBindingRuleMatch{
+			&structs.ACLBindingRuleMatch{
 				Selector: []string{
 					"serviceaccount.name",
 				},
@@ -3537,7 +3537,7 @@ func TestACLEndpoint_RoleBindingRuleSet(t *testing.T) {
 	})
 }
 
-func TestACLEndpoint_RoleBindingRuleDelete(t *testing.T) {
+func TestACLEndpoint_BindingRuleDelete(t *testing.T) {
 	t.Parallel()
 
 	dir1, s1 := testServerWithConfig(t, func(c *Config) {
@@ -3556,7 +3556,7 @@ func TestACLEndpoint_RoleBindingRuleDelete(t *testing.T) {
 	testIDP, err := upsertTestIDP(codec, "root", "dc1", ca.RootCert)
 	require.NoError(t, err)
 
-	existingRule, err := upsertTestRoleBindingRule(
+	existingRule, err := upsertTestBindingRule(
 		codec, "root", "dc1",
 		testIDP.Name,
 		[]string{"serviceaccount.name=abc"},
@@ -3568,39 +3568,39 @@ func TestACLEndpoint_RoleBindingRuleDelete(t *testing.T) {
 	acl := ACL{srv: s1}
 
 	t.Run("normal", func(t *testing.T) {
-		req := structs.ACLRoleBindingRuleDeleteRequest{
-			Datacenter:        "dc1",
-			RoleBindingRuleID: existingRule.ID,
-			WriteRequest:      structs.WriteRequest{Token: "root"},
+		req := structs.ACLBindingRuleDeleteRequest{
+			Datacenter:    "dc1",
+			BindingRuleID: existingRule.ID,
+			WriteRequest:  structs.WriteRequest{Token: "root"},
 		}
 
 		var ignored bool
-		err = acl.RoleBindingRuleDelete(&req, &ignored)
+		err = acl.BindingRuleDelete(&req, &ignored)
 		require.NoError(t, err)
 
 		// Make sure the rule is gone
-		ruleResp, err := retrieveTestRoleBindingRule(codec, "root", "dc1", existingRule.ID)
+		ruleResp, err := retrieveTestBindingRule(codec, "root", "dc1", existingRule.ID)
 		require.NoError(t, err)
-		require.Nil(t, ruleResp.RoleBindingRule)
+		require.Nil(t, ruleResp.BindingRule)
 	})
 
 	t.Run("delete something that doesn't exist", func(t *testing.T) {
 		fakeID, err := uuid.GenerateUUID()
 		require.NoError(t, err)
 
-		req := structs.ACLRoleBindingRuleDeleteRequest{
-			Datacenter:        "dc1",
-			RoleBindingRuleID: fakeID,
-			WriteRequest:      structs.WriteRequest{Token: "root"},
+		req := structs.ACLBindingRuleDeleteRequest{
+			Datacenter:    "dc1",
+			BindingRuleID: fakeID,
+			WriteRequest:  structs.WriteRequest{Token: "root"},
 		}
 
 		var ignored bool
-		err = acl.RoleBindingRuleDelete(&req, &ignored)
+		err = acl.BindingRuleDelete(&req, &ignored)
 		require.NoError(t, err)
 	})
 }
 
-func TestACLEndpoint_RoleBindingRuleList(t *testing.T) {
+func TestACLEndpoint_BindingRuleList(t *testing.T) {
 	t.Parallel()
 
 	dir1, s1 := testServerWithConfig(t, func(c *Config) {
@@ -3619,7 +3619,7 @@ func TestACLEndpoint_RoleBindingRuleList(t *testing.T) {
 	testIDP, err := upsertTestIDP(codec, "root", "dc1", ca.RootCert)
 	require.NoError(t, err)
 
-	r1, err := upsertTestRoleBindingRule(
+	r1, err := upsertTestBindingRule(
 		codec, "root", "dc1",
 		testIDP.Name,
 		[]string{"serviceaccount.name=abc"},
@@ -3628,7 +3628,7 @@ func TestACLEndpoint_RoleBindingRuleList(t *testing.T) {
 	)
 	require.NoError(t, err)
 
-	r2, err := upsertTestRoleBindingRule(
+	r2, err := upsertTestBindingRule(
 		codec, "root", "dc1",
 		testIDP.Name,
 		[]string{"serviceaccount.name=def"},
@@ -3639,16 +3639,16 @@ func TestACLEndpoint_RoleBindingRuleList(t *testing.T) {
 
 	acl := ACL{srv: s1}
 
-	req := structs.ACLRoleBindingRuleListRequest{
+	req := structs.ACLBindingRuleListRequest{
 		Datacenter:   "dc1",
 		QueryOptions: structs.QueryOptions{Token: "root"},
 	}
 
-	resp := structs.ACLRoleBindingRuleListResponse{}
+	resp := structs.ACLBindingRuleListResponse{}
 
-	err = acl.RoleBindingRuleList(&req, &resp)
+	err = acl.BindingRuleList(&req, &resp)
 	require.NoError(t, err)
-	require.ElementsMatch(t, gatherIDs(t, resp.RoleBindingRules), []string{r1.ID, r2.ID})
+	require.ElementsMatch(t, gatherIDs(t, resp.BindingRules), []string{r1.ID, r2.ID})
 }
 
 type fakeK8SIdentityProviderValidator struct {
@@ -3767,7 +3767,7 @@ func TestACLEndpoint_Login(t *testing.T) {
 	idp, err := upsertTestIDP(codec, "root", "dc1", ca.RootCert)
 	require.NoError(t, err)
 
-	ruleDB, err := upsertTestRoleBindingRule(
+	ruleDB, err := upsertTestBindingRule(
 		codec, "root", "dc1", idp.Name,
 		[]string{
 			"serviceaccount.namespace=default",
@@ -3776,7 +3776,7 @@ func TestACLEndpoint_Login(t *testing.T) {
 		"k8s-{{serviceaccount.name}}",
 		false,
 	)
-	_, err = upsertTestRoleBindingRule(
+	_, err = upsertTestBindingRule(
 		codec, "root", "dc1", idp.Name,
 		[]string{
 			"serviceaccount.namespace=default",
@@ -3978,9 +3978,9 @@ func TestACLEndpoint_Login(t *testing.T) {
 	})
 
 	{
-		req := structs.ACLRoleBindingRuleSetRequest{
+		req := structs.ACLBindingRuleSetRequest{
 			Datacenter: "dc1",
-			RoleBindingRule: structs.ACLRoleBindingRule{
+			BindingRule: structs.ACLBindingRule{
 				IDPName:   ruleDB.IDPName,
 				RoleName:  ruleDB.RoleName,
 				MustExist: false,
@@ -3989,8 +3989,8 @@ func TestACLEndpoint_Login(t *testing.T) {
 			WriteRequest: structs.WriteRequest{Token: "root"},
 		}
 
-		var out structs.ACLRoleBindingRule
-		require.NoError(t, acl.RoleBindingRuleSet(&req, &out))
+		var out structs.ACLBindingRule
+		require.NoError(t, acl.BindingRuleSet(&req, &out))
 	}
 
 	t.Run("valid idp token 1 binding (no selectors this time)", func(t *testing.T) {
@@ -4129,7 +4129,7 @@ func TestACLEndpoint_Login_k8s(t *testing.T) {
 		requireErrorContains(t, acl.Login(&req, &resp), "Permission denied")
 	})
 
-	_, err = upsertTestRoleBindingRule(
+	_, err = upsertTestBindingRule(
 		codec, "root", "dc1", idp.Name,
 		[]string{
 			"serviceaccount.namespace=default",
@@ -4235,7 +4235,7 @@ func TestACLEndpoint_Logout(t *testing.T) {
 	)
 	require.NoError(t, err)
 
-	_, err = upsertTestRoleBindingRule(
+	_, err = upsertTestBindingRule(
 		codec, "root", "dc1", idp.Name,
 		nil,
 		"k8s-{{serviceaccount.name}}",
@@ -4336,11 +4336,11 @@ func gatherIDs(t *testing.T, v interface{}) []string {
 		for _, p := range x {
 			out = append(out, p.Name)
 		}
-	case []*structs.ACLRoleBindingRule:
+	case []*structs.ACLBindingRule:
 		for _, p := range x {
 			out = append(out, p.ID)
 		}
-	case structs.ACLRoleBindingRules:
+	case structs.ACLBindingRules:
 		for _, p := range x {
 			out = append(out, p.ID)
 		}
@@ -4651,19 +4651,19 @@ func retrieveTestIDP(codec rpc.ClientCodec, masterToken string, datacenter strin
 	return &out, nil
 }
 
-func deleteTestRoleBindingRule(codec rpc.ClientCodec, masterToken string, datacenter string, ruleID string) error {
-	arg := structs.ACLRoleBindingRuleDeleteRequest{
-		Datacenter:        datacenter,
-		RoleBindingRuleID: ruleID,
-		WriteRequest:      structs.WriteRequest{Token: masterToken},
+func deleteTestBindingRule(codec rpc.ClientCodec, masterToken string, datacenter string, ruleID string) error {
+	arg := structs.ACLBindingRuleDeleteRequest{
+		Datacenter:    datacenter,
+		BindingRuleID: ruleID,
+		WriteRequest:  structs.WriteRequest{Token: masterToken},
 	}
 
 	var ignored string
-	err := msgpackrpc.CallWithCodec(codec, "ACL.RoleBindingRuleDelete", &arg, &ignored)
+	err := msgpackrpc.CallWithCodec(codec, "ACL.BindingRuleDelete", &arg, &ignored)
 	return err
 }
 
-func upsertTestRoleBindingRule(
+func upsertTestBindingRule(
 	codec rpc.ClientCodec,
 	masterToken string,
 	datacenter string,
@@ -4671,10 +4671,10 @@ func upsertTestRoleBindingRule(
 	singleSelector []string,
 	roleName string,
 	mustExist bool,
-) (*structs.ACLRoleBindingRule, error) {
-	req := structs.ACLRoleBindingRuleSetRequest{
+) (*structs.ACLBindingRule, error) {
+	req := structs.ACLBindingRuleSetRequest{
 		Datacenter: datacenter,
-		RoleBindingRule: structs.ACLRoleBindingRule{
+		BindingRule: structs.ACLBindingRule{
 			IDPName:   idpName,
 			RoleName:  roleName,
 			MustExist: mustExist,
@@ -4682,16 +4682,16 @@ func upsertTestRoleBindingRule(
 		WriteRequest: structs.WriteRequest{Token: masterToken},
 	}
 	if len(singleSelector) > 0 {
-		req.RoleBindingRule.Matches = []*structs.ACLRoleBindingRuleMatch{
-			&structs.ACLRoleBindingRuleMatch{
+		req.BindingRule.Matches = []*structs.ACLBindingRuleMatch{
+			&structs.ACLBindingRuleMatch{
 				Selector: singleSelector,
 			},
 		}
 	}
 
-	var out structs.ACLRoleBindingRule
+	var out structs.ACLBindingRule
 
-	err := msgpackrpc.CallWithCodec(codec, "ACL.RoleBindingRuleSet", &req, &out)
+	err := msgpackrpc.CallWithCodec(codec, "ACL.BindingRuleSet", &req, &out)
 	if err != nil {
 		return nil, err
 	}
@@ -4699,16 +4699,16 @@ func upsertTestRoleBindingRule(
 	return &out, nil
 }
 
-func retrieveTestRoleBindingRule(codec rpc.ClientCodec, masterToken string, datacenter string, ruleID string) (*structs.ACLRoleBindingRuleResponse, error) {
-	arg := structs.ACLRoleBindingRuleGetRequest{
-		Datacenter:        datacenter,
-		RoleBindingRuleID: ruleID,
-		QueryOptions:      structs.QueryOptions{Token: masterToken},
+func retrieveTestBindingRule(codec rpc.ClientCodec, masterToken string, datacenter string, ruleID string) (*structs.ACLBindingRuleResponse, error) {
+	arg := structs.ACLBindingRuleGetRequest{
+		Datacenter:    datacenter,
+		BindingRuleID: ruleID,
+		QueryOptions:  structs.QueryOptions{Token: masterToken},
 	}
 
-	var out structs.ACLRoleBindingRuleResponse
+	var out structs.ACLBindingRuleResponse
 
-	err := msgpackrpc.CallWithCodec(codec, "ACL.RoleBindingRuleRead", &arg, &out)
+	err := msgpackrpc.CallWithCodec(codec, "ACL.BindingRuleRead", &arg, &out)
 
 	if err != nil {
 		return nil, err

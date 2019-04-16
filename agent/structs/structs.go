@@ -57,8 +57,8 @@ const (
 	ConnectCALeafRequestType                         = 21
 	ACLRoleSetRequestType                            = 22
 	ACLRoleDeleteRequestType                         = 23
-	ACLRoleBindingRuleSetRequestType                 = 24
-	ACLRoleBindingRuleDeleteRequestType              = 25
+	ACLBindingRuleSetRequestType                     = 24
+	ACLBindingRuleDeleteRequestType                  = 25
 	ACLIdentityProviderSetRequestType                = 26
 	ACLIdentityProviderDeleteRequestType             = 27
 )

@@ -491,7 +491,7 @@ func (a *ACL) tokenSetInternal(args *structs.ACLTokenSetRequest, reply *structs.
 	)
 
 	// Validate all the role names and convert them to role IDs except the ones
-	// that originate from role binding rules.
+	// that originate from binding rules.
 	for _, link := range token.Roles {
 		if link.BoundName != "" {
 			if !fromLogin {
@@ -1473,12 +1473,12 @@ func (a *ACL) RoleResolve(args *structs.ACLRoleBatchGetRequest, reply *structs.A
 	return nil
 }
 
-func (a *ACL) RoleBindingRuleRead(args *structs.ACLRoleBindingRuleGetRequest, reply *structs.ACLRoleBindingRuleResponse) error {
+func (a *ACL) BindingRuleRead(args *structs.ACLBindingRuleGetRequest, reply *structs.ACLBindingRuleResponse) error {
 	if err := a.aclPreCheck(); err != nil {
 		return err
 	}
 
-	if done, err := a.srv.forward("ACL.RoleBindingRuleRead", args, args, reply); done {
+	if done, err := a.srv.forward("ACL.BindingRuleRead", args, args, reply); done {
 		return err
 	}
 
@@ -1490,18 +1490,18 @@ func (a *ACL) RoleBindingRuleRead(args *structs.ACLRoleBindingRuleGetRequest, re
 
 	return a.srv.blockingQuery(&args.QueryOptions, &reply.QueryMeta,
 		func(ws memdb.WatchSet, state *state.Store) error {
-			index, rule, err := state.ACLRoleBindingRuleGetByID(ws, args.RoleBindingRuleID)
+			index, rule, err := state.ACLBindingRuleGetByID(ws, args.BindingRuleID)
 
 			if err != nil {
 				return err
 			}
 
-			reply.Index, reply.RoleBindingRule = index, rule
+			reply.Index, reply.BindingRule = index, rule
 			return nil
 		})
 }
 
-func (a *ACL) RoleBindingRuleSet(args *structs.ACLRoleBindingRuleSetRequest, reply *structs.ACLRoleBindingRule) error {
+func (a *ACL) BindingRuleSet(args *structs.ACLBindingRuleSetRequest, reply *structs.ACLBindingRule) error {
 	if err := a.aclPreCheck(); err != nil {
 		return err
 	}
@@ -1510,7 +1510,7 @@ func (a *ACL) RoleBindingRuleSet(args *structs.ACLRoleBindingRuleSetRequest, rep
 		args.Datacenter = a.srv.config.ACLDatacenter
 	}
 
-	if done, err := a.srv.forward("ACL.RoleBindingRuleSet", args, args, reply); done {
+	if done, err := a.srv.forward("ACL.BindingRuleSet", args, args, reply); done {
 		return err
 	}
 
@@ -1523,11 +1523,11 @@ func (a *ACL) RoleBindingRuleSet(args *structs.ACLRoleBindingRuleSetRequest, rep
 		return acl.ErrPermissionDenied
 	}
 
-	rule := &args.RoleBindingRule
+	rule := &args.BindingRule
 	state := a.srv.fsm.State()
 
 	if rule.IDPName == "" {
-		return fmt.Errorf("Invalid Role Binding Rule: no IDPName is set")
+		return fmt.Errorf("Invalid Binding Rule: no IDPName is set")
 	}
 
 	_, idp, err := state.ACLIdentityProviderGetByName(nil, rule.IDPName)
@@ -1538,34 +1538,34 @@ func (a *ACL) RoleBindingRuleSet(args *structs.ACLRoleBindingRuleSetRequest, rep
 	}
 
 	if rule.ID == "" {
-		// with no role binding rule ID one will be generated
+		// with no binding rule ID one will be generated
 		var err error
 
-		rule.ID, err = lib.GenerateUUID(a.srv.checkRoleBindingRuleUUID)
+		rule.ID, err = lib.GenerateUUID(a.srv.checkBindingRuleUUID)
 		if err != nil {
 			return err
 		}
 	} else {
 		if _, err := uuid.ParseUUID(rule.ID); err != nil {
-			return fmt.Errorf("Role Binding Rule ID invalid UUID")
+			return fmt.Errorf("Binding Rule ID invalid UUID")
 		}
 
 		// Verify the role exists
-		_, existing, err := state.ACLRoleBindingRuleGetByID(nil, rule.ID)
+		_, existing, err := state.ACLBindingRuleGetByID(nil, rule.ID)
 		if err != nil {
-			return fmt.Errorf("acl role binding rule lookup failed: %v", err)
+			return fmt.Errorf("acl binding rule lookup failed: %v", err)
 		} else if existing == nil {
-			return fmt.Errorf("cannot find role binding rule %s", rule.ID)
+			return fmt.Errorf("cannot find binding rule %s", rule.ID)
 		}
 
 		if existing.IDPName != rule.IDPName {
-			return fmt.Errorf("the IDPName field of an Role Binding Rule is immutable")
+			return fmt.Errorf("the IDPName field of an Binding Rule is immutable")
 		}
 	}
 
 	for _, match := range rule.Matches {
 		if len(match.Selector) == 0 {
-			return fmt.Errorf("Invalid Role Binding Rule: Match must have Selector set")
+			return fmt.Errorf("Invalid Binding Rule: Match must have Selector set")
 		}
 		fields := make(map[string]struct{})
 		for _, sel := range match.Selector {
@@ -1574,47 +1574,47 @@ func (a *ACL) RoleBindingRuleSet(args *structs.ACLRoleBindingRuleSetRequest, rep
 				return fmt.Errorf("invalid match selector %q", sel)
 			}
 			if _, ok := fields[lhs]; ok {
-				return fmt.Errorf("role binding rule selector uses the same field twice: %q", lhs)
+				return fmt.Errorf("binding rule selector uses the same field twice: %q", lhs)
 			}
 			fields[lhs] = struct{}{}
 
 			unknown := findUnknownIdentityProviderFields(idp.Type, []string{lhs})
 			if len(unknown) > 0 {
-				return fmt.Errorf("role binding rule selector uses unknown field: %q", unknown[0])
+				return fmt.Errorf("binding rule selector uses unknown field: %q", unknown[0])
 			}
 		}
 	}
 
 	if rule.RoleName == "" {
-		return fmt.Errorf("Invalid Role Binding Rule: no RoleName is set")
+		return fmt.Errorf("Invalid Binding Rule: no RoleName is set")
 	}
-	if valid, err := isValidRoleBindingRuleRoleName(idp.Type, rule.RoleName); err != nil {
-		return fmt.Errorf("role binding rule role name is invalid: %v", err)
+	if valid, err := isValidBindingRuleRoleName(idp.Type, rule.RoleName); err != nil {
+		return fmt.Errorf("binding rule role name is invalid: %v", err)
 	} else if !valid {
-		return fmt.Errorf("role binding rule role name is invalid")
+		return fmt.Errorf("binding rule role name is invalid")
 	}
 
-	req := &structs.ACLRoleBindingRuleBatchSetRequest{
-		RoleBindingRules: structs.ACLRoleBindingRules{rule},
+	req := &structs.ACLBindingRuleBatchSetRequest{
+		BindingRules: structs.ACLBindingRules{rule},
 	}
 
-	resp, err := a.srv.raftApply(structs.ACLRoleBindingRuleSetRequestType, req)
+	resp, err := a.srv.raftApply(structs.ACLBindingRuleSetRequestType, req)
 	if err != nil {
-		return fmt.Errorf("Failed to apply role binding rule upsert request: %v", err)
+		return fmt.Errorf("Failed to apply binding rule upsert request: %v", err)
 	}
 
 	if respErr, ok := resp.(error); ok {
 		return respErr
 	}
 
-	if _, rule, err := a.srv.fsm.State().ACLRoleBindingRuleGetByID(nil, rule.ID); err == nil && rule != nil {
+	if _, rule, err := a.srv.fsm.State().ACLBindingRuleGetByID(nil, rule.ID); err == nil && rule != nil {
 		*reply = *rule
 	}
 
 	return nil
 }
 
-func isValidRoleBindingRuleRoleName(idpType, roleName string) (bool, error) {
+func isValidBindingRuleRoleName(idpType, roleName string) (bool, error) {
 	if idpType == "" || roleName == "" {
 		return false, nil
 	}
@@ -1648,7 +1648,7 @@ func isValidRoleBindingRuleRoleName(idpType, roleName string) (bool, error) {
 	return validRoleName.MatchString(generatedName), nil
 }
 
-func (a *ACL) RoleBindingRuleDelete(args *structs.ACLRoleBindingRuleDeleteRequest, reply *bool) error {
+func (a *ACL) BindingRuleDelete(args *structs.ACLBindingRuleDeleteRequest, reply *bool) error {
 	if err := a.aclPreCheck(); err != nil {
 		return err
 	}
@@ -1657,7 +1657,7 @@ func (a *ACL) RoleBindingRuleDelete(args *structs.ACLRoleBindingRuleDeleteReques
 		args.Datacenter = a.srv.config.ACLDatacenter
 	}
 
-	if done, err := a.srv.forward("ACL.RoleBindingRuleDelete", args, args, reply); done {
+	if done, err := a.srv.forward("ACL.BindingRuleDelete", args, args, reply); done {
 		return err
 	}
 
@@ -1670,7 +1670,7 @@ func (a *ACL) RoleBindingRuleDelete(args *structs.ACLRoleBindingRuleDeleteReques
 		return acl.ErrPermissionDenied
 	}
 
-	_, rule, err := a.srv.fsm.State().ACLRoleBindingRuleGetByID(nil, args.RoleBindingRuleID)
+	_, rule, err := a.srv.fsm.State().ACLBindingRuleGetByID(nil, args.BindingRuleID)
 	if err != nil {
 		return err
 	}
@@ -1679,13 +1679,13 @@ func (a *ACL) RoleBindingRuleDelete(args *structs.ACLRoleBindingRuleDeleteReques
 		return nil
 	}
 
-	req := structs.ACLRoleBindingRuleBatchDeleteRequest{
-		RoleBindingRuleIDs: []string{args.RoleBindingRuleID},
+	req := structs.ACLBindingRuleBatchDeleteRequest{
+		BindingRuleIDs: []string{args.BindingRuleID},
 	}
 
-	resp, err := a.srv.raftApply(structs.ACLRoleBindingRuleDeleteRequestType, &req)
+	resp, err := a.srv.raftApply(structs.ACLBindingRuleDeleteRequestType, &req)
 	if err != nil {
-		return fmt.Errorf("Failed to apply role binding rule delete request: %v", err)
+		return fmt.Errorf("Failed to apply binding rule delete request: %v", err)
 	}
 
 	if respErr, ok := resp.(error); ok {
@@ -1697,12 +1697,12 @@ func (a *ACL) RoleBindingRuleDelete(args *structs.ACLRoleBindingRuleDeleteReques
 	return nil
 }
 
-func (a *ACL) RoleBindingRuleList(args *structs.ACLRoleBindingRuleListRequest, reply *structs.ACLRoleBindingRuleListResponse) error {
+func (a *ACL) BindingRuleList(args *structs.ACLBindingRuleListRequest, reply *structs.ACLBindingRuleListResponse) error {
 	if err := a.aclPreCheck(); err != nil {
 		return err
 	}
 
-	if done, err := a.srv.forward("ACL.RoleBindingRuleList", args, args, reply); done {
+	if done, err := a.srv.forward("ACL.BindingRuleList", args, args, reply); done {
 		return err
 	}
 
@@ -1714,12 +1714,12 @@ func (a *ACL) RoleBindingRuleList(args *structs.ACLRoleBindingRuleListRequest, r
 
 	return a.srv.blockingQuery(&args.QueryOptions, &reply.QueryMeta,
 		func(ws memdb.WatchSet, state *state.Store) error {
-			index, rules, err := state.ACLRoleBindingRuleList(ws, args.IDPName)
+			index, rules, err := state.ACLBindingRuleList(ws, args.IDPName)
 			if err != nil {
 				return err
 			}
 
-			reply.Index, reply.RoleBindingRules = index, rules
+			reply.Index, reply.BindingRules = index, rules
 			return nil
 		})
 }

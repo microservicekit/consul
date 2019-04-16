@@ -73,9 +73,9 @@ func (s *Server) checkRoleUUID(id string) (bool, error) {
 	return !structs.ACLIDReserved(id), nil
 }
 
-func (s *Server) checkRoleBindingRuleUUID(id string) (bool, error) {
+func (s *Server) checkBindingRuleUUID(id string) (bool, error) {
 	state := s.fsm.State()
-	if _, rule, err := state.ACLRoleBindingRuleGetByID(nil, id); err != nil {
+	if _, rule, err := state.ACLBindingRuleGetByID(nil, id); err != nil {
 		return false, err
 	} else if rule != nil {
 		return false, nil

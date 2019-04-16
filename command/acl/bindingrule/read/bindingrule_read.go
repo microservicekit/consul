@@ -33,7 +33,7 @@ func (c *cmd) init() {
 		&c.showMeta,
 		"meta",
 		false,
-		"Indicates that role binding rule metadata such "+
+		"Indicates that binding rule metadata such "+
 			"as the content hash and raft indices should be shown for each entry.",
 	)
 
@@ -41,9 +41,9 @@ func (c *cmd) init() {
 		&c.ruleID,
 		"id",
 		"",
-		"The ID of the role binding rule to read. "+
+		"The ID of the binding rule to read. "+
 			"It may be specified as a unique ID prefix but will error if the prefix "+
-			"matches multiple role binding rule IDs",
+			"matches multiple binding rule IDs",
 	)
 
 	c.http = &flags.HTTPFlags{}
@@ -68,22 +68,22 @@ func (c *cmd) Run(args []string) int {
 		return 1
 	}
 
-	ruleID, err := acl.GetRoleBindingRuleIDFromPartial(client, c.ruleID)
+	ruleID, err := acl.GetBindingRuleIDFromPartial(client, c.ruleID)
 	if err != nil {
-		c.UI.Error(fmt.Sprintf("Error determining role binding rule ID: %v", err))
+		c.UI.Error(fmt.Sprintf("Error determining binding rule ID: %v", err))
 		return 1
 	}
 
-	rule, _, err := client.ACL().RoleBindingRuleRead(ruleID, nil)
+	rule, _, err := client.ACL().BindingRuleRead(ruleID, nil)
 	if err != nil {
-		c.UI.Error(fmt.Sprintf("Error reading role binding rule %q: %v", ruleID, err))
+		c.UI.Error(fmt.Sprintf("Error reading binding rule %q: %v", ruleID, err))
 		return 1
 	} else if rule == nil {
-		c.UI.Error(fmt.Sprintf("Role binding rule not found with ID %q", ruleID))
+		c.UI.Error(fmt.Sprintf("Binding rule not found with ID %q", ruleID))
 		return 1
 	}
 
-	acl.PrintRoleBindingRule(rule, c.UI, c.showMeta)
+	acl.PrintBindingRule(rule, c.UI, c.showMeta)
 	return 0
 }
 
@@ -95,14 +95,14 @@ func (c *cmd) Help() string {
 	return flags.Usage(c.help, nil)
 }
 
-const synopsis = "Read an ACL Role Binding Rule"
+const synopsis = "Read an ACL Binding Rule"
 const help = `
-Usage: consul acl rolebindingrule read -id ID [options]
+Usage: consul acl binding-rule read -id ID [options]
 
   This command will retrieve and print out the details of a single
-  role binding rule.
+  binding rule.
 
     Read:
 
-     $ consul acl rolebindingrule read -id fdabbcb5-9de5-4b1a-961f-77214ae88cba
+     $ consul acl binding-rule read -id fdabbcb5-9de5-4b1a-961f-77214ae88cba
 `

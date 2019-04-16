@@ -189,7 +189,7 @@ func TestLoginCommand(t *testing.T) {
 		require.NoError(t, err)
 	}
 
-	t.Run("try login with idp configured but no role binding rules", func(t *testing.T) {
+	t.Run("try login with idp configured but no binding rules", func(t *testing.T) {
 		defer os.Remove(tokenSinkFile)
 
 		ui := cli.NewMockUi()
@@ -210,11 +210,11 @@ func TestLoginCommand(t *testing.T) {
 	})
 
 	{
-		_, _, err := client.ACL().RoleBindingRuleCreate(&api.ACLRoleBindingRule{
+		_, _, err := client.ACL().BindingRuleCreate(&api.ACLBindingRule{
 			IDPName:  "k8s",
 			RoleName: "{{serviceaccount.name}}",
-			Matches: []*api.ACLRoleBindingRuleMatch{
-				&api.ACLRoleBindingRuleMatch{
+			Matches: []*api.ACLBindingRuleMatch{
+				&api.ACLBindingRuleMatch{
 					Selector: []string{
 						"serviceaccount.namespace=default",
 					},
@@ -226,7 +226,7 @@ func TestLoginCommand(t *testing.T) {
 		require.NoError(t, err)
 	}
 
-	t.Run("try login with idp configured and role binding rules", func(t *testing.T) {
+	t.Run("try login with idp configured and binding rules", func(t *testing.T) {
 		defer os.Remove(tokenSinkFile)
 
 		ui := cli.NewMockUi()

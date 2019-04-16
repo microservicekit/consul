@@ -18,7 +18,7 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-func TestRoleBindingRuleReadCommand_noTabs(t *testing.T) {
+func TestBindingRuleReadCommand_noTabs(t *testing.T) {
 	t.Parallel()
 
 	if strings.ContainsRune(New(cli.NewMockUi()).Help(), '\t') {
@@ -26,7 +26,7 @@ func TestRoleBindingRuleReadCommand_noTabs(t *testing.T) {
 	}
 }
 
-func TestRoleBindingRuleReadCommand(t *testing.T) {
+func TestBindingRuleReadCommand(t *testing.T) {
 	t.Parallel()
 
 	testDir := testutil.TempDir(t, "acl")
@@ -65,14 +65,14 @@ func TestRoleBindingRuleReadCommand(t *testing.T) {
 	}
 
 	createRule := func(t *testing.T) string {
-		rule, _, err := client.ACL().RoleBindingRuleCreate(
-			&api.ACLRoleBindingRule{
+		rule, _, err := client.ACL().BindingRuleCreate(
+			&api.ACLBindingRule{
 				IDPName:     "k8s",
 				Description: "test rule",
 				RoleName:    "k8s-{{serviceaccount.name}}",
 				MustExist:   false,
-				Matches: []*api.ACLRoleBindingRuleMatch{
-					&api.ACLRoleBindingRuleMatch{
+				Matches: []*api.ACLBindingRuleMatch{
+					&api.ACLBindingRuleMatch{
 						Selector: []string{
 							"serviceaccount.namespace=default",
 						},
@@ -114,7 +114,7 @@ func TestRoleBindingRuleReadCommand(t *testing.T) {
 
 		code := cmd.Run(args)
 		require.Equal(t, code, 1)
-		require.Contains(t, ui.ErrorWriter.String(), "Role binding rule not found with ID")
+		require.Contains(t, ui.ErrorWriter.String(), "Binding rule not found with ID")
 	})
 
 	t.Run("read by id", func(t *testing.T) {

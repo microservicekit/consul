@@ -31,8 +31,8 @@ func init() {
 	registerCommand(structs.ConnectCALeafRequestType, (*FSM).applyConnectCALeafOperation)
 	registerCommand(structs.ACLRoleSetRequestType, (*FSM).applyACLRoleSetOperation)
 	registerCommand(structs.ACLRoleDeleteRequestType, (*FSM).applyACLRoleDeleteOperation)
-	registerCommand(structs.ACLRoleBindingRuleSetRequestType, (*FSM).applyACLRoleBindingRuleSetOperation)
-	registerCommand(structs.ACLRoleBindingRuleDeleteRequestType, (*FSM).applyACLRoleBindingRuleDeleteOperation)
+	registerCommand(structs.ACLBindingRuleSetRequestType, (*FSM).applyACLBindingRuleSetOperation)
+	registerCommand(structs.ACLBindingRuleDeleteRequestType, (*FSM).applyACLBindingRuleDeleteOperation)
 	registerCommand(structs.ACLIdentityProviderSetRequestType, (*FSM).applyACLIdentityProviderSetOperation)
 	registerCommand(structs.ACLIdentityProviderDeleteRequestType, (*FSM).applyACLIdentityProviderDeleteOperation)
 }
@@ -458,26 +458,26 @@ func (c *FSM) applyACLRoleDeleteOperation(buf []byte, index uint64) interface{} 
 	return c.state.ACLRoleBatchDelete(index, req.RoleIDs)
 }
 
-func (c *FSM) applyACLRoleBindingRuleSetOperation(buf []byte, index uint64) interface{} {
-	var req structs.ACLRoleBindingRuleBatchSetRequest
+func (c *FSM) applyACLBindingRuleSetOperation(buf []byte, index uint64) interface{} {
+	var req structs.ACLBindingRuleBatchSetRequest
 	if err := structs.Decode(buf, &req); err != nil {
 		panic(fmt.Errorf("failed to decode request: %v", err))
 	}
 	defer metrics.MeasureSinceWithLabels([]string{"fsm", "acl", "bindingrule"}, time.Now(),
 		[]metrics.Label{{Name: "op", Value: "upsert"}})
 
-	return c.state.ACLRoleBindingRuleBatchSet(index, req.RoleBindingRules)
+	return c.state.ACLBindingRuleBatchSet(index, req.BindingRules)
 }
 
-func (c *FSM) applyACLRoleBindingRuleDeleteOperation(buf []byte, index uint64) interface{} {
-	var req structs.ACLRoleBindingRuleBatchDeleteRequest
+func (c *FSM) applyACLBindingRuleDeleteOperation(buf []byte, index uint64) interface{} {
+	var req structs.ACLBindingRuleBatchDeleteRequest
 	if err := structs.Decode(buf, &req); err != nil {
 		panic(fmt.Errorf("failed to decode request: %v", err))
 	}
 	defer metrics.MeasureSinceWithLabels([]string{"fsm", "acl", "bindingrule"}, time.Now(),
 		[]metrics.Label{{Name: "op", Value: "delete"}})
 
-	return c.state.ACLRoleBindingRuleBatchDelete(index, req.RoleBindingRuleIDs)
+	return c.state.ACLBindingRuleBatchDelete(index, req.BindingRuleIDs)
 }
 
 func (c *FSM) applyACLIdentityProviderSetOperation(buf []byte, index uint64) interface{} {

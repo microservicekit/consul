@@ -45,13 +45,13 @@ var (
 	// a role with an empty Name.
 	ErrMissingACLRoleName = errors.New("Missing ACL Role Name")
 
-	// ErrMissingACLRoleBindingRuleID is returned when a role binding rule set
-	// is called on a role binding rule with an empty ID.
-	ErrMissingACLRoleBindingRuleID = errors.New("Missing ACL Role Binding Rule ID")
+	// ErrMissingACLBindingRuleID is returned when a binding rule set
+	// is called on a binding rule with an empty ID.
+	ErrMissingACLBindingRuleID = errors.New("Missing ACL Binding Rule ID")
 
-	// ErrMissingACLRoleBindingRuleIDPName is returned when a role binding rule set
-	// is called on a role binding rule with an empty IDPName.
-	ErrMissingACLRoleBindingRuleIDPName = errors.New("Missing ACL Role Binding Rule IDPName")
+	// ErrMissingACLBindingRuleIDPName is returned when a binding rule set
+	// is called on a binding rule with an empty IDPName.
+	ErrMissingACLBindingRuleIDPName = errors.New("Missing ACL Binding Rule IDPName")
 
 	// ErrMissingACLIdentityProviderName is returned when a identity provider
 	// set is called on a identity provider with an empty Name.

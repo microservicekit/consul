@@ -16,7 +16,7 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-func TestRoleBindingRuleCreateCommand_noTabs(t *testing.T) {
+func TestBindingRuleCreateCommand_noTabs(t *testing.T) {
 	t.Parallel()
 
 	if strings.ContainsRune(New(cli.NewMockUi()).Help(), '\t') {
@@ -24,7 +24,7 @@ func TestRoleBindingRuleCreateCommand_noTabs(t *testing.T) {
 	}
 }
 
-func TestRoleBindingRuleCreateCommand(t *testing.T) {
+func TestBindingRuleCreateCommand(t *testing.T) {
 	t.Parallel()
 
 	testDir := testutil.TempDir(t, "acl")

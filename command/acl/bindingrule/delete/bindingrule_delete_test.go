@@ -17,7 +17,7 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-func TestRoleBindingRuleDeleteCommand_noTabs(t *testing.T) {
+func TestBindingRuleDeleteCommand_noTabs(t *testing.T) {
 	t.Parallel()
 
 	if strings.ContainsRune(New(cli.NewMockUi()).Help(), '\t') {
@@ -25,7 +25,7 @@ func TestRoleBindingRuleDeleteCommand_noTabs(t *testing.T) {
 	}
 }
 
-func TestRoleBindingRuleDeleteCommand(t *testing.T) {
+func TestBindingRuleDeleteCommand(t *testing.T) {
 	t.Parallel()
 
 	testDir := testutil.TempDir(t, "acl")
@@ -64,14 +64,14 @@ func TestRoleBindingRuleDeleteCommand(t *testing.T) {
 	}
 
 	createRule := func(t *testing.T) string {
-		rule, _, err := client.ACL().RoleBindingRuleCreate(
-			&api.ACLRoleBindingRule{
+		rule, _, err := client.ACL().BindingRuleCreate(
+			&api.ACLBindingRule{
 				IDPName:     "k8s",
 				Description: "test rule",
 				RoleName:    "k8s-{{serviceaccount.name}}",
 				MustExist:   false,
-				Matches: []*api.ACLRoleBindingRuleMatch{
-					&api.ACLRoleBindingRuleMatch{
+				Matches: []*api.ACLBindingRuleMatch{
+					&api.ACLBindingRuleMatch{
 						Selector: []string{
 							"serviceaccount.namespace=default",
 						},
@@ -87,7 +87,7 @@ func TestRoleBindingRuleDeleteCommand(t *testing.T) {
 	createDupe := func(t *testing.T) string {
 		for {
 			// Check for 1-char duplicates.
-			rules, _, err := client.ACL().RoleBindingRuleList(
+			rules, _, err := client.ACL().BindingRuleList(
 				"k8s",
 				&api.QueryOptions{Token: "root"},
 			)
@@ -141,7 +141,7 @@ func TestRoleBindingRuleDeleteCommand(t *testing.T) {
 		require.Contains(t, output, fmt.Sprintf("deleted successfully"))
 		require.Contains(t, output, id)
 
-		rule, _, err := client.ACL().RoleBindingRuleRead(
+		rule, _, err := client.ACL().BindingRuleRead(
 			id,
 			&api.QueryOptions{Token: "root"},
 		)
@@ -169,7 +169,7 @@ func TestRoleBindingRuleDeleteCommand(t *testing.T) {
 		require.Contains(t, output, fmt.Sprintf("deleted successfully"))
 		require.Contains(t, output, id)
 
-		rule, _, err := client.ACL().RoleBindingRuleRead(
+		rule, _, err := client.ACL().BindingRuleRead(
 			id,
 			&api.QueryOptions{Token: "root"},
 		)
@@ -191,6 +191,6 @@ func TestRoleBindingRuleDeleteCommand(t *testing.T) {
 
 		code := cmd.Run(args)
 		require.Equal(t, code, 1)
-		require.Contains(t, ui.ErrorWriter.String(), "Error determining role binding rule ID")
+		require.Contains(t, ui.ErrorWriter.String(), "Error determining binding rule ID")
 	})
 }

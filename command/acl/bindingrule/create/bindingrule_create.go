@@ -39,7 +39,7 @@ func (c *cmd) init() {
 		&c.showMeta,
 		"meta",
 		false,
-		"Indicates that role binding rule metadata such "+
+		"Indicates that binding rule metadata such "+
 			"as the content hash and raft indices should be shown for each entry.",
 	)
 
@@ -47,14 +47,14 @@ func (c *cmd) init() {
 		&c.idpName,
 		"idp-name",
 		"",
-		"The identity provider's name for which this role binding rule applies. "+
+		"The identity provider's name for which this binding rule applies. "+
 			"This flag is required.",
 	)
 	c.flags.StringVar(
 		&c.description,
 		"description",
 		"",
-		"A description of the role binding rule.",
+		"A description of the binding rule.",
 	)
 	c.flags.Var(
 		(*flags.AppendSliceValue)(&c.matchSelectors),
@@ -98,13 +98,13 @@ func (c *cmd) Run(args []string) int {
 		return 1
 	}
 
-	found, err := acl.ParseRoleBindingRuleMatchSelectors(c.matchSelectors)
+	found, err := acl.ParseBindingRuleMatchSelectors(c.matchSelectors)
 	if err != nil {
 		c.UI.Error(err.Error())
 		return 1
 	}
 
-	newRule := &api.ACLRoleBindingRule{
+	newRule := &api.ACLBindingRule{
 		Description: c.description,
 		IDPName:     c.idpName,
 		RoleName:    c.roleName,
@@ -118,13 +118,13 @@ func (c *cmd) Run(args []string) int {
 		return 1
 	}
 
-	rule, _, err := client.ACL().RoleBindingRuleCreate(newRule, nil)
+	rule, _, err := client.ACL().BindingRuleCreate(newRule, nil)
 	if err != nil {
-		c.UI.Error(fmt.Sprintf("Failed to create new role binding rule: %v", err))
+		c.UI.Error(fmt.Sprintf("Failed to create new binding rule: %v", err))
 		return 1
 	}
 
-	aclhelpers.PrintRoleBindingRule(rule, c.UI, c.showMeta)
+	aclhelpers.PrintBindingRule(rule, c.UI, c.showMeta)
 	return 0
 }
 
@@ -136,14 +136,14 @@ func (c *cmd) Help() string {
 	return flags.Usage(c.help, nil)
 }
 
-const synopsis = "Create an ACL Role Binding Rule"
+const synopsis = "Create an ACL Binding Rule"
 
 const help = `
-Usage: consul acl rolebindingrule create [options]
+Usage: consul acl binding-rule create [options]
 
-  Create a new role binding rule:
+  Create a new binding rule:
 
-     $ consul acl rolebindingrule create \
+     $ consul acl binding-rule create \
             -idp-name=minikube \
             -role-name="k8s-{{serviceaccount.name}}" \
             -match-selector='serviceaccount.namespace=default,serviceaccount.name=web' \

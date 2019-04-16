@@ -182,16 +182,16 @@ func (s *Server) evaluateRoleBindings(idpName string, validationResp *LoginValid
 	}
 
 	// Only fetch rules that are relevant for this idp.
-	_, rules, err := s.fsm.State().ACLRoleBindingRuleList(nil, idpName)
+	_, rules, err := s.fsm.State().ACLBindingRuleList(nil, idpName)
 	if err != nil {
 		return nil, err
 	} else if len(rules) == 0 {
 		return nil, nil
 	}
 
-	var matchingRules []*structs.ACLRoleBindingRule
+	var matchingRules []*structs.ACLBindingRule
 	for _, rule := range rules {
-		if doesRoleBindingRuleMatch(rule, validationResp.Fields) {
+		if doesBindingRuleMatch(rule, validationResp.Fields) {
 			matchingRules = append(matchingRules, rule)
 		}
 	}
@@ -226,7 +226,7 @@ func (s *Server) evaluateRoleBindings(idpName string, validationResp *LoginValid
 	return roleLinks, nil
 }
 
-func doesRoleBindingRuleMatch(rule *structs.ACLRoleBindingRule, fields map[string]string) bool {
+func doesBindingRuleMatch(rule *structs.ACLBindingRule, fields map[string]string) bool {
 	if len(rule.Matches) == 0 {
 		return true // catch-all
 	}

@@ -703,12 +703,12 @@ func (s *HTTPServer) ACLRoleDelete(resp http.ResponseWriter, req *http.Request, 
 	return true, nil
 }
 
-func (s *HTTPServer) ACLRoleBindingRuleList(resp http.ResponseWriter, req *http.Request) (interface{}, error) {
+func (s *HTTPServer) ACLBindingRuleList(resp http.ResponseWriter, req *http.Request) (interface{}, error) {
 	if s.checkACLDisabled(resp, req) {
 		return nil, nil
 	}
 
-	var args structs.ACLRoleBindingRuleListRequest
+	var args structs.ACLBindingRuleListRequest
 	if done := s.parse(resp, req, &args.Datacenter, &args.QueryOptions); done {
 		return nil, nil
 	}
@@ -719,53 +719,53 @@ func (s *HTTPServer) ACLRoleBindingRuleList(resp http.ResponseWriter, req *http.
 
 	args.IDPName = req.URL.Query().Get("idp")
 
-	var out structs.ACLRoleBindingRuleListResponse
+	var out structs.ACLBindingRuleListResponse
 	defer setMeta(resp, &out.QueryMeta)
-	if err := s.agent.RPC("ACL.RoleBindingRuleList", &args, &out); err != nil {
+	if err := s.agent.RPC("ACL.BindingRuleList", &args, &out); err != nil {
 		return nil, err
 	}
 
 	// make sure we return an array and not nil
-	if out.RoleBindingRules == nil {
-		out.RoleBindingRules = make(structs.ACLRoleBindingRules, 0)
+	if out.BindingRules == nil {
+		out.BindingRules = make(structs.ACLBindingRules, 0)
 	}
 
-	return out.RoleBindingRules, nil
+	return out.BindingRules, nil
 }
 
-func (s *HTTPServer) ACLRoleBindingRuleCRUD(resp http.ResponseWriter, req *http.Request) (interface{}, error) {
+func (s *HTTPServer) ACLBindingRuleCRUD(resp http.ResponseWriter, req *http.Request) (interface{}, error) {
 	if s.checkACLDisabled(resp, req) {
 		return nil, nil
 	}
 
-	var fn func(resp http.ResponseWriter, req *http.Request, roleBindingRuleID string) (interface{}, error)
+	var fn func(resp http.ResponseWriter, req *http.Request, bindingRuleID string) (interface{}, error)
 
 	switch req.Method {
 	case "GET":
-		fn = s.ACLRoleBindingRuleRead
+		fn = s.ACLBindingRuleRead
 
 	case "PUT":
-		fn = s.ACLRoleBindingRuleWrite
+		fn = s.ACLBindingRuleWrite
 
 	case "DELETE":
-		fn = s.ACLRoleBindingRuleDelete
+		fn = s.ACLBindingRuleDelete
 
 	default:
 		return nil, MethodNotAllowedError{req.Method, []string{"GET", "PUT", "DELETE"}}
 	}
 
-	roleBindingRuleID := strings.TrimPrefix(req.URL.Path, "/v1/acl/bindingrule/")
-	if roleBindingRuleID == "" && req.Method != "PUT" {
-		return nil, BadRequestError{Reason: "Missing role binding rule ID"}
+	bindingRuleID := strings.TrimPrefix(req.URL.Path, "/v1/acl/binding-rule/")
+	if bindingRuleID == "" && req.Method != "PUT" {
+		return nil, BadRequestError{Reason: "Missing binding rule ID"}
 	}
 
-	return fn(resp, req, roleBindingRuleID)
+	return fn(resp, req, bindingRuleID)
 }
 
-func (s *HTTPServer) ACLRoleBindingRuleRead(resp http.ResponseWriter, req *http.Request, roleBindingRuleID string) (interface{}, error) {
-	args := structs.ACLRoleBindingRuleGetRequest{
-		Datacenter:        s.agent.config.Datacenter,
-		RoleBindingRuleID: roleBindingRuleID,
+func (s *HTTPServer) ACLBindingRuleRead(resp http.ResponseWriter, req *http.Request, bindingRuleID string) (interface{}, error) {
+	args := structs.ACLBindingRuleGetRequest{
+		Datacenter:    s.agent.config.Datacenter,
+		BindingRuleID: bindingRuleID,
 	}
 	if done := s.parse(resp, req, &args.Datacenter, &args.QueryOptions); done {
 		return nil, nil
@@ -775,61 +775,61 @@ func (s *HTTPServer) ACLRoleBindingRuleRead(resp http.ResponseWriter, req *http.
 		args.Datacenter = s.agent.config.Datacenter
 	}
 
-	var out structs.ACLRoleBindingRuleResponse
+	var out structs.ACLBindingRuleResponse
 	defer setMeta(resp, &out.QueryMeta)
-	if err := s.agent.RPC("ACL.RoleBindingRuleRead", &args, &out); err != nil {
+	if err := s.agent.RPC("ACL.BindingRuleRead", &args, &out); err != nil {
 		return nil, err
 	}
 
-	if out.RoleBindingRule == nil {
+	if out.BindingRule == nil {
 		resp.WriteHeader(http.StatusNotFound)
 		return nil, nil
 	}
 
-	return out.RoleBindingRule, nil
+	return out.BindingRule, nil
 }
 
-func (s *HTTPServer) ACLRoleBindingRuleCreate(resp http.ResponseWriter, req *http.Request) (interface{}, error) {
+func (s *HTTPServer) ACLBindingRuleCreate(resp http.ResponseWriter, req *http.Request) (interface{}, error) {
 	if s.checkACLDisabled(resp, req) {
 		return nil, nil
 	}
 
-	return s.ACLRoleBindingRuleWrite(resp, req, "")
+	return s.ACLBindingRuleWrite(resp, req, "")
 }
 
-func (s *HTTPServer) ACLRoleBindingRuleWrite(resp http.ResponseWriter, req *http.Request, roleBindingRuleID string) (interface{}, error) {
-	args := structs.ACLRoleBindingRuleSetRequest{
+func (s *HTTPServer) ACLBindingRuleWrite(resp http.ResponseWriter, req *http.Request, bindingRuleID string) (interface{}, error) {
+	args := structs.ACLBindingRuleSetRequest{
 		Datacenter: s.agent.config.Datacenter,
 	}
 	s.parseToken(req, &args.Token)
 
-	if err := decodeBody(req, &args.RoleBindingRule, fixTimeAndHashFields); err != nil {
-		return nil, BadRequestError{Reason: fmt.Sprintf("RoleBindingRule decoding failed: %v", err)}
+	if err := decodeBody(req, &args.BindingRule, fixTimeAndHashFields); err != nil {
+		return nil, BadRequestError{Reason: fmt.Sprintf("BindingRule decoding failed: %v", err)}
 	}
 
-	if args.RoleBindingRule.ID != "" && args.RoleBindingRule.ID != roleBindingRuleID {
-		return nil, BadRequestError{Reason: "RoleBindingRule ID in URL and payload do not match"}
-	} else if args.RoleBindingRule.ID == "" {
-		args.RoleBindingRule.ID = roleBindingRuleID
+	if args.BindingRule.ID != "" && args.BindingRule.ID != bindingRuleID {
+		return nil, BadRequestError{Reason: "BindingRule ID in URL and payload do not match"}
+	} else if args.BindingRule.ID == "" {
+		args.BindingRule.ID = bindingRuleID
 	}
 
-	var out structs.ACLRoleBindingRule
-	if err := s.agent.RPC("ACL.RoleBindingRuleSet", args, &out); err != nil {
+	var out structs.ACLBindingRule
+	if err := s.agent.RPC("ACL.BindingRuleSet", args, &out); err != nil {
 		return nil, err
 	}
 
 	return &out, nil
 }
 
-func (s *HTTPServer) ACLRoleBindingRuleDelete(resp http.ResponseWriter, req *http.Request, roleBindingRuleID string) (interface{}, error) {
-	args := structs.ACLRoleBindingRuleDeleteRequest{
-		Datacenter:        s.agent.config.Datacenter,
-		RoleBindingRuleID: roleBindingRuleID,
+func (s *HTTPServer) ACLBindingRuleDelete(resp http.ResponseWriter, req *http.Request, bindingRuleID string) (interface{}, error) {
+	args := structs.ACLBindingRuleDeleteRequest{
+		Datacenter:    s.agent.config.Datacenter,
+		BindingRuleID: bindingRuleID,
 	}
 	s.parseToken(req, &args.Token)
 
 	var ignored bool
-	if err := s.agent.RPC("ACL.RoleBindingRuleDelete", args, &ignored); err != nil {
+	if err := s.agent.RPC("ACL.BindingRuleDelete", args, &ignored); err != nil {
 		return nil, err
 	}
 

@@ -193,7 +193,7 @@ func PrintIdentityProviderListEntry(idp *api.ACLIdentityProviderListEntry, ui cl
 	}
 }
 
-func PrintRoleBindingRule(rule *api.ACLRoleBindingRule, ui cli.Ui, showMeta bool) {
+func PrintBindingRule(rule *api.ACLBindingRule, ui cli.Ui, showMeta bool) {
 	ui.Info(fmt.Sprintf("ID:           %s", rule.ID))
 	ui.Info(fmt.Sprintf("IDPName:      %s", rule.IDPName))
 	ui.Info(fmt.Sprintf("Description:  %s", rule.Description))
@@ -212,7 +212,7 @@ func PrintRoleBindingRule(rule *api.ACLRoleBindingRule, ui cli.Ui, showMeta bool
 	}
 }
 
-func PrintRoleBindingRuleListEntry(rule *api.ACLRoleBindingRule, ui cli.Ui, showMeta bool) {
+func PrintBindingRuleListEntry(rule *api.ACLBindingRule, ui cli.Ui, showMeta bool) {
 	ui.Info(fmt.Sprintf("%s:", rule.ID))
 	ui.Info(fmt.Sprintf("   IDPName:      %s", rule.IDPName))
 	ui.Info(fmt.Sprintf("   Description:  %s", rule.Description))
@@ -391,13 +391,13 @@ func GetRoleIDByName(client *api.Client, name string) (string, error) {
 	return "", fmt.Errorf("No such role with name %s", name)
 }
 
-func GetRoleBindingRuleIDFromPartial(client *api.Client, partialID string) (string, error) {
+func GetBindingRuleIDFromPartial(client *api.Client, partialID string) (string, error) {
 	// the full UUID string was given
 	if len(partialID) == 36 {
 		return partialID, nil
 	}
 
-	rules, _, err := client.ACL().RoleBindingRuleList("", nil)
+	rules, _, err := client.ACL().BindingRuleList("", nil)
 	if err != nil {
 		return "", err
 	}
@@ -440,8 +440,8 @@ func ExtractServiceIdentities(serviceIdents []string) ([]*api.ACLServiceIdentity
 	return out, nil
 }
 
-func ParseRoleBindingRuleMatchSelectors(matchSelectors []string) ([]*api.ACLRoleBindingRuleMatch, error) {
-	var found []*api.ACLRoleBindingRuleMatch
+func ParseBindingRuleMatchSelectors(matchSelectors []string) ([]*api.ACLBindingRuleMatch, error) {
+	var found []*api.ACLBindingRuleMatch
 
 	for _, rawMatch := range matchSelectors {
 		rawSelectors := strings.Split(rawMatch, ",")
@@ -449,7 +449,7 @@ func ParseRoleBindingRuleMatchSelectors(matchSelectors []string) ([]*api.ACLRole
 			return nil, fmt.Errorf("Invalid match selector: %s", rawMatch)
 		}
 
-		var m api.ACLRoleBindingRuleMatch
+		var m api.ACLBindingRuleMatch
 		for _, rawSelector := range rawSelectors {
 			selector := strings.TrimSpace(rawSelector)
 			if selector == "" {

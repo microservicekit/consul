@@ -8,7 +8,7 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-func TestDoesRoleBindingRuleMatch(t *testing.T) {
+func TestDoesBindingRuleMatch(t *testing.T) {
 	makeF := func(s string) map[string]string {
 		kvs := strings.Split(s, " ")
 		out := make(map[string]string)
@@ -47,20 +47,20 @@ func TestDoesRoleBindingRuleMatch(t *testing.T) {
 		{"1 term ok (no selectors)",
 			nil, nil, makeF("a=b"), true},
 	} {
-		var rule structs.ACLRoleBindingRule
+		var rule structs.ACLBindingRule
 		if len(test.match1) > 0 {
-			rule.Matches = append(rule.Matches, &structs.ACLRoleBindingRuleMatch{
+			rule.Matches = append(rule.Matches, &structs.ACLBindingRuleMatch{
 				Selector: test.match1,
 			})
 		}
 		if len(test.match2) > 0 {
-			rule.Matches = append(rule.Matches, &structs.ACLRoleBindingRuleMatch{
+			rule.Matches = append(rule.Matches, &structs.ACLBindingRuleMatch{
 				Selector: test.match2,
 			})
 		}
 
 		t.Run(test.name, func(t *testing.T) {
-			ok := doesRoleBindingRuleMatch(&rule, test.fields)
+			ok := doesBindingRuleMatch(&rule, test.fields)
 			require.Equal(t, test.ok, ok)
 		})
 	}

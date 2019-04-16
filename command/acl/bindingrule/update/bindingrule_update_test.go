@@ -18,7 +18,7 @@ import (
 	uuid "github.com/hashicorp/go-uuid"
 )
 
-func TestRoleBindingRuleUpdateCommand_noTabs(t *testing.T) {
+func TestBindingRuleUpdateCommand_noTabs(t *testing.T) {
 	t.Parallel()
 
 	if strings.ContainsRune(New(cli.NewMockUi()).Help(), '\t') {
@@ -26,7 +26,7 @@ func TestRoleBindingRuleUpdateCommand_noTabs(t *testing.T) {
 	}
 }
 
-func TestRoleBindingRuleUpdateCommand(t *testing.T) {
+func TestBindingRuleUpdateCommand(t *testing.T) {
 	t.Parallel()
 
 	testDir := testutil.TempDir(t, "acl")
@@ -65,14 +65,14 @@ func TestRoleBindingRuleUpdateCommand(t *testing.T) {
 	}
 
 	deleteRules := func(t *testing.T) {
-		rules, _, err := client.ACL().RoleBindingRuleList(
+		rules, _, err := client.ACL().BindingRuleList(
 			"k8s",
 			&api.QueryOptions{Token: "root"},
 		)
 		require.NoError(t, err)
 
 		for _, rule := range rules {
-			_, err := client.ACL().RoleBindingRuleDelete(
+			_, err := client.ACL().BindingRuleDelete(
 				rule.ID,
 				&api.WriteOptions{Token: "root"},
 			)
@@ -91,7 +91,7 @@ func TestRoleBindingRuleUpdateCommand(t *testing.T) {
 
 		code := cmd.Run(args)
 		require.Equal(t, code, 1)
-		require.Contains(t, ui.ErrorWriter.String(), "Cannot update a role binding rule without specifying the -id parameter")
+		require.Contains(t, ui.ErrorWriter.String(), "Cannot update a binding rule without specifying the -id parameter")
 	})
 
 	t.Run("must use roughly valid match selectors", func(t *testing.T) {
@@ -128,7 +128,7 @@ func TestRoleBindingRuleUpdateCommand(t *testing.T) {
 
 		code := cmd.Run(args)
 		require.Equal(t, code, 1)
-		require.Contains(t, ui.ErrorWriter.String(), "Error determining role binding rule ID")
+		require.Contains(t, ui.ErrorWriter.String(), "Error determining binding rule ID")
 	})
 
 	t.Run("rule id exact match doesn't exist", func(t *testing.T) {
@@ -146,18 +146,18 @@ func TestRoleBindingRuleUpdateCommand(t *testing.T) {
 
 		code := cmd.Run(args)
 		require.Equal(t, code, 1)
-		require.Contains(t, ui.ErrorWriter.String(), "Role binding rule not found with ID")
+		require.Contains(t, ui.ErrorWriter.String(), "Binding rule not found with ID")
 	})
 
 	createRule := func(t *testing.T) string {
-		rule, _, err := client.ACL().RoleBindingRuleCreate(
-			&api.ACLRoleBindingRule{
+		rule, _, err := client.ACL().BindingRuleCreate(
+			&api.ACLBindingRule{
 				IDPName:     "k8s",
 				Description: "test rule",
 				RoleName:    "k8s-{{serviceaccount.name}}",
 				MustExist:   false,
-				Matches: []*api.ACLRoleBindingRuleMatch{
-					&api.ACLRoleBindingRuleMatch{
+				Matches: []*api.ACLBindingRuleMatch{
+					&api.ACLBindingRuleMatch{
 						Selector: []string{
 							"serviceaccount.namespace=default",
 						},
@@ -173,7 +173,7 @@ func TestRoleBindingRuleUpdateCommand(t *testing.T) {
 	createDupe := func(t *testing.T) string {
 		for {
 			// Check for 1-char duplicates.
-			rules, _, err := client.ACL().RoleBindingRuleList(
+			rules, _, err := client.ACL().BindingRuleList(
 				"k8s",
 				&api.QueryOptions{Token: "root"},
 			)
@@ -207,7 +207,7 @@ func TestRoleBindingRuleUpdateCommand(t *testing.T) {
 
 		code := cmd.Run(args)
 		require.Equal(t, code, 1)
-		require.Contains(t, ui.ErrorWriter.String(), "Error determining role binding rule ID")
+		require.Contains(t, ui.ErrorWriter.String(), "Error determining binding rule ID")
 	})
 
 	t.Run("update all fields", func(t *testing.T) {
@@ -227,10 +227,10 @@ func TestRoleBindingRuleUpdateCommand(t *testing.T) {
 		}
 
 		code := cmd.Run(args)
-		require.Equal(t, code, 0)
+		require.Equal(t, code, 0, "err: %s", ui.ErrorWriter.String())
 		require.Empty(t, ui.ErrorWriter.String())
 
-		rule, _, err := client.ACL().RoleBindingRuleRead(
+		rule, _, err := client.ACL().BindingRuleRead(
 			id,
 			&api.QueryOptions{Token: "root"},
 		)
@@ -269,10 +269,10 @@ func TestRoleBindingRuleUpdateCommand(t *testing.T) {
 		}
 
 		code := cmd.Run(args)
-		require.Equal(t, code, 0)
+		require.Equal(t, code, 0, "err: %s", ui.ErrorWriter.String())
 		require.Empty(t, ui.ErrorWriter.String())
 
-		rule, _, err := client.ACL().RoleBindingRuleRead(
+		rule, _, err := client.ACL().BindingRuleRead(
 			id,
 			&api.QueryOptions{Token: "root"},
 		)
@@ -308,10 +308,10 @@ func TestRoleBindingRuleUpdateCommand(t *testing.T) {
 		}
 
 		code := cmd.Run(args)
-		require.Equal(t, code, 0)
+		require.Equal(t, code, 0, "err: %s", ui.ErrorWriter.String())
 		require.Empty(t, ui.ErrorWriter.String())
 
-		rule, _, err := client.ACL().RoleBindingRuleRead(
+		rule, _, err := client.ACL().BindingRuleRead(
 			id,
 			&api.QueryOptions{Token: "root"},
 		)
@@ -347,10 +347,10 @@ func TestRoleBindingRuleUpdateCommand(t *testing.T) {
 		}
 
 		code := cmd.Run(args)
-		require.Equal(t, code, 0)
+		require.Equal(t, code, 0, "err: %s", ui.ErrorWriter.String())
 		require.Empty(t, ui.ErrorWriter.String())
 
-		rule, _, err := client.ACL().RoleBindingRuleRead(
+		rule, _, err := client.ACL().BindingRuleRead(
 			id,
 			&api.QueryOptions{Token: "root"},
 		)
@@ -386,10 +386,10 @@ func TestRoleBindingRuleUpdateCommand(t *testing.T) {
 		}
 
 		code := cmd.Run(args)
-		require.Equal(t, code, 0)
+		require.Equal(t, code, 0, "err: %s", ui.ErrorWriter.String())
 		require.Empty(t, ui.ErrorWriter.String())
 
-		rule, _, err := client.ACL().RoleBindingRuleRead(
+		rule, _, err := client.ACL().BindingRuleRead(
 			id,
 			&api.QueryOptions{Token: "root"},
 		)
@@ -425,10 +425,10 @@ func TestRoleBindingRuleUpdateCommand(t *testing.T) {
 		}
 
 		code := cmd.Run(args)
-		require.Equal(t, code, 0)
+		require.Equal(t, code, 0, "err: %s", ui.ErrorWriter.String())
 		require.Empty(t, ui.ErrorWriter.String())
 
-		rule, _, err := client.ACL().RoleBindingRuleRead(
+		rule, _, err := client.ACL().BindingRuleRead(
 			id,
 			&api.QueryOptions{Token: "root"},
 		)
@@ -446,7 +446,7 @@ func TestRoleBindingRuleUpdateCommand(t *testing.T) {
 	})
 }
 
-func TestRoleBindingRuleUpdateCommand_noMerge(t *testing.T) {
+func TestBindingRuleUpdateCommand_noMerge(t *testing.T) {
 	t.Parallel()
 
 	testDir := testutil.TempDir(t, "acl")
@@ -485,14 +485,14 @@ func TestRoleBindingRuleUpdateCommand_noMerge(t *testing.T) {
 	}
 
 	deleteRules := func(t *testing.T) {
-		rules, _, err := client.ACL().RoleBindingRuleList(
+		rules, _, err := client.ACL().BindingRuleList(
 			"k8s",
 			&api.QueryOptions{Token: "root"},
 		)
 		require.NoError(t, err)
 
 		for _, rule := range rules {
-			_, err := client.ACL().RoleBindingRuleDelete(
+			_, err := client.ACL().BindingRuleDelete(
 				rule.ID,
 				&api.WriteOptions{Token: "root"},
 			)
@@ -512,7 +512,7 @@ func TestRoleBindingRuleUpdateCommand_noMerge(t *testing.T) {
 
 		code := cmd.Run(args)
 		require.Equal(t, code, 1)
-		require.Contains(t, ui.ErrorWriter.String(), "Cannot update a role binding rule without specifying the -id parameter")
+		require.Contains(t, ui.ErrorWriter.String(), "Cannot update a binding rule without specifying the -id parameter")
 	})
 
 	t.Run("must use roughly valid match selectors", func(t *testing.T) {
@@ -551,7 +551,7 @@ func TestRoleBindingRuleUpdateCommand_noMerge(t *testing.T) {
 
 		code := cmd.Run(args)
 		require.Equal(t, code, 1)
-		require.Contains(t, ui.ErrorWriter.String(), "Error determining role binding rule ID")
+		require.Contains(t, ui.ErrorWriter.String(), "Error determining binding rule ID")
 	})
 
 	t.Run("rule id exact match doesn't exist", func(t *testing.T) {
@@ -570,18 +570,18 @@ func TestRoleBindingRuleUpdateCommand_noMerge(t *testing.T) {
 
 		code := cmd.Run(args)
 		require.Equal(t, code, 1)
-		require.Contains(t, ui.ErrorWriter.String(), "Role binding rule not found with ID")
+		require.Contains(t, ui.ErrorWriter.String(), "Binding rule not found with ID")
 	})
 
 	createRule := func(t *testing.T) string {
-		rule, _, err := client.ACL().RoleBindingRuleCreate(
-			&api.ACLRoleBindingRule{
+		rule, _, err := client.ACL().BindingRuleCreate(
+			&api.ACLBindingRule{
 				IDPName:     "k8s",
 				Description: "test rule",
 				RoleName:    "k8s-{{serviceaccount.name}}",
 				MustExist:   true,
-				Matches: []*api.ACLRoleBindingRuleMatch{
-					&api.ACLRoleBindingRuleMatch{
+				Matches: []*api.ACLBindingRuleMatch{
+					&api.ACLBindingRuleMatch{
 						Selector: []string{
 							"serviceaccount.namespace=default",
 						},
@@ -597,7 +597,7 @@ func TestRoleBindingRuleUpdateCommand_noMerge(t *testing.T) {
 	createDupe := func(t *testing.T) string {
 		for {
 			// Check for 1-char duplicates.
-			rules, _, err := client.ACL().RoleBindingRuleList(
+			rules, _, err := client.ACL().BindingRuleList(
 				"k8s",
 				&api.QueryOptions{Token: "root"},
 			)
@@ -632,7 +632,7 @@ func TestRoleBindingRuleUpdateCommand_noMerge(t *testing.T) {
 
 		code := cmd.Run(args)
 		require.Equal(t, code, 1)
-		require.Contains(t, ui.ErrorWriter.String(), "Error determining role binding rule ID")
+		require.Contains(t, ui.ErrorWriter.String(), "Error determining binding rule ID")
 	})
 
 	t.Run("update all fields", func(t *testing.T) {
@@ -653,10 +653,10 @@ func TestRoleBindingRuleUpdateCommand_noMerge(t *testing.T) {
 		}
 
 		code := cmd.Run(args)
-		require.Equal(t, code, 0)
+		require.Equal(t, code, 0, "err: %s", ui.ErrorWriter.String())
 		require.Empty(t, ui.ErrorWriter.String())
 
-		rule, _, err := client.ACL().RoleBindingRuleRead(
+		rule, _, err := client.ACL().BindingRuleRead(
 			id,
 			&api.QueryOptions{Token: "root"},
 		)
@@ -694,10 +694,10 @@ func TestRoleBindingRuleUpdateCommand_noMerge(t *testing.T) {
 		}
 
 		code := cmd.Run(args)
-		require.Equal(t, code, 0)
+		require.Equal(t, code, 0, "err: %s", ui.ErrorWriter.String())
 		require.Empty(t, ui.ErrorWriter.String())
 
-		rule, _, err := client.ACL().RoleBindingRuleRead(
+		rule, _, err := client.ACL().BindingRuleRead(
 			id,
 			&api.QueryOptions{Token: "root"},
 		)
@@ -732,10 +732,10 @@ func TestRoleBindingRuleUpdateCommand_noMerge(t *testing.T) {
 		}
 
 		code := cmd.Run(args)
-		require.Equal(t, code, 0)
+		require.Equal(t, code, 0, "err: %s", ui.ErrorWriter.String())
 		require.Empty(t, ui.ErrorWriter.String())
 
-		rule, _, err := client.ACL().RoleBindingRuleRead(
+		rule, _, err := client.ACL().BindingRuleRead(
 			id,
 			&api.QueryOptions{Token: "root"},
 		)
@@ -790,10 +790,10 @@ func TestRoleBindingRuleUpdateCommand_noMerge(t *testing.T) {
 		}
 
 		code := cmd.Run(args)
-		require.Equal(t, code, 0)
+		require.Equal(t, code, 0, "err: %s", ui.ErrorWriter.String())
 		require.Empty(t, ui.ErrorWriter.String())
 
-		rule, _, err := client.ACL().RoleBindingRuleRead(
+		rule, _, err := client.ACL().BindingRuleRead(
 			id,
 			&api.QueryOptions{Token: "root"},
 		)
@@ -828,10 +828,10 @@ func TestRoleBindingRuleUpdateCommand_noMerge(t *testing.T) {
 		}
 
 		code := cmd.Run(args)
-		require.Equal(t, code, 0)
+		require.Equal(t, code, 0, "err: %s", ui.ErrorWriter.String())
 		require.Empty(t, ui.ErrorWriter.String())
 
-		rule, _, err := client.ACL().RoleBindingRuleRead(
+		rule, _, err := client.ACL().BindingRuleRead(
 			id,
 			&api.QueryOptions{Token: "root"},
 		)

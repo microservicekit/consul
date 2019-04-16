@@ -143,7 +143,7 @@ type ACLTokenPolicyLink struct {
 
 // ACLTokenRoleLink is a way to link a Role to a Token. At the storage layer
 // one of ID or BoundName is required. BoundName can only be set during a Login
-// operation when RoleBindingRules are evaluated. If the optional Name is
+// operation when BindingRules are evaluated. If the optional Name is
 // presented during link creation it is resolved to an ID and persisted
 // alongside a snapshot of the current Role's name, but the Name should not be
 // considered a long-term link to the Role, as the ID is used for that.
@@ -853,8 +853,8 @@ func (r *ACLRole) EstimateSize() int {
 	return size
 }
 
-type ACLRoleBindingRule struct {
-	// ID is the internal UUID associated with the role binding rule
+type ACLBindingRule struct {
+	// ID is the internal UUID associated with the binding rule
 	ID string
 
 	// Description is a human readable description (Optional)
@@ -866,7 +866,7 @@ type ACLRoleBindingRule struct {
 
 	// Matches is a list of matching rules. Elements logically are used as a
 	// disjunction (OR) when matching identities presented.
-	Matches []*ACLRoleBindingRuleMatch
+	Matches []*ACLBindingRuleMatch
 
 	// RoleName is the named ACL Role to bind to. Can be lightly templated
 	// using {{ foo }} syntax from available field names.
@@ -901,12 +901,12 @@ type ACLRoleBindingRule struct {
 	RaftIndex `hash:"ignore"`
 }
 
-func (r *ACLRoleBindingRule) Clone() *ACLRoleBindingRule {
+func (r *ACLBindingRule) Clone() *ACLBindingRule {
 	r2 := *r
 	r2.Matches = nil
 
 	if len(r.Matches) > 0 {
-		r2.Matches = make([]*ACLRoleBindingRuleMatch, len(r.Matches))
+		r2.Matches = make([]*ACLBindingRuleMatch, len(r.Matches))
 		for i, v := range r.Matches {
 			r2.Matches[i] = v.Clone()
 		}
@@ -915,21 +915,21 @@ func (r *ACLRoleBindingRule) Clone() *ACLRoleBindingRule {
 	return &r2
 }
 
-type ACLRoleBindingRules []*ACLRoleBindingRule
+type ACLBindingRules []*ACLBindingRule
 
-func (rules ACLRoleBindingRules) Sort() {
+func (rules ACLBindingRules) Sort() {
 	sort.Slice(rules, func(i, j int) bool {
 		return rules[i].ID < rules[j].ID
 	})
 }
 
-type ACLRoleBindingRuleMatch struct {
+type ACLBindingRuleMatch struct {
 	// Selector is a list of field selectors. Elements logically are used as a
 	// conjunction (AND) when matching identities presented.
 	Selector []string
 }
 
-func (m *ACLRoleBindingRuleMatch) Clone() *ACLRoleBindingRuleMatch {
+func (m *ACLBindingRuleMatch) Clone() *ACLBindingRuleMatch {
 	m2 := *m
 	m2.Selector = cloneStringSlice(m.Selector)
 	return &m2
@@ -972,7 +972,7 @@ func (idps ACLIdentityProviderListStubs) Sort() {
 
 type ACLIdentityProvider struct {
 	// Name is a unique identifier for this specific IdP. It is used later when
-	// scoping Role Binding Rules.
+	// scoping Binding Rules.
 	//
 	// Immutable once set and only settable during create.
 	Name string
@@ -1363,71 +1363,71 @@ type ACLRoleBatchDeleteRequest struct {
 	RoleIDs []string
 }
 
-// ACLRoleBindingRuleSetRequest is used at the RPC layer for creation and update requests
-type ACLRoleBindingRuleSetRequest struct {
-	RoleBindingRule ACLRoleBindingRule // The rule to upsert
-	Datacenter      string             // The datacenter to perform the request within
+// ACLBindingRuleSetRequest is used at the RPC layer for creation and update requests
+type ACLBindingRuleSetRequest struct {
+	BindingRule ACLBindingRule // The rule to upsert
+	Datacenter  string         // The datacenter to perform the request within
 	WriteRequest
 }
 
-func (r *ACLRoleBindingRuleSetRequest) RequestDatacenter() string {
+func (r *ACLBindingRuleSetRequest) RequestDatacenter() string {
 	return r.Datacenter
 }
 
-// ACLRoleBindingRuleDeleteRequest is used at the RPC layer deletion requests
-type ACLRoleBindingRuleDeleteRequest struct {
-	RoleBindingRuleID string // id of the rule to delete
-	Datacenter        string // The datacenter to perform the request within
+// ACLBindingRuleDeleteRequest is used at the RPC layer deletion requests
+type ACLBindingRuleDeleteRequest struct {
+	BindingRuleID string // id of the rule to delete
+	Datacenter    string // The datacenter to perform the request within
 	WriteRequest
 }
 
-func (r *ACLRoleBindingRuleDeleteRequest) RequestDatacenter() string {
+func (r *ACLBindingRuleDeleteRequest) RequestDatacenter() string {
 	return r.Datacenter
 }
 
-// ACLRoleBindingRuleGetRequest is used at the RPC layer to perform rule read operations
-type ACLRoleBindingRuleGetRequest struct {
-	RoleBindingRuleID string // id used for the rule lookup
-	Datacenter        string // The datacenter to perform the request within
+// ACLBindingRuleGetRequest is used at the RPC layer to perform rule read operations
+type ACLBindingRuleGetRequest struct {
+	BindingRuleID string // id used for the rule lookup
+	Datacenter    string // The datacenter to perform the request within
 	QueryOptions
 }
 
-func (r *ACLRoleBindingRuleGetRequest) RequestDatacenter() string {
+func (r *ACLBindingRuleGetRequest) RequestDatacenter() string {
 	return r.Datacenter
 }
 
-// ACLRoleBindingRuleListRequest is used at the RPC layer to request a listing of rules
-type ACLRoleBindingRuleListRequest struct {
+// ACLBindingRuleListRequest is used at the RPC layer to request a listing of rules
+type ACLBindingRuleListRequest struct {
 	IDPName    string // optional filter
 	Datacenter string // The datacenter to perform the request within
 	QueryOptions
 }
 
-func (r *ACLRoleBindingRuleListRequest) RequestDatacenter() string {
+func (r *ACLBindingRuleListRequest) RequestDatacenter() string {
 	return r.Datacenter
 }
 
-type ACLRoleBindingRuleListResponse struct {
-	RoleBindingRules ACLRoleBindingRules
+type ACLBindingRuleListResponse struct {
+	BindingRules ACLBindingRules
 	QueryMeta
 }
 
-// ACLRoleBindingRuleResponse returns a single binding + metadata
-type ACLRoleBindingRuleResponse struct {
-	RoleBindingRule *ACLRoleBindingRule
+// ACLBindingRuleResponse returns a single binding + metadata
+type ACLBindingRuleResponse struct {
+	BindingRule *ACLBindingRule
 	QueryMeta
 }
 
-// ACLRoleBindingRuleBatchSetRequest is used at the Raft layer for batching
+// ACLBindingRuleBatchSetRequest is used at the Raft layer for batching
 // multiple rule creations and updates
-type ACLRoleBindingRuleBatchSetRequest struct {
-	RoleBindingRules ACLRoleBindingRules
+type ACLBindingRuleBatchSetRequest struct {
+	BindingRules ACLBindingRules
 }
 
-// ACLRoleBindingRuleBatchDeleteRequest is used at the Raft layer for batching
+// ACLBindingRuleBatchDeleteRequest is used at the Raft layer for batching
 // multiple rule deletions
-type ACLRoleBindingRuleBatchDeleteRequest struct {
-	RoleBindingRuleIDs []string
+type ACLBindingRuleBatchDeleteRequest struct {
+	BindingRuleIDs []string
 }
 
 // ACLIdentityProviderSetRequest is used at the RPC layer for creation and update requests

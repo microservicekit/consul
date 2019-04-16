@@ -128,7 +128,7 @@ func TestLogoutCommand(t *testing.T) {
 		require.NoError(t, err)
 	}
 	{
-		_, _, err := client.ACL().RoleBindingRuleCreate(&api.ACLRoleBindingRule{
+		_, _, err := client.ACL().BindingRuleCreate(&api.ACLBindingRule{
 			IDPName:  "k8s",
 			RoleName: "{{serviceaccount.name}}",
 		},

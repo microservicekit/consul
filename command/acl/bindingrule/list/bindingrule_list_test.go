@@ -17,7 +17,7 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-func TestRoleBindingRuleListCommand_noTabs(t *testing.T) {
+func TestBindingRuleListCommand_noTabs(t *testing.T) {
 	t.Parallel()
 
 	if strings.ContainsRune(New(cli.NewMockUi()).Help(), '\t') {
@@ -25,7 +25,7 @@ func TestRoleBindingRuleListCommand_noTabs(t *testing.T) {
 	}
 }
 
-func TestRoleBindingRuleListCommand(t *testing.T) {
+func TestBindingRuleListCommand(t *testing.T) {
 	t.Parallel()
 
 	testDir := testutil.TempDir(t, "acl")
@@ -77,14 +77,14 @@ func TestRoleBindingRuleListCommand(t *testing.T) {
 	}
 
 	createRule := func(t *testing.T, idpName, description string) string {
-		rule, _, err := client.ACL().RoleBindingRuleCreate(
-			&api.ACLRoleBindingRule{
+		rule, _, err := client.ACL().BindingRuleCreate(
+			&api.ACLBindingRule{
 				IDPName:     idpName,
 				Description: description,
 				RoleName:    "k8s-{{serviceaccount.name}}",
 				MustExist:   false,
-				Matches: []*api.ACLRoleBindingRuleMatch{
-					&api.ACLRoleBindingRuleMatch{
+				Matches: []*api.ACLBindingRuleMatch{
+					&api.ACLBindingRuleMatch{
 						Selector: []string{
 							"serviceaccount.namespace=default",
 						},
