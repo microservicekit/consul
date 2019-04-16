@@ -12,7 +12,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/hashicorp/consul/api/internal"
 	"github.com/hashicorp/consul/sdk/testutil"
 	"github.com/hashicorp/consul/sdk/testutil/retry"
 	"github.com/hashicorp/serf/serf"
@@ -21,7 +20,7 @@ import (
 
 func TestAPI_AgentSelf(t *testing.T) {
 	t.Parallel()
-	c, s := internal.MakeClient(t)
+	c, s := MakeTestClient(t)
 	defer s.Stop()
 
 	agent := c.Agent()
@@ -39,7 +38,7 @@ func TestAPI_AgentSelf(t *testing.T) {
 
 func TestAPI_AgentMetrics(t *testing.T) {
 	t.Parallel()
-	c, s := internal.MakeClient(t)
+	c, s := MakeTestClient(t)
 	defer s.Stop()
 
 	agent := c.Agent()
@@ -62,7 +61,7 @@ func TestAPI_AgentMetrics(t *testing.T) {
 
 func TestAPI_AgentHost(t *testing.T) {
 	t.Parallel()
-	c, s := internal.MakeClient(t)
+	c, s := MakeTestClient(t)
 	defer s.Stop()
 
 	agent := c.Agent()
@@ -93,7 +92,7 @@ func TestAPI_AgentReload(t *testing.T) {
 		t.Fatalf("Unable to create file %v, got error:%v", cfgFilePath, err)
 	}
 
-	c, s := internal.MakeClientWithConfig(t, nil, func(conf *testutil.TestServerConfig) {
+	c, s := MakeTestClientWithConfig(t, nil, func(conf *testutil.TestServerConfig) {
 		conf.Args = []string{"-config-file", configFile.Name()}
 	})
 	defer s.Stop()
@@ -130,8 +129,8 @@ func TestAPI_AgentReload(t *testing.T) {
 
 func TestAPI_AgentMembersOpts(t *testing.T) {
 	t.Parallel()
-	c, s1 := internal.MakeClient(t)
-	_, s2 := internal.MakeClientWithConfig(t, nil, func(c *testutil.TestServerConfig) {
+	c, s1 := MakeTestClient(t)
+	_, s2 := MakeTestClientWithConfig(t, nil, func(c *testutil.TestServerConfig) {
 		c.Datacenter = "dc2"
 	})
 	defer s1.Stop()
@@ -153,7 +152,7 @@ func TestAPI_AgentMembersOpts(t *testing.T) {
 
 func TestAPI_AgentMembers(t *testing.T) {
 	t.Parallel()
-	c, s := internal.MakeClient(t)
+	c, s := MakeTestClient(t)
 	defer s.Stop()
 
 	agent := c.Agent()
@@ -170,7 +169,7 @@ func TestAPI_AgentMembers(t *testing.T) {
 
 func TestAPI_AgentServices(t *testing.T) {
 	t.Parallel()
-	c, s := internal.MakeClient(t)
+	c, s := MakeTestClient(t)
 	defer s.Stop()
 
 	agent := c.Agent()
@@ -234,7 +233,7 @@ func TestAPI_AgentServices(t *testing.T) {
 
 func TestAPI_AgentServices_ManagedConnectProxy(t *testing.T) {
 	t.Parallel()
-	c, s := internal.MakeClient(t)
+	c, s := MakeTestClient(t)
 	defer s.Stop()
 
 	agent := c.Agent()
@@ -296,7 +295,7 @@ func TestAPI_AgentServices_ManagedConnectProxy(t *testing.T) {
 
 func TestAPI_AgentServices_ManagedConnectProxyDeprecatedUpstreams(t *testing.T) {
 	t.Parallel()
-	c, s := internal.MakeClient(t)
+	c, s := MakeTestClient(t)
 	defer s.Stop()
 
 	agent := c.Agent()
@@ -372,7 +371,7 @@ func TestAPI_AgentServices_ManagedConnectProxyDeprecatedUpstreams(t *testing.T) 
 
 func TestAPI_AgentServices_SidecarService(t *testing.T) {
 	t.Parallel()
-	c, s := internal.MakeClient(t)
+	c, s := MakeTestClient(t)
 	defer s.Stop()
 
 	agent := c.Agent()
@@ -418,7 +417,7 @@ func TestAPI_AgentServices_SidecarService(t *testing.T) {
 
 func TestAPI_AgentServices_ExternalConnectProxy(t *testing.T) {
 	t.Parallel()
-	c, s := internal.MakeClient(t)
+	c, s := MakeTestClient(t)
 	defer s.Stop()
 
 	agent := c.Agent()
@@ -465,7 +464,7 @@ func TestAPI_AgentServices_ExternalConnectProxy(t *testing.T) {
 
 func TestAPI_AgentServices_CheckPassing(t *testing.T) {
 	t.Parallel()
-	c, s := internal.MakeClient(t)
+	c, s := MakeTestClient(t)
 	defer s.Stop()
 
 	agent := c.Agent()
@@ -509,7 +508,7 @@ func TestAPI_AgentServices_CheckPassing(t *testing.T) {
 
 func TestAPI_AgentServices_CheckBadStatus(t *testing.T) {
 	t.Parallel()
-	c, s := internal.MakeClient(t)
+	c, s := MakeTestClient(t)
 	defer s.Stop()
 
 	agent := c.Agent()
@@ -529,7 +528,7 @@ func TestAPI_AgentServices_CheckBadStatus(t *testing.T) {
 
 func TestAPI_AgentServices_CheckID(t *testing.T) {
 	t.Parallel()
-	c, s := internal.MakeClient(t)
+	c, s := MakeTestClient(t)
 	defer s.Stop()
 
 	agent := c.Agent()
@@ -557,7 +556,7 @@ func TestAPI_AgentServices_CheckID(t *testing.T) {
 
 func TestAPI_AgentServiceAddress(t *testing.T) {
 	t.Parallel()
-	c, s := internal.MakeClient(t)
+	c, s := MakeTestClient(t)
 	defer s.Stop()
 
 	agent := c.Agent()
@@ -604,7 +603,7 @@ func TestAPI_AgentServiceAddress(t *testing.T) {
 
 func TestAPI_AgentEnableTagOverride(t *testing.T) {
 	t.Parallel()
-	c, s := internal.MakeClient(t)
+	c, s := MakeTestClient(t)
 	defer s.Stop()
 
 	agent := c.Agent()
@@ -647,7 +646,7 @@ func TestAPI_AgentEnableTagOverride(t *testing.T) {
 
 func TestAPI_AgentServices_MultipleChecks(t *testing.T) {
 	t.Parallel()
-	c, s := internal.MakeClient(t)
+	c, s := MakeTestClient(t)
 	defer s.Stop()
 
 	agent := c.Agent()
@@ -691,7 +690,7 @@ func TestAPI_AgentServices_MultipleChecks(t *testing.T) {
 
 func TestAPI_AgentService(t *testing.T) {
 	t.Parallel()
-	c, s := internal.MakeClient(t)
+	c, s := MakeTestClient(t)
 	defer s.Stop()
 
 	agent := c.Agent()
@@ -746,7 +745,7 @@ func TestAPI_AgentService(t *testing.T) {
 
 func TestAPI_AgentSetTTLStatus(t *testing.T) {
 	t.Parallel()
-	c, s := internal.MakeClient(t)
+	c, s := MakeTestClient(t)
 	defer s.Stop()
 
 	agent := c.Agent()
@@ -831,7 +830,7 @@ func TestAPI_AgentSetTTLStatus(t *testing.T) {
 
 func TestAPI_AgentChecks(t *testing.T) {
 	t.Parallel()
-	c, s := internal.MakeClient(t)
+	c, s := MakeTestClient(t)
 	defer s.Stop()
 
 	agent := c.Agent()
@@ -863,7 +862,7 @@ func TestAPI_AgentChecks(t *testing.T) {
 
 func TestAPI_AgentScriptCheck(t *testing.T) {
 	t.Parallel()
-	c, s := internal.MakeClientWithConfig(t, nil, func(c *testutil.TestServerConfig) {
+	c, s := MakeTestClientWithConfig(t, nil, func(c *testutil.TestServerConfig) {
 		c.EnableScriptChecks = true
 	})
 	defer s.Stop()
@@ -926,7 +925,7 @@ func TestAPI_AgentScriptCheck(t *testing.T) {
 
 func TestAPI_AgentCheckStartPassing(t *testing.T) {
 	t.Parallel()
-	c, s := internal.MakeClient(t)
+	c, s := MakeTestClient(t)
 	defer s.Stop()
 
 	agent := c.Agent()
@@ -961,7 +960,7 @@ func TestAPI_AgentCheckStartPassing(t *testing.T) {
 
 func TestAPI_AgentChecks_serviceBound(t *testing.T) {
 	t.Parallel()
-	c, s := internal.MakeClient(t)
+	c, s := MakeTestClient(t)
 	defer s.Stop()
 
 	agent := c.Agent()
@@ -1008,7 +1007,7 @@ func TestAPI_AgentChecks_serviceBound(t *testing.T) {
 
 func TestAPI_AgentChecks_Docker(t *testing.T) {
 	t.Parallel()
-	c, s := internal.MakeClientWithConfig(t, nil, func(c *testutil.TestServerConfig) {
+	c, s := MakeTestClientWithConfig(t, nil, func(c *testutil.TestServerConfig) {
 		c.EnableScriptChecks = true
 	})
 	defer s.Stop()
@@ -1054,7 +1053,7 @@ func TestAPI_AgentChecks_Docker(t *testing.T) {
 
 func TestAPI_AgentJoin(t *testing.T) {
 	t.Parallel()
-	c, s := internal.MakeClient(t)
+	c, s := MakeTestClient(t)
 	defer s.Stop()
 
 	agent := c.Agent()
@@ -1076,10 +1075,10 @@ func TestAPI_AgentJoin(t *testing.T) {
 
 func TestAPI_AgentLeave(t *testing.T) {
 	t.Parallel()
-	c1, s1 := internal.MakeClient(t)
+	c1, s1 := MakeTestClient(t)
 	defer s1.Stop()
 
-	c2, s2 := internal.MakeClientWithConfig(t, nil, func(conf *testutil.TestServerConfig) {
+	c2, s2 := MakeTestClientWithConfig(t, nil, func(conf *testutil.TestServerConfig) {
 		conf.Server = false
 		conf.Bootstrap = false
 	})
@@ -1111,7 +1110,7 @@ func TestAPI_AgentLeave(t *testing.T) {
 
 func TestAPI_AgentForceLeave(t *testing.T) {
 	t.Parallel()
-	c, s := internal.MakeClient(t)
+	c, s := MakeTestClient(t)
 	defer s.Stop()
 
 	agent := c.Agent()
@@ -1125,7 +1124,7 @@ func TestAPI_AgentForceLeave(t *testing.T) {
 
 func TestAPI_AgentMonitor(t *testing.T) {
 	t.Parallel()
-	c, s := internal.MakeClient(t)
+	c, s := MakeTestClient(t)
 	defer s.Stop()
 
 	agent := c.Agent()
@@ -1148,7 +1147,7 @@ func TestAPI_AgentMonitor(t *testing.T) {
 
 func TestAPI_ServiceMaintenance(t *testing.T) {
 	t.Parallel()
-	c, s := internal.MakeClient(t)
+	c, s := MakeTestClient(t)
 	defer s.Stop()
 
 	agent := c.Agent()
@@ -1203,7 +1202,7 @@ func TestAPI_ServiceMaintenance(t *testing.T) {
 
 func TestAPI_NodeMaintenance(t *testing.T) {
 	t.Parallel()
-	c, s := internal.MakeClient(t)
+	c, s := MakeTestClient(t)
 	defer s.Stop()
 
 	agent := c.Agent()
@@ -1251,7 +1250,7 @@ func TestAPI_NodeMaintenance(t *testing.T) {
 
 func TestAPI_AgentUpdateToken(t *testing.T) {
 	t.Parallel()
-	c, s := internal.MakeACLClient(t)
+	c, s := MakeTestACLClient(t)
 	defer s.Stop()
 
 	t.Run("deprecated", func(t *testing.T) {
@@ -1379,7 +1378,7 @@ func TestAPI_AgentConnectCARoots_empty(t *testing.T) {
 	t.Parallel()
 
 	require := require.New(t)
-	c, s := internal.MakeClientWithConfig(t, nil, func(c *testutil.TestServerConfig) {
+	c, s := MakeTestClientWithConfig(t, nil, func(c *testutil.TestServerConfig) {
 		c.Connect = nil // disable connect to prevent CA being bootstrapped
 	})
 	defer s.Stop()
@@ -1394,7 +1393,7 @@ func TestAPI_AgentConnectCARoots_list(t *testing.T) {
 	t.Parallel()
 
 	require := require.New(t)
-	c, s := internal.MakeClient(t)
+	c, s := MakeTestClient(t)
 	defer s.Stop()
 
 	agent := c.Agent()
@@ -1409,7 +1408,7 @@ func TestAPI_AgentConnectCALeaf(t *testing.T) {
 	t.Parallel()
 
 	require := require.New(t)
-	c, s := internal.MakeClient(t)
+	c, s := MakeTestClient(t)
 	defer s.Stop()
 
 	agent := c.Agent()
@@ -1439,7 +1438,7 @@ func TestAPI_AgentConnectCALeaf(t *testing.T) {
 func TestAPI_AgentConnectAuthorize(t *testing.T) {
 	t.Parallel()
 	require := require.New(t)
-	c, s := internal.MakeClient(t)
+	c, s := MakeTestClient(t)
 	defer s.Stop()
 
 	agent := c.Agent()
@@ -1458,7 +1457,7 @@ func TestAPI_AgentConnectAuthorize(t *testing.T) {
 
 func TestAPI_AgentConnectProxyConfig(t *testing.T) {
 	t.Parallel()
-	c, s := internal.MakeClientWithConfig(t, nil, func(c *testutil.TestServerConfig) {
+	c, s := MakeTestClientWithConfig(t, nil, func(c *testutil.TestServerConfig) {
 		// Force auto port range to 1 port so we have deterministic response.
 		c.Ports.ProxyMinPort = 20000
 		c.Ports.ProxyMaxPort = 20000
@@ -1507,7 +1506,7 @@ func TestAPI_AgentConnectProxyConfig(t *testing.T) {
 
 func TestAPI_AgentHealthService(t *testing.T) {
 	t.Parallel()
-	c, s := internal.MakeClient(t)
+	c, s := MakeTestClient(t)
 	defer s.Stop()
 
 	agent := c.Agent()

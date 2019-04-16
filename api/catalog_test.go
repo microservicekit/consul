@@ -5,7 +5,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/hashicorp/consul/api/internal"
 	"github.com/hashicorp/consul/sdk/testutil"
 	"github.com/hashicorp/consul/sdk/testutil/retry"
 	"github.com/stretchr/testify/require"
@@ -13,7 +12,7 @@ import (
 
 func TestAPI_CatalogDatacenters(t *testing.T) {
 	t.Parallel()
-	c, s := internal.MakeClient(t)
+	c, s := MakeTestClient(t)
 	defer s.Stop()
 
 	catalog := c.Catalog()
@@ -30,7 +29,7 @@ func TestAPI_CatalogDatacenters(t *testing.T) {
 
 func TestAPI_CatalogNodes(t *testing.T) {
 	t.Parallel()
-	c, s := internal.MakeClient(t)
+	c, s := MakeTestClient(t)
 	defer s.Stop()
 
 	s.WaitForSerfCheck(t)
@@ -75,7 +74,7 @@ func TestAPI_CatalogNodes(t *testing.T) {
 func TestAPI_CatalogNodes_MetaFilter(t *testing.T) {
 	t.Parallel()
 	meta := map[string]string{"somekey": "somevalue"}
-	c, s := internal.MakeClientWithConfig(t, nil, func(conf *testutil.TestServerConfig) {
+	c, s := MakeTestClientWithConfig(t, nil, func(conf *testutil.TestServerConfig) {
 		conf.NodeMeta = meta
 	})
 	defer s.Stop()
@@ -128,7 +127,7 @@ func TestAPI_CatalogNodes_MetaFilter(t *testing.T) {
 
 func TestAPI_CatalogServices(t *testing.T) {
 	t.Parallel()
-	c, s := internal.MakeClient(t)
+	c, s := MakeTestClient(t)
 	defer s.Stop()
 
 	catalog := c.Catalog()
@@ -151,7 +150,7 @@ func TestAPI_CatalogServices(t *testing.T) {
 func TestAPI_CatalogServices_NodeMetaFilter(t *testing.T) {
 	t.Parallel()
 	meta := map[string]string{"somekey": "somevalue"}
-	c, s := internal.MakeClientWithConfig(t, nil, func(conf *testutil.TestServerConfig) {
+	c, s := MakeTestClientWithConfig(t, nil, func(conf *testutil.TestServerConfig) {
 		conf.NodeMeta = meta
 	})
 	defer s.Stop()
@@ -192,7 +191,7 @@ func TestAPI_CatalogServices_NodeMetaFilter(t *testing.T) {
 
 func TestAPI_CatalogService(t *testing.T) {
 	t.Parallel()
-	c, s := internal.MakeClient(t)
+	c, s := MakeTestClient(t)
 	defer s.Stop()
 
 	catalog := c.Catalog()
@@ -219,7 +218,7 @@ func TestAPI_CatalogService(t *testing.T) {
 
 func TestAPI_CatalogServiceUnmanagedProxy(t *testing.T) {
 	t.Parallel()
-	c, s := internal.MakeClient(t)
+	c, s := MakeTestClient(t)
 	defer s.Stop()
 
 	catalog := c.Catalog()
@@ -256,7 +255,7 @@ func TestAPI_CatalogServiceUnmanagedProxy(t *testing.T) {
 
 func TestAPI_CatalogServiceCached(t *testing.T) {
 	t.Parallel()
-	c, s := internal.MakeClient(t)
+	c, s := MakeTestClient(t)
 	defer s.Stop()
 
 	catalog := c.Catalog()
@@ -295,7 +294,7 @@ func TestAPI_CatalogServiceCached(t *testing.T) {
 
 func TestAPI_CatalogService_SingleTag(t *testing.T) {
 	t.Parallel()
-	c, s := internal.MakeClientWithConfig(t, nil, func(conf *testutil.TestServerConfig) {
+	c, s := MakeTestClientWithConfig(t, nil, func(conf *testutil.TestServerConfig) {
 		conf.NodeName = "node123"
 	})
 	defer s.Stop()
@@ -322,7 +321,7 @@ func TestAPI_CatalogService_SingleTag(t *testing.T) {
 
 func TestAPI_CatalogService_MultipleTags(t *testing.T) {
 	t.Parallel()
-	c, s := internal.MakeClientWithConfig(t, nil, func(conf *testutil.TestServerConfig) {
+	c, s := MakeTestClientWithConfig(t, nil, func(conf *testutil.TestServerConfig) {
 		conf.NodeName = "node123"
 	})
 	defer s.Stop()
@@ -374,7 +373,7 @@ func TestAPI_CatalogService_MultipleTags(t *testing.T) {
 func TestAPI_CatalogService_NodeMetaFilter(t *testing.T) {
 	t.Parallel()
 	meta := map[string]string{"somekey": "somevalue"}
-	c, s := internal.MakeClientWithConfig(t, nil, func(conf *testutil.TestServerConfig) {
+	c, s := MakeTestClientWithConfig(t, nil, func(conf *testutil.TestServerConfig) {
 		conf.NodeMeta = meta
 	})
 	defer s.Stop()
@@ -460,7 +459,7 @@ func testUnmanagedProxyRegistration(t *testing.T) *CatalogRegistration {
 
 func TestAPI_CatalogConnect(t *testing.T) {
 	t.Parallel()
-	c, s := internal.MakeClient(t)
+	c, s := MakeTestClient(t)
 	defer s.Stop()
 
 	catalog := c.Catalog()
@@ -539,7 +538,7 @@ func TestAPI_CatalogConnect(t *testing.T) {
 
 func TestAPI_CatalogConnectNative(t *testing.T) {
 	t.Parallel()
-	c, s := internal.MakeClient(t)
+	c, s := MakeTestClient(t)
 	defer s.Stop()
 
 	catalog := c.Catalog()
@@ -598,7 +597,7 @@ func TestAPI_CatalogConnectNative(t *testing.T) {
 
 func TestAPI_CatalogNode(t *testing.T) {
 	t.Parallel()
-	c, s := internal.MakeClient(t)
+	c, s := MakeTestClient(t)
 	defer s.Stop()
 
 	catalog := c.Catalog()
@@ -649,7 +648,7 @@ func TestAPI_CatalogNode(t *testing.T) {
 
 func TestAPI_CatalogRegistration(t *testing.T) {
 	t.Parallel()
-	c, s := internal.MakeClient(t)
+	c, s := MakeTestClient(t)
 	defer s.Stop()
 
 	catalog := c.Catalog()
@@ -845,7 +844,7 @@ func TestAPI_CatalogRegistration(t *testing.T) {
 
 func TestAPI_CatalogEnableTagOverride(t *testing.T) {
 	t.Parallel()
-	c, s := internal.MakeClient(t)
+	c, s := MakeTestClient(t)
 	defer s.Stop()
 	s.WaitForSerfCheck(t)
 
