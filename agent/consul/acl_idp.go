@@ -2,13 +2,15 @@ package consul
 
 import (
 	"fmt"
-	"strings"
 
-	"github.com/hashicorp/consul/acl"
 	"github.com/hashicorp/consul/agent/structs"
+	"github.com/hashicorp/go-bexpr"
 )
 
 type IdentityProviderValidator interface {
+	// Name returns the name of the identity provider backing this validator.
+	Name() string
+
 	// ValidateToken takes raw user-provided IdP metadata and ensures it is
 	// sane, provably correct, and currently valid. Relevant identifying data
 	// is extracted and returned for immediate use by the role binding process.
@@ -16,20 +18,30 @@ type IdentityProviderValidator interface {
 	// Depending upon the provider, it may make sense to use these calls to
 	// continue to extend the life of the underlying token
 	//
-	// TODO(rb): cook up stock errors that the caller may care about
-	ValidateLogin(*LoginValidationRequest) (*LoginValidationResponse, error)
+	// Returns IdP specific metadata suitable for the Role Binding process.
+	ValidateLogin(loginToken string) (map[string]string, error)
 
+	// AvailableFields returns a slice of all fields that are returned as a
+	// result of ValidateLogin. These are valid fields for use in any
+	// BindingRule tied to this identity provider.
 	AvailableFields() []string
+
+	// MakeFieldMapSelectable converts a field map as returned by ValidateLogin
+	// into a structure suitable for selection with a binding rule.
+	MakeFieldMapSelectable(fieldMap map[string]string) interface{}
 }
 
-type LoginValidationRequest struct {
-	// Token is a bearer token, such as a JWT that is identity provider specific.
-	Token string
-}
-
-type LoginValidationResponse struct {
-	// Fields stores IdP specific metadata suitable for the Role Binding process.
-	Fields map[string]string
+// createIdentityProviderValidator returns an IdentityProviderValidator for the
+// given idp configuration.
+//
+// No caches are updated.
+func (s *Server) createIdentityProviderValidator(idp *structs.ACLIdentityProvider) (IdentityProviderValidator, error) {
+	switch idp.Type {
+	case "kubernetes":
+		return newK8SIdentityProviderValidator(idp)
+	default:
+		return nil, fmt.Errorf("identity provider with name %q found with unknown type %q", idp.Name, idp.Type)
+	}
 }
 
 type idpValidatorEntry struct {
@@ -37,13 +49,34 @@ type idpValidatorEntry struct {
 	ModifyIndex uint64 // the raft index when this last changed
 }
 
-func (s *Server) purgeIdentityProviderValidators() {
-	s.aclIDPValidatorLock.Lock()
-	s.aclIDPValidators = make(map[string]*idpValidatorEntry)
-	s.aclIDPValidatorLock.Unlock()
+// loadIdentityProviderValidator returns an IdentityProviderValidator for the
+// given idp configuration. If the cache is up to date as-of the provided index
+// then the cached version is returned, otherwise a new validator is created
+// and cached.
+func (s *Server) loadIdentityProviderValidator(idx uint64, idp *structs.ACLIdentityProvider) (IdentityProviderValidator, error) {
+	if prevIdx, v, ok := s.getCachedIdentityProviderValidator(idp.Name); ok && idx <= prevIdx {
+		return v, nil
+	}
+
+	v, err := s.createIdentityProviderValidator(idp)
+
+	if err == nil && s.aclIDPValidatorCreateTestHook != nil {
+		v, err = s.aclIDPValidatorCreateTestHook(v)
+	}
+
+	if err != nil {
+		return nil, fmt.Errorf("identity provider validator for %q could not be initialized: %v", idp.Name, err)
+	}
+
+	v = s.getOrReplaceIdentityProviderValidator(idp.Name, idx, v)
+
+	return v, nil
 }
 
-func (s *Server) getIdentityProviderValidator(name string) (uint64, IdentityProviderValidator, bool) {
+// getCachedIdentityProviderValidator returns an IdentityProviderValidator for
+// the given name exclusively from the cache. If one is not found in the cache
+// nil is returned.
+func (s *Server) getCachedIdentityProviderValidator(name string) (uint64, IdentityProviderValidator, bool) {
 	s.aclIDPValidatorLock.RLock()
 	defer s.aclIDPValidatorLock.RUnlock()
 
@@ -56,6 +89,9 @@ func (s *Server) getIdentityProviderValidator(name string) (uint64, IdentityProv
 	return 0, nil, false
 }
 
+// getOrReplaceIdentityProviderValidator updates the cached validator with the
+// provided one UNLESS it has been updated by another goroutine in which case
+// the updated one is returned.
 func (s *Server) getOrReplaceIdentityProviderValidator(name string, idx uint64, v IdentityProviderValidator) IdentityProviderValidator {
 	s.aclIDPValidatorLock.Lock()
 	defer s.aclIDPValidatorLock.Unlock()
@@ -71,7 +107,7 @@ func (s *Server) getOrReplaceIdentityProviderValidator(name string, idx uint64, 
 		}
 	}
 
-	s.logger.Printf("[INFO] acl: updating cached identity provider validator for %q", name)
+	s.logger.Printf("[DEBUG] acl: updating cached identity provider validator for %q", name)
 
 	s.aclIDPValidators[name] = &idpValidatorEntry{
 		Validator:   v,
@@ -80,118 +116,34 @@ func (s *Server) getOrReplaceIdentityProviderValidator(name string, idx uint64, 
 	return v
 }
 
-func isValidIdentityProviderField(idpType, name string) bool {
-	var allowed []string // this list will be VERY short
-
-	switch idpType {
-	case "kubernetes":
-		allowed = k8sAvailableFields
-	}
-
-	for _, f := range allowed {
-		if f == name {
-			return true
-		}
-	}
-
-	return false
+// purgeIdentityProviderValidators resets the cache of validators.
+func (s *Server) purgeIdentityProviderValidators() {
+	s.aclIDPValidatorLock.Lock()
+	s.aclIDPValidators = make(map[string]*idpValidatorEntry)
+	s.aclIDPValidatorLock.Unlock()
 }
 
-func findUnknownIdentityProviderFields(idpType string, names []string) []string {
-	if len(names) == 0 {
-		return nil
-	}
-
-	var (
-		allowed []string // this list will be VERY short
-		unknown []string
-	)
-
-	switch idpType {
-	case "kubernetes":
-		allowed = k8sAvailableFields
-	}
-
-	for _, name := range names {
-		found := false
-		for _, f := range allowed {
-			if f == name {
-				found = true
-				break
-			}
-		}
-		if !found {
-			unknown = append(unknown, name)
-		}
-	}
-
-	return unknown
-}
-
-// TODO: rename
-func (s *Server) validateIdentityProviderSpecificFields(idp *structs.ACLIdentityProvider) error {
-	switch idp.Type {
-	case "kubernetes":
-		return k8sValidateIdentityProvider(idp)
-	default:
-		return nil
-	}
-}
-
-func (s *Server) getIdentityProvider(idpType, name string) (IdentityProviderValidator, error) {
-	idx, idp, err := s.fsm.State().ACLIdentityProviderGetByName(nil, name)
-	if err != nil {
-		return nil, err
-	} else if idp == nil {
-		return nil, acl.ErrNotFound
-	}
-
-	if idp.Type != idpType {
-		return nil, fmt.Errorf("identity provider with name %q is of type %q not %q", name, idp.Type, idpType)
-	}
-
-	if prevIdx, v, ok := s.getIdentityProviderValidator(name); ok && idx <= prevIdx {
-		return v, nil
-	}
-
-	var v IdentityProviderValidator
-
-	switch idp.Type {
-	case "kubernetes":
-		v, err = newK8SIdentityProviderValidator(idp)
-	default:
-		return nil, fmt.Errorf("identity provider with name %q found with unknown type %q", name, idp.Type)
-	}
-
-	if err == nil && s.aclIDPValidatorCreateTestHook != nil {
-		v, err = s.aclIDPValidatorCreateTestHook(v)
-	}
-
-	if err != nil {
-		return nil, fmt.Errorf("identity provider validator for %q could not be initialized: %v", idp.Name, err)
-	}
-
-	v = s.getOrReplaceIdentityProviderValidator(name, idx, v)
-
-	return v, nil
-}
-
-func (s *Server) evaluateRoleBindings(idpName string, validationResp *LoginValidationResponse) ([]structs.ACLTokenRoleLink, error) {
-	if idpName == "" {
-		return nil, nil
-	}
-
+// evaluateRoleBindings evaluates all current binding rules associated with the
+// given identity provider against the verified data returned from the idp
+// authentication process.
+//
+// A list of token role links suitable for creating a new token are returned.
+func (s *Server) evaluateRoleBindings(validator IdentityProviderValidator, verifiedFields map[string]string) ([]structs.ACLTokenRoleLink, error) {
 	// Only fetch rules that are relevant for this idp.
-	_, rules, err := s.fsm.State().ACLBindingRuleList(nil, idpName)
+	_, rules, err := s.fsm.State().ACLBindingRuleList(nil, validator.Name())
 	if err != nil {
 		return nil, err
 	} else if len(rules) == 0 {
 		return nil, nil
 	}
 
+	// Convert the fields into something suitable for go-bexpr.
+	selectableVars := validator.MakeFieldMapSelectable(verifiedFields)
+
+	// Find all binding rules that match the provided fields.
 	var matchingRules []*structs.ACLBindingRule
 	for _, rule := range rules {
-		if doesBindingRuleMatch(rule, validationResp.Fields) {
+		if doesBindingRuleMatch(rule, selectableVars) {
 			matchingRules = append(matchingRules, rule)
 		}
 	}
@@ -199,10 +151,10 @@ func (s *Server) evaluateRoleBindings(idpName string, validationResp *LoginValid
 		return nil, nil
 	}
 
+	// For all matching rules compute the role links.
 	var roleLinks []structs.ACLTokenRoleLink
-
 	for _, rule := range matchingRules {
-		roleName, err := simpleInterpolateVars(rule.RoleName, validationResp.Fields)
+		roleName, err := simpleInterpolateVars(rule.RoleName, verifiedFields)
 		if err != nil {
 			return nil, fmt.Errorf("cannot compute role name for bind target: %v", err)
 		}
@@ -214,10 +166,10 @@ func (s *Server) evaluateRoleBindings(idpName string, validationResp *LoginValid
 			// ID during the token persistence operation.
 			link.Name = roleName
 		} else {
-			// This is how you declare a synthetic role mapping. Note that
-			// if a role with this name is present during a token resolve operation
-			// that real role may still take effect, it's just not REQUIRED in the way
-			// that MustExist=true implies.
+			// This is how you declare a synthetic role mapping. Note that if a
+			// role with this name is present during a token resolve operation
+			// that real role may still take effect, it's just not REQUIRED in
+			// the way that MustExist=true implies.
 			link.BoundName = roleName
 		}
 		roleLinks = append(roleLinks, link)
@@ -226,54 +178,22 @@ func (s *Server) evaluateRoleBindings(idpName string, validationResp *LoginValid
 	return roleLinks, nil
 }
 
-func doesBindingRuleMatch(rule *structs.ACLBindingRule, fields map[string]string) bool {
-	if len(rule.Matches) == 0 {
+// doesBindingRuleMatch checks that a single binding rule matches the provided
+// vars.
+func doesBindingRuleMatch(rule *structs.ACLBindingRule, selectableVars interface{}) bool {
+	if rule.Selector == "" {
 		return true // catch-all
 	}
 
-	if len(fields) == 0 {
-		return false // cannot match
+	eval, err := bexpr.CreateEvaluatorForType(rule.Selector, nil, selectableVars)
+	if err != nil {
+		return false // fails to match if selector is invalid
 	}
 
-	// Only one of these must match for it to apply.
-	ruleMatches := false
-	for _, match := range rule.Matches {
-		if len(match.Selector) == 0 {
-			continue // makes no sense
-		}
-
-		// ALL of these must match for it to apply.
-		selectorMatches := true
-		for _, entry := range match.Selector {
-			lhs, rhs, ok := parseExactMatchSelector(entry)
-			if !ok {
-				selectorMatches = false // Fails to match if invalid.
-				break
-			}
-			val, ok := fields[lhs]
-			if !ok || val != rhs {
-				selectorMatches = false // missing field or wrong value
-				break
-			}
-		}
-
-		if selectorMatches {
-			ruleMatches = true
-			break
-		}
+	result, err := eval.Evaluate(selectableVars)
+	if err != nil {
+		return false // fails to match if evaluation fails
 	}
 
-	return ruleMatches
-}
-
-func parseExactMatchSelector(s string) (lhs, rhs string, ok bool) {
-	parts := strings.Split(s, "=")
-	if len(parts) != 2 {
-		return "", "", false
-	}
-	lhs, rhs = strings.TrimSpace(parts[0]), strings.TrimSpace(parts[1])
-	if lhs == "" || rhs == "" {
-		return "", "", false
-	}
-	return lhs, rhs, true
+	return result
 }

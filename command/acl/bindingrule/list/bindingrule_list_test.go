@@ -83,13 +83,7 @@ func TestBindingRuleListCommand(t *testing.T) {
 				Description: description,
 				RoleName:    "k8s-{{serviceaccount.name}}",
 				MustExist:   false,
-				Matches: []*api.ACLBindingRuleMatch{
-					&api.ACLBindingRuleMatch{
-						Selector: []string{
-							"serviceaccount.namespace=default",
-						},
-					},
-				},
+				Selector:    "serviceaccount.namespace==default",
 			},
 			&api.WriteOptions{Token: "root"},
 		)

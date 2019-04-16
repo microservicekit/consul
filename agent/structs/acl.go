@@ -864,9 +864,9 @@ type ACLBindingRule struct {
 	// applies when credentials from this provider are exchanged.
 	IDPName string
 
-	// Matches is a list of matching rules. Elements logically are used as a
-	// disjunction (OR) when matching identities presented.
-	Matches []*ACLBindingRuleMatch
+	// Selector is an expression that matches against verified identity
+	// attributes returned from the identity provider during login.
+	Selector string
 
 	// RoleName is the named ACL Role to bind to. Can be lightly templated
 	// using {{ foo }} syntax from available field names.
@@ -903,15 +903,6 @@ type ACLBindingRule struct {
 
 func (r *ACLBindingRule) Clone() *ACLBindingRule {
 	r2 := *r
-	r2.Matches = nil
-
-	if len(r.Matches) > 0 {
-		r2.Matches = make([]*ACLBindingRuleMatch, len(r.Matches))
-		for i, v := range r.Matches {
-			r2.Matches[i] = v.Clone()
-		}
-	}
-
 	return &r2
 }
 
@@ -921,18 +912,6 @@ func (rules ACLBindingRules) Sort() {
 	sort.Slice(rules, func(i, j int) bool {
 		return rules[i].ID < rules[j].ID
 	})
-}
-
-type ACLBindingRuleMatch struct {
-	// Selector is a list of field selectors. Elements logically are used as a
-	// conjunction (AND) when matching identities presented.
-	Selector []string
-}
-
-func (m *ACLBindingRuleMatch) Clone() *ACLBindingRuleMatch {
-	m2 := *m
-	m2.Selector = cloneStringSlice(m.Selector)
-	return &m2
 }
 
 type ACLIdentityProviderListStub struct {

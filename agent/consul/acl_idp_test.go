@@ -1,7 +1,6 @@
 package consul
 
 import (
-	"strings"
 	"testing"
 
 	"github.com/hashicorp/consul/agent/structs"
@@ -9,89 +8,55 @@ import (
 )
 
 func TestDoesBindingRuleMatch(t *testing.T) {
-	makeF := func(s string) map[string]string {
-		kvs := strings.Split(s, " ")
-		out := make(map[string]string)
-		for _, kv := range kvs {
-			k, v, ok := parseExactMatchSelector(kv) // cheat and reuse this function
-			require.True(t, ok)
-			out[k] = v
-		}
-		return out
+	type matchable struct {
+		A string `bexpr:"a"`
+		C string `bexpr:"c"`
 	}
 
 	for _, test := range []struct {
-		name   string
-		match1 []string
-		match2 []string // TODO use this
-		fields map[string]string
-		ok     bool
+		name     string
+		selector string
+		details  interface{}
+		ok       bool
 	}{
 		{"no fields",
-			[]string{"a=b"}, nil, nil, false},
+			"a==b", nil, false},
 		{"1 term ok",
-			[]string{"a=b"}, nil, makeF("a=b"), true},
+			"a==b", &matchable{A: "b"}, true},
 		{"1 term no field",
-			[]string{"a=b"}, nil, makeF("c=d"), false},
+			"a==b", &matchable{C: "d"}, false},
 		{"1 term wrong value",
-			[]string{"a=b"}, nil, makeF("a=z"), false},
+			"a==b", &matchable{A: "z"}, false},
 		{"2 terms ok",
-			[]string{"a=b", "c=d"}, nil, makeF("a=b c=d"), true},
+			"a==b and c==d", &matchable{A: "b", C: "d"}, true},
 		{"2 terms one missing field",
-			[]string{"a=b", "c=d"}, nil, makeF("a=b"), false},
+			"a==b and c==d", &matchable{A: "b"}, false},
 		{"2 terms one wrong value",
-			[]string{"a=b", "c=d"}, nil, makeF("a=z c=d"), false},
+			"a==b and c==d", &matchable{A: "z", C: "d"}, false},
 		///////////////////////////////
 		{"no fields (no selectors)",
-			nil, nil, nil, true},
+			"", nil, true},
 		{"1 term ok (no selectors)",
-			nil, nil, makeF("a=b"), true},
+			"", &matchable{A: "b"}, true},
 	} {
-		var rule structs.ACLBindingRule
-		if len(test.match1) > 0 {
-			rule.Matches = append(rule.Matches, &structs.ACLBindingRuleMatch{
-				Selector: test.match1,
-			})
-		}
-		if len(test.match2) > 0 {
-			rule.Matches = append(rule.Matches, &structs.ACLBindingRuleMatch{
-				Selector: test.match2,
-			})
-		}
-
 		t.Run(test.name, func(t *testing.T) {
-			ok := doesBindingRuleMatch(&rule, test.fields)
+			rule := structs.ACLBindingRule{Selector: test.selector}
+			ok := doesBindingRuleMatch(&rule, test.details)
 			require.Equal(t, test.ok, ok)
 		})
 	}
 }
 
-func TestParseExactMatchSelector(t *testing.T) {
-	for _, test := range []struct {
-		input    string
-		lhs, rhs string
-		ok       bool
-	}{
-		{"", "", "", false},
-		{"=", "", "", false},
-		{" =", "", "", false},
-		{"= ", "", "", false},
-		{" = ", "", "", false},
-		{"a=", "", "", false},
-		{"a= ", "", "", false},
-		{"=b", "", "", false},
-		{" =b", "", "", false},
-		{"a=b", "a", "b", true},
-		{" a = b ", "a", "b", true},
-		{"a=b=", "", "", false},
-		{"=a=b", "", "", false},
-		{"a==b", "", "", false},
-	} {
-		t.Run(test.input, func(t *testing.T) {
-			lhs, rhs, ok := parseExactMatchSelector(test.input)
-			require.Equal(t, test.ok, ok)
-			require.Equal(t, test.lhs, lhs)
-			require.Equal(t, test.rhs, rhs)
-		})
+// mapify takes pairwise string fields and inserts them into a map
+//
+// example: mapify("a","b","c","d") => {"a":"b", "c":"d"}
+func mapify(kvs ...string) map[string]string {
+	if len(kvs)%2 != 0 {
+		panic("function takes an even number of args")
 	}
+	out := make(map[string]string)
+	for i := 0; i < len(kvs); i += 2 {
+		out[kvs[i]] = kvs[i+1]
+	}
+	return out
 }

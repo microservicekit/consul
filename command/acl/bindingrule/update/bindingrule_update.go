@@ -24,10 +24,10 @@ type cmd struct {
 
 	ruleID string
 
-	description    string
-	matchSelectors []string
-	roleName       string
-	mustExist      bool
+	description string
+	selector    string
+	roleName    string
+	mustExist   bool
 
 	noMerge  bool
 	showMeta bool
@@ -58,11 +58,12 @@ func (c *cmd) init() {
 		"",
 		"A description of the binding rule.",
 	)
-	c.flags.Var(
-		(*flags.AppendSliceValue)(&c.matchSelectors),
-		"match-selector",
-		"Comma separated list of match selectors in the format KEY1=VAL1,KEY2=VAL2. "+
-			"May be specified multiple times.",
+	c.flags.StringVar(
+		&c.selector,
+		"selector",
+		"",
+		"Selector is an expression that matches against verified identity "+
+			"attributes returned from the identity provider during login.",
 	)
 	c.flags.StringVar(
 		&c.roleName,
@@ -116,12 +117,6 @@ func (c *cmd) Run(args []string) int {
 		return 1
 	}
 
-	found, err := acl.ParseBindingRuleMatchSelectors(c.matchSelectors)
-	if err != nil {
-		c.UI.Error(err.Error())
-		return 1
-	}
-
 	// Read the current binding rule in both cases so we can fail better if not found.
 	currentRule, _, err := client.ACL().BindingRuleRead(ruleID, nil)
 	if err != nil {
@@ -146,7 +141,7 @@ func (c *cmd) Run(args []string) int {
 			Description: c.description,
 			RoleName:    c.roleName,
 			MustExist:   c.mustExist,
-			Matches:     found,
+			Selector:    c.selector,
 		}
 
 	} else {
@@ -161,9 +156,8 @@ func (c *cmd) Run(args []string) int {
 		if isFlagSet(c.flags, "must-exist") {
 			rule.MustExist = c.mustExist
 		}
-
-		if len(found) > 0 {
-			rule.Matches = append(rule.Matches, found...)
+		if isFlagSet(c.flags, "selector") {
+			rule.Selector = c.selector // empty is valid
 		}
 	}
 
@@ -211,6 +205,5 @@ Usage: consul acl binding-rule update -id ID [options]
             -description="new description" \
             -role-name="k8s-{{serviceaccount.name}}" \
             -must-exist \
-            -match-selector='serviceaccount.namespace=default,serviceaccount.name=web' \
-            -match-selector='serviceaccount.namespace=default,serviceaccount.name=db'
+            -selector='serviceaccount.namespace==default and serviceaccount.name==web'
 `

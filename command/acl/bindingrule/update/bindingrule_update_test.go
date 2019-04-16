@@ -94,25 +94,6 @@ func TestBindingRuleUpdateCommand(t *testing.T) {
 		require.Contains(t, ui.ErrorWriter.String(), "Cannot update a binding rule without specifying the -id parameter")
 	})
 
-	t.Run("must use roughly valid match selectors", func(t *testing.T) {
-		fakeID, err := uuid.GenerateUUID()
-		require.NoError(t, err)
-
-		args := []string{
-			"-http-addr=" + a.HTTPAddr(),
-			"-token=root",
-			"-id=" + fakeID,
-			"-match-selector", " , ",
-		}
-
-		ui := cli.NewMockUi()
-		cmd := New(ui)
-
-		code := cmd.Run(args)
-		require.Equal(t, code, 1)
-		require.Contains(t, ui.ErrorWriter.String(), "Invalid match selector")
-	})
-
 	t.Run("rule id partial matches nothing", func(t *testing.T) {
 		fakeID, err := uuid.GenerateUUID()
 		require.NoError(t, err)
@@ -156,13 +137,7 @@ func TestBindingRuleUpdateCommand(t *testing.T) {
 				Description: "test rule",
 				RoleName:    "k8s-{{serviceaccount.name}}",
 				MustExist:   false,
-				Matches: []*api.ACLBindingRuleMatch{
-					&api.ACLBindingRuleMatch{
-						Selector: []string{
-							"serviceaccount.namespace=default",
-						},
-					},
-				},
+				Selector:    "serviceaccount.namespace==default",
 			},
 			&api.WriteOptions{Token: "root"},
 		)
@@ -210,6 +185,24 @@ func TestBindingRuleUpdateCommand(t *testing.T) {
 		require.Contains(t, ui.ErrorWriter.String(), "Error determining binding rule ID")
 	})
 
+	t.Run("must use roughly valid selector", func(t *testing.T) {
+		id := createRule(t)
+
+		args := []string{
+			"-http-addr=" + a.HTTPAddr(),
+			"-token=root",
+			"-id", id,
+			"-selector", "foo",
+		}
+
+		ui := cli.NewMockUi()
+		cmd := New(ui)
+
+		code := cmd.Run(args)
+		require.Equal(t, code, 1)
+		require.Contains(t, ui.ErrorWriter.String(), "Selector is invalid")
+	})
+
 	t.Run("update all fields", func(t *testing.T) {
 		id := createRule(t)
 
@@ -223,7 +216,7 @@ func TestBindingRuleUpdateCommand(t *testing.T) {
 			"-description=test rule edited",
 			"-role-name=role-updated",
 			"-must-exist=true",
-			"-match-selector=serviceaccount.namespace=alt,serviceaccount.name=demo",
+			"-selector=serviceaccount.namespace==alt and serviceaccount.name==demo",
 		}
 
 		code := cmd.Run(args)
@@ -240,14 +233,7 @@ func TestBindingRuleUpdateCommand(t *testing.T) {
 		require.Equal(t, "test rule edited", rule.Description)
 		require.Equal(t, "role-updated", rule.RoleName)
 		require.True(t, rule.MustExist)
-		require.Len(t, rule.Matches, 2)
-
-		m0, m1 := rule.Matches[0], rule.Matches[1]
-		require.Len(t, m0.Selector, 1)
-		require.Equal(t, "serviceaccount.namespace=default", m0.Selector[0])
-		require.Len(t, m1.Selector, 2)
-		require.Equal(t, "serviceaccount.namespace=alt", m1.Selector[0])
-		require.Equal(t, "serviceaccount.name=demo", m1.Selector[1])
+		require.Equal(t, "serviceaccount.namespace==alt and serviceaccount.name==demo", rule.Selector)
 	})
 
 	t.Run("update all fields - partial", func(t *testing.T) {
@@ -265,7 +251,7 @@ func TestBindingRuleUpdateCommand(t *testing.T) {
 			"-description=test rule edited",
 			"-role-name=role-updated",
 			"-must-exist=true",
-			"-match-selector=serviceaccount.namespace=alt,serviceaccount.name=demo",
+			"-selector=serviceaccount.namespace==alt and serviceaccount.name==demo",
 		}
 
 		code := cmd.Run(args)
@@ -282,14 +268,7 @@ func TestBindingRuleUpdateCommand(t *testing.T) {
 		require.Equal(t, "test rule edited", rule.Description)
 		require.Equal(t, "role-updated", rule.RoleName)
 		require.True(t, rule.MustExist)
-		require.Len(t, rule.Matches, 2)
-
-		m0, m1 := rule.Matches[0], rule.Matches[1]
-		require.Len(t, m0.Selector, 1)
-		require.Equal(t, "serviceaccount.namespace=default", m0.Selector[0])
-		require.Len(t, m1.Selector, 2)
-		require.Equal(t, "serviceaccount.namespace=alt", m1.Selector[0])
-		require.Equal(t, "serviceaccount.name=demo", m1.Selector[1])
+		require.Equal(t, "serviceaccount.namespace==alt and serviceaccount.name==demo", rule.Selector)
 	})
 
 	t.Run("update all fields but description", func(t *testing.T) {
@@ -304,7 +283,7 @@ func TestBindingRuleUpdateCommand(t *testing.T) {
 			"-id", id,
 			"-role-name=role-updated",
 			"-must-exist=true",
-			"-match-selector=serviceaccount.namespace=alt,serviceaccount.name=demo",
+			"-selector=serviceaccount.namespace==alt and serviceaccount.name==demo",
 		}
 
 		code := cmd.Run(args)
@@ -321,14 +300,7 @@ func TestBindingRuleUpdateCommand(t *testing.T) {
 		require.Equal(t, "test rule", rule.Description)
 		require.Equal(t, "role-updated", rule.RoleName)
 		require.True(t, rule.MustExist)
-		require.Len(t, rule.Matches, 2)
-
-		m0, m1 := rule.Matches[0], rule.Matches[1]
-		require.Len(t, m0.Selector, 1)
-		require.Equal(t, "serviceaccount.namespace=default", m0.Selector[0])
-		require.Len(t, m1.Selector, 2)
-		require.Equal(t, "serviceaccount.namespace=alt", m1.Selector[0])
-		require.Equal(t, "serviceaccount.name=demo", m1.Selector[1])
+		require.Equal(t, "serviceaccount.namespace==alt and serviceaccount.name==demo", rule.Selector)
 	})
 
 	t.Run("update all fields but role name", func(t *testing.T) {
@@ -343,7 +315,7 @@ func TestBindingRuleUpdateCommand(t *testing.T) {
 			"-id", id,
 			"-description=test rule edited",
 			"-must-exist=true",
-			"-match-selector=serviceaccount.namespace=alt,serviceaccount.name=demo",
+			"-selector=serviceaccount.namespace==alt and serviceaccount.name==demo",
 		}
 
 		code := cmd.Run(args)
@@ -360,14 +332,7 @@ func TestBindingRuleUpdateCommand(t *testing.T) {
 		require.Equal(t, "test rule edited", rule.Description)
 		require.Equal(t, "k8s-{{serviceaccount.name}}", rule.RoleName)
 		require.True(t, rule.MustExist)
-		require.Len(t, rule.Matches, 2)
-
-		m0, m1 := rule.Matches[0], rule.Matches[1]
-		require.Len(t, m0.Selector, 1)
-		require.Equal(t, "serviceaccount.namespace=default", m0.Selector[0])
-		require.Len(t, m1.Selector, 2)
-		require.Equal(t, "serviceaccount.namespace=alt", m1.Selector[0])
-		require.Equal(t, "serviceaccount.name=demo", m1.Selector[1])
+		require.Equal(t, "serviceaccount.namespace==alt and serviceaccount.name==demo", rule.Selector)
 	})
 
 	t.Run("update all fields but must exist", func(t *testing.T) {
@@ -382,7 +347,7 @@ func TestBindingRuleUpdateCommand(t *testing.T) {
 			"-id", id,
 			"-description=test rule edited",
 			"-role-name=role-updated",
-			"-match-selector=serviceaccount.namespace=alt,serviceaccount.name=demo",
+			"-selector=serviceaccount.namespace==alt and serviceaccount.name==demo",
 		}
 
 		code := cmd.Run(args)
@@ -399,17 +364,10 @@ func TestBindingRuleUpdateCommand(t *testing.T) {
 		require.Equal(t, "test rule edited", rule.Description)
 		require.Equal(t, "role-updated", rule.RoleName)
 		require.False(t, rule.MustExist)
-		require.Len(t, rule.Matches, 2)
-
-		m0, m1 := rule.Matches[0], rule.Matches[1]
-		require.Len(t, m0.Selector, 1)
-		require.Equal(t, "serviceaccount.namespace=default", m0.Selector[0])
-		require.Len(t, m1.Selector, 2)
-		require.Equal(t, "serviceaccount.namespace=alt", m1.Selector[0])
-		require.Equal(t, "serviceaccount.name=demo", m1.Selector[1])
+		require.Equal(t, "serviceaccount.namespace==alt and serviceaccount.name==demo", rule.Selector)
 	})
 
-	t.Run("update all fields but matches", func(t *testing.T) {
+	t.Run("update all fields but selector", func(t *testing.T) {
 		id := createRule(t)
 
 		ui := cli.NewMockUi()
@@ -438,11 +396,40 @@ func TestBindingRuleUpdateCommand(t *testing.T) {
 		require.Equal(t, "test rule edited", rule.Description)
 		require.Equal(t, "role-updated", rule.RoleName)
 		require.True(t, rule.MustExist)
-		require.Len(t, rule.Matches, 1)
+		require.Equal(t, "serviceaccount.namespace==default", rule.Selector)
+	})
 
-		m0 := rule.Matches[0]
-		require.Len(t, m0.Selector, 1)
-		require.Equal(t, "serviceaccount.namespace=default", m0.Selector[0])
+	t.Run("update all fields clear selector", func(t *testing.T) {
+		id := createRule(t)
+
+		ui := cli.NewMockUi()
+		cmd := New(ui)
+
+		args := []string{
+			"-http-addr=" + a.HTTPAddr(),
+			"-token=root",
+			"-id", id,
+			"-description=test rule edited",
+			"-role-name=role-updated",
+			"-must-exist=true",
+			"-selector=",
+		}
+
+		code := cmd.Run(args)
+		require.Equal(t, code, 0, "err: %s", ui.ErrorWriter.String())
+		require.Empty(t, ui.ErrorWriter.String())
+
+		rule, _, err := client.ACL().BindingRuleRead(
+			id,
+			&api.QueryOptions{Token: "root"},
+		)
+		require.NoError(t, err)
+		require.NotNil(t, rule)
+
+		require.Equal(t, "test rule edited", rule.Description)
+		require.Equal(t, "role-updated", rule.RoleName)
+		require.True(t, rule.MustExist)
+		require.Empty(t, rule.Selector)
 	})
 }
 
@@ -515,26 +502,6 @@ func TestBindingRuleUpdateCommand_noMerge(t *testing.T) {
 		require.Contains(t, ui.ErrorWriter.String(), "Cannot update a binding rule without specifying the -id parameter")
 	})
 
-	t.Run("must use roughly valid match selectors", func(t *testing.T) {
-		fakeID, err := uuid.GenerateUUID()
-		require.NoError(t, err)
-
-		args := []string{
-			"-http-addr=" + a.HTTPAddr(),
-			"-token=root",
-			"-no-merge",
-			"-id=" + fakeID,
-			"-match-selector", " , ",
-		}
-
-		ui := cli.NewMockUi()
-		cmd := New(ui)
-
-		code := cmd.Run(args)
-		require.Equal(t, code, 1)
-		require.Contains(t, ui.ErrorWriter.String(), "Invalid match selector")
-	})
-
 	t.Run("rule id partial matches nothing", func(t *testing.T) {
 		fakeID, err := uuid.GenerateUUID()
 		require.NoError(t, err)
@@ -580,13 +547,7 @@ func TestBindingRuleUpdateCommand_noMerge(t *testing.T) {
 				Description: "test rule",
 				RoleName:    "k8s-{{serviceaccount.name}}",
 				MustExist:   true,
-				Matches: []*api.ACLBindingRuleMatch{
-					&api.ACLBindingRuleMatch{
-						Selector: []string{
-							"serviceaccount.namespace=default",
-						},
-					},
-				},
+				Selector:    "serviceaccount.namespace==default",
 			},
 			&api.WriteOptions{Token: "root"},
 		)
@@ -635,6 +596,28 @@ func TestBindingRuleUpdateCommand_noMerge(t *testing.T) {
 		require.Contains(t, ui.ErrorWriter.String(), "Error determining binding rule ID")
 	})
 
+	t.Run("must use roughly valid selector", func(t *testing.T) {
+		id := createRule(t)
+
+		ui := cli.NewMockUi()
+		cmd := New(ui)
+
+		args := []string{
+			"-http-addr=" + a.HTTPAddr(),
+			"-token=root",
+			"-no-merge",
+			"-id", id,
+			"-description=test rule edited",
+			"-role-name=role-updated",
+			"-must-exist=false",
+			"-selector", "foo",
+		}
+
+		code := cmd.Run(args)
+		require.Equal(t, code, 1)
+		require.Contains(t, ui.ErrorWriter.String(), "Selector is invalid")
+	})
+
 	t.Run("update all fields", func(t *testing.T) {
 		id := createRule(t)
 
@@ -649,7 +632,7 @@ func TestBindingRuleUpdateCommand_noMerge(t *testing.T) {
 			"-description=test rule edited",
 			"-role-name=role-updated",
 			"-must-exist=false",
-			"-match-selector=serviceaccount.namespace=alt,serviceaccount.name=demo",
+			"-selector=serviceaccount.namespace==alt and serviceaccount.name==demo",
 		}
 
 		code := cmd.Run(args)
@@ -666,12 +649,7 @@ func TestBindingRuleUpdateCommand_noMerge(t *testing.T) {
 		require.Equal(t, "test rule edited", rule.Description)
 		require.Equal(t, "role-updated", rule.RoleName)
 		require.False(t, rule.MustExist)
-		require.Len(t, rule.Matches, 1)
-
-		m0 := rule.Matches[0]
-		require.Len(t, m0.Selector, 2)
-		require.Equal(t, "serviceaccount.namespace=alt", m0.Selector[0])
-		require.Equal(t, "serviceaccount.name=demo", m0.Selector[1])
+		require.Equal(t, "serviceaccount.namespace==alt and serviceaccount.name==demo", rule.Selector)
 	})
 
 	t.Run("update all fields - partial", func(t *testing.T) {
@@ -690,7 +668,7 @@ func TestBindingRuleUpdateCommand_noMerge(t *testing.T) {
 			"-description=test rule edited",
 			"-role-name=role-updated",
 			"-must-exist=false",
-			"-match-selector=serviceaccount.namespace=alt,serviceaccount.name=demo",
+			"-selector=serviceaccount.namespace==alt and serviceaccount.name==demo",
 		}
 
 		code := cmd.Run(args)
@@ -707,12 +685,7 @@ func TestBindingRuleUpdateCommand_noMerge(t *testing.T) {
 		require.Equal(t, "test rule edited", rule.Description)
 		require.Equal(t, "role-updated", rule.RoleName)
 		require.False(t, rule.MustExist)
-		require.Len(t, rule.Matches, 1)
-
-		m0 := rule.Matches[0]
-		require.Len(t, m0.Selector, 2)
-		require.Equal(t, "serviceaccount.namespace=alt", m0.Selector[0])
-		require.Equal(t, "serviceaccount.name=demo", m0.Selector[1])
+		require.Equal(t, "serviceaccount.namespace==alt and serviceaccount.name==demo", rule.Selector)
 	})
 
 	t.Run("update all fields but description", func(t *testing.T) {
@@ -728,7 +701,7 @@ func TestBindingRuleUpdateCommand_noMerge(t *testing.T) {
 			"-id", id,
 			"-role-name=role-updated",
 			"-must-exist=false",
-			"-match-selector=serviceaccount.namespace=alt,serviceaccount.name=demo",
+			"-selector=serviceaccount.namespace==alt and serviceaccount.name==demo",
 		}
 
 		code := cmd.Run(args)
@@ -745,12 +718,7 @@ func TestBindingRuleUpdateCommand_noMerge(t *testing.T) {
 		require.Empty(t, rule.Description)
 		require.Equal(t, "role-updated", rule.RoleName)
 		require.False(t, rule.MustExist)
-		require.Len(t, rule.Matches, 1)
-
-		m0 := rule.Matches[0]
-		require.Len(t, m0.Selector, 2)
-		require.Equal(t, "serviceaccount.namespace=alt", m0.Selector[0])
-		require.Equal(t, "serviceaccount.name=demo", m0.Selector[1])
+		require.Equal(t, "serviceaccount.namespace==alt and serviceaccount.name==demo", rule.Selector)
 	})
 
 	t.Run("missing role name", func(t *testing.T) {
@@ -765,7 +733,7 @@ func TestBindingRuleUpdateCommand_noMerge(t *testing.T) {
 			"-id=" + id,
 			"-description=test rule edited",
 			"-must-exist=true",
-			"-match-selector=serviceaccount.namespace=alt,serviceaccount.name=demo",
+			"-selector=serviceaccount.namespace==alt and serviceaccount.name==demo",
 		}
 
 		code := cmd.Run(args)
@@ -786,7 +754,7 @@ func TestBindingRuleUpdateCommand_noMerge(t *testing.T) {
 			"-id", id,
 			"-description=test rule edited",
 			"-role-name=role-updated",
-			"-match-selector=serviceaccount.namespace=alt,serviceaccount.name=demo",
+			"-selector=serviceaccount.namespace==alt and serviceaccount.name==demo",
 		}
 
 		code := cmd.Run(args)
@@ -803,15 +771,10 @@ func TestBindingRuleUpdateCommand_noMerge(t *testing.T) {
 		require.Equal(t, "test rule edited", rule.Description)
 		require.Equal(t, "role-updated", rule.RoleName)
 		require.False(t, rule.MustExist) // reset to zero value
-		require.Len(t, rule.Matches, 1)
-
-		m0 := rule.Matches[0]
-		require.Len(t, m0.Selector, 2)
-		require.Equal(t, "serviceaccount.namespace=alt", m0.Selector[0])
-		require.Equal(t, "serviceaccount.name=demo", m0.Selector[1])
+		require.Equal(t, "serviceaccount.namespace==alt and serviceaccount.name==demo", rule.Selector)
 	})
 
-	t.Run("update all fields but matches", func(t *testing.T) {
+	t.Run("update all fields but selector", func(t *testing.T) {
 		id := createRule(t)
 
 		ui := cli.NewMockUi()
@@ -841,6 +804,6 @@ func TestBindingRuleUpdateCommand_noMerge(t *testing.T) {
 		require.Equal(t, "test rule edited", rule.Description)
 		require.Equal(t, "role-updated", rule.RoleName)
 		require.False(t, rule.MustExist)
-		require.Len(t, rule.Matches, 0)
+		require.Empty(t, rule.Selector)
 	})
 }

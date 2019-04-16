@@ -5,7 +5,6 @@ import (
 	"fmt"
 
 	"github.com/hashicorp/consul/api"
-	"github.com/hashicorp/consul/command/acl"
 	aclhelpers "github.com/hashicorp/consul/command/acl"
 	"github.com/hashicorp/consul/command/flags"
 	"github.com/mitchellh/cli"
@@ -23,11 +22,11 @@ type cmd struct {
 	http  *flags.HTTPFlags
 	help  string
 
-	idpName        string
-	description    string
-	matchSelectors []string
-	roleName       string
-	mustExist      bool
+	idpName     string
+	description string
+	selector    string
+	roleName    string
+	mustExist   bool
 
 	showMeta bool
 }
@@ -56,11 +55,12 @@ func (c *cmd) init() {
 		"",
 		"A description of the binding rule.",
 	)
-	c.flags.Var(
-		(*flags.AppendSliceValue)(&c.matchSelectors),
-		"match-selector",
-		"Comma separated list of match selectors in the format KEY1=VAL1,KEY2=VAL2. "+
-			"May be specified multiple times.",
+	c.flags.StringVar(
+		&c.selector,
+		"selector",
+		"",
+		"Selector is an expression that matches against verified identity "+
+			"attributes returned from the identity provider during login.",
 	)
 	c.flags.StringVar(
 		&c.roleName,
@@ -98,18 +98,12 @@ func (c *cmd) Run(args []string) int {
 		return 1
 	}
 
-	found, err := acl.ParseBindingRuleMatchSelectors(c.matchSelectors)
-	if err != nil {
-		c.UI.Error(err.Error())
-		return 1
-	}
-
 	newRule := &api.ACLBindingRule{
 		Description: c.description,
 		IDPName:     c.idpName,
 		RoleName:    c.roleName,
 		MustExist:   c.mustExist,
-		Matches:     found,
+		Selector:    c.selector,
 	}
 
 	client, err := c.http.APIClient()
@@ -146,6 +140,5 @@ Usage: consul acl binding-rule create [options]
      $ consul acl binding-rule create \
             -idp-name=minikube \
             -role-name="k8s-{{serviceaccount.name}}" \
-            -match-selector='serviceaccount.namespace=default,serviceaccount.name=web' \
-            -match-selector='serviceaccount.namespace=default,serviceaccount.name=db'
+            -selector='serviceaccount.namespace==default and serviceaccount.name==web'
 `

@@ -91,13 +91,13 @@ func TestBindingRuleCreateCommand(t *testing.T) {
 		require.Contains(t, ui.ErrorWriter.String(), "Missing required '-role-name' flag")
 	})
 
-	t.Run("must use roughly valid match selectors", func(t *testing.T) {
+	t.Run("must use roughly valid selector", func(t *testing.T) {
 		args := []string{
 			"-http-addr=" + a.HTTPAddr(),
 			"-token=root",
 			"-idp-name=k8s",
 			"-role-name=demo",
-			"-match-selector", " , ",
+			"-selector", "foo",
 		}
 
 		ui := cli.NewMockUi()
@@ -105,10 +105,10 @@ func TestBindingRuleCreateCommand(t *testing.T) {
 
 		code := cmd.Run(args)
 		require.Equal(t, code, 1)
-		require.Contains(t, ui.ErrorWriter.String(), "Invalid match selector")
+		require.Contains(t, ui.ErrorWriter.String(), "Selector is invalid")
 	})
 
-	t.Run("create it with no match selectors", func(t *testing.T) {
+	t.Run("create it with no selector", func(t *testing.T) {
 		args := []string{
 			"-http-addr=" + a.HTTPAddr(),
 			"-token=root",
@@ -124,14 +124,13 @@ func TestBindingRuleCreateCommand(t *testing.T) {
 		require.Empty(t, ui.ErrorWriter.String())
 	})
 
-	t.Run("create it with 2 match selectors", func(t *testing.T) {
+	t.Run("create it with a match selector", func(t *testing.T) {
 		args := []string{
 			"-http-addr=" + a.HTTPAddr(),
 			"-token=root",
 			"-idp-name=k8s",
 			"-role-name=demo",
-			"-match-selector", "serviceaccount.name=demo",
-			"-match-selector", "serviceaccount.namespace=default,serviceaccount.name=vault",
+			"-selector", "serviceaccount.namespace==default and serviceaccount.name==vault",
 		}
 
 		ui := cli.NewMockUi()
@@ -140,6 +139,5 @@ func TestBindingRuleCreateCommand(t *testing.T) {
 		code := cmd.Run(args)
 		require.Equal(t, code, 0)
 		require.Empty(t, ui.ErrorWriter.String())
-		// TODO: verify both selectors made it
 	})
 }

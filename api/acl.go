@@ -137,7 +137,7 @@ type ACLBindingRule struct {
 	ID          string
 	Description string
 	IDPName     string
-	Matches     []*ACLBindingRuleMatch
+	Selector    string
 	RoleName    string
 	MustExist   bool `json:",omitempty"`
 
@@ -145,6 +145,7 @@ type ACLBindingRule struct {
 	ModifyIndex uint64
 }
 
+// TODO: deprecate
 type ACLBindingRuleMatch struct {
 	Selector []string
 }

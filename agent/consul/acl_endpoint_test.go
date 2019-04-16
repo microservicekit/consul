@@ -3193,7 +3193,7 @@ func TestACLEndpoint_IdentityProviderDelete_RuleCascade(t *testing.T) {
 	i1_r1, err := upsertTestBindingRule(
 		codec, "root", "dc1",
 		idp1.Name,
-		[]string{"serviceaccount.name=abc"},
+		"serviceaccount.name==abc",
 		"abc",
 		false,
 	)
@@ -3201,7 +3201,7 @@ func TestACLEndpoint_IdentityProviderDelete_RuleCascade(t *testing.T) {
 	i1_r2, err := upsertTestBindingRule(
 		codec, "root", "dc1",
 		idp1.Name,
-		[]string{"serviceaccount.name=def"},
+		"serviceaccount.name==def",
 		"def",
 		false,
 	)
@@ -3212,7 +3212,7 @@ func TestACLEndpoint_IdentityProviderDelete_RuleCascade(t *testing.T) {
 	i2_r1, err := upsertTestBindingRule(
 		codec, "root", "dc1",
 		idp2.Name,
-		[]string{"serviceaccount.name=abc"},
+		"serviceaccount.name==abc",
 		"abc",
 		false,
 	)
@@ -3220,7 +3220,7 @@ func TestACLEndpoint_IdentityProviderDelete_RuleCascade(t *testing.T) {
 	i2_r2, err := upsertTestBindingRule(
 		codec, "root", "dc1",
 		idp2.Name,
-		[]string{"serviceaccount.name=def"},
+		"serviceaccount.name==def",
 		"def",
 		false,
 	)
@@ -3323,14 +3323,8 @@ func TestACLEndpoint_BindingRuleSet(t *testing.T) {
 		return structs.ACLBindingRule{
 			Description: "foobar",
 			IDPName:     testIDP.Name,
-			Matches: []*structs.ACLBindingRuleMatch{
-				&structs.ACLBindingRuleMatch{
-					Selector: []string{
-						"serviceaccount.name=abc",
-					},
-				},
-			},
-			RoleName: "abc",
+			Selector:    "serviceaccount.name==abc",
+			RoleName:    "abc",
 		}
 	}
 
@@ -3382,9 +3376,7 @@ func TestACLEndpoint_BindingRuleSet(t *testing.T) {
 		require.NotEmpty(t, rule.ID)
 		require.Equal(t, rule.Description, "foobar")
 		require.Equal(t, rule.IDPName, testIDP.Name)
-		require.Len(t, rule.Matches, 1)
-		require.Len(t, rule.Matches[0].Selector, 1)
-		require.Equal(t, "serviceaccount.name=abc", rule.Matches[0].Selector[0])
+		require.Equal(t, "serviceaccount.name==abc", rule.Selector)
 		require.Equal(t, "abc", rule.RoleName)
 		require.False(t, rule.MustExist)
 
@@ -3402,13 +3394,7 @@ func TestACLEndpoint_BindingRuleSet(t *testing.T) {
 		reqRule := newRule()
 		reqRule.ID = ruleID
 		reqRule.Description = "foobar modified"
-		reqRule.Matches = []*structs.ACLBindingRuleMatch{
-			&structs.ACLBindingRuleMatch{
-				Selector: []string{
-					"serviceaccount.namespace=def",
-				},
-			},
-		}
+		reqRule.Selector = "serviceaccount.namespace==def"
 		reqRule.RoleName = "def"
 		reqRule.MustExist = true
 
@@ -3431,9 +3417,7 @@ func TestACLEndpoint_BindingRuleSet(t *testing.T) {
 		require.NotEmpty(t, rule.ID)
 		require.Equal(t, rule.Description, "foobar modified")
 		require.Equal(t, rule.IDPName, testIDP.Name)
-		require.Len(t, rule.Matches, 1)
-		require.Len(t, rule.Matches[0].Selector, 1)
-		require.Equal(t, "serviceaccount.namespace=def", rule.Matches[0].Selector[0])
+		require.Equal(t, "serviceaccount.namespace==def", rule.Selector)
 		require.Equal(t, "def", rule.RoleName)
 		require.True(t, rule.MustExist)
 	})
@@ -3450,60 +3434,23 @@ func TestACLEndpoint_BindingRuleSet(t *testing.T) {
 		requireSetErrors(t, reqRule)
 	})
 
-	t.Run("Create with no explicit matches", func(t *testing.T) {
+	t.Run("Create with no explicit selector", func(t *testing.T) {
 		reqRule := newRule()
-		reqRule.Matches = nil
+		reqRule.Selector = ""
 
 		rule := requireOK(t, reqRule)
-		require.Len(t, rule.Matches, 0)
-	})
-
-	t.Run("Create fails; match contains no selector", func(t *testing.T) {
-		// If you don't want any selectors you should not provide any match.
-		reqRule := newRule()
-		reqRule.Matches = []*structs.ACLBindingRuleMatch{
-			&structs.ACLBindingRuleMatch{
-				Selector: nil,
-			},
-		}
-		requireSetErrors(t, reqRule)
-	})
-
-	t.Run("Create fails; match selector reuses vars", func(t *testing.T) {
-		reqRule := newRule()
-		reqRule.Matches = []*structs.ACLBindingRuleMatch{
-			&structs.ACLBindingRuleMatch{
-				Selector: []string{
-					"serviceaccount.name=a",
-					"serviceaccount.name=b",
-				},
-			},
-		}
-		requireSetErrors(t, reqRule)
+		require.Empty(t, rule.Selector, 0)
 	})
 
 	t.Run("Create fails; match selector with unknown vars", func(t *testing.T) {
 		reqRule := newRule()
-		reqRule.Matches = []*structs.ACLBindingRuleMatch{
-			&structs.ACLBindingRuleMatch{
-				Selector: []string{
-					"serviceaccount.name=a",
-					"serviceaccount.bizarroname=b",
-				},
-			},
-		}
+		reqRule.Selector = "serviceaccount.name==a and serviceaccount.bizarroname==b"
 		requireSetErrors(t, reqRule)
 	})
 
 	t.Run("Create fails; match selector invalid", func(t *testing.T) {
 		reqRule := newRule()
-		reqRule.Matches = []*structs.ACLBindingRuleMatch{
-			&structs.ACLBindingRuleMatch{
-				Selector: []string{
-					"serviceaccount.name",
-				},
-			},
-		}
+		reqRule.Selector = "serviceaccount.name"
 		requireSetErrors(t, reqRule)
 	})
 
@@ -3559,7 +3506,7 @@ func TestACLEndpoint_BindingRuleDelete(t *testing.T) {
 	existingRule, err := upsertTestBindingRule(
 		codec, "root", "dc1",
 		testIDP.Name,
-		[]string{"serviceaccount.name=abc"},
+		"serviceaccount.name==abc",
 		"abc",
 		false,
 	)
@@ -3622,7 +3569,7 @@ func TestACLEndpoint_BindingRuleList(t *testing.T) {
 	r1, err := upsertTestBindingRule(
 		codec, "root", "dc1",
 		testIDP.Name,
-		[]string{"serviceaccount.name=abc"},
+		"serviceaccount.name==abc",
 		"abc",
 		false,
 	)
@@ -3631,7 +3578,7 @@ func TestACLEndpoint_BindingRuleList(t *testing.T) {
 	r2, err := upsertTestBindingRule(
 		codec, "root", "dc1",
 		testIDP.Name,
-		[]string{"serviceaccount.name=def"},
+		"serviceaccount.name==def",
 		"def",
 		false,
 	)
@@ -3652,7 +3599,7 @@ func TestACLEndpoint_BindingRuleList(t *testing.T) {
 }
 
 type fakeK8SIdentityProviderValidator struct {
-	data map[string]map[string]string // token -> fieldmap
+	data map[string]map[string]string
 
 	*k8sIdentityProviderValidator
 }
@@ -3661,28 +3608,28 @@ func (p *fakeK8SIdentityProviderValidator) Reset() {
 	p.data = nil
 }
 
-func (p *fakeK8SIdentityProviderValidator) InstallToken(token string, fieldMap map[string]string) {
+func (p *fakeK8SIdentityProviderValidator) InstallToken(token string, fields map[string]string) {
 	if p.data == nil {
 		p.data = make(map[string]map[string]string)
 	}
-	p.data[token] = fieldMap
+	p.data[token] = fields
 }
 
-func (p *fakeK8SIdentityProviderValidator) ValidateLogin(req *LoginValidationRequest) (*LoginValidationResponse, error) {
+func (p *fakeK8SIdentityProviderValidator) ValidateLogin(loginToken string) (map[string]string, error) {
 	if p.data == nil {
 		return nil, acl.ErrNotFound
 	}
-	fm, ok := p.data[req.Token]
+	fields, ok := p.data[loginToken]
 	if !ok {
 		return nil, acl.ErrNotFound
 	}
 
 	fmCopy := make(map[string]string)
-	for k, v := range fm {
+	for k, v := range fields {
 		fmCopy[k] = v
 	}
 
-	return &LoginValidationResponse{Fields: fmCopy}, nil
+	return fmCopy, nil
 }
 
 func TestACLEndpoint_Login_LocalTokensDisabled(t *testing.T) {
@@ -3767,51 +3714,27 @@ func TestACLEndpoint_Login(t *testing.T) {
 	idp, err := upsertTestIDP(codec, "root", "dc1", ca.RootCert)
 	require.NoError(t, err)
 
-	ruleDB, err := upsertTestBindingRule(
-		codec, "root", "dc1", idp.Name,
-		[]string{
-			"serviceaccount.namespace=default",
-			"serviceaccount.name=db",
-		},
-		"k8s-{{serviceaccount.name}}",
-		false,
-	)
-	_, err = upsertTestBindingRule(
-		codec, "root", "dc1", idp.Name,
-		[]string{
-			"serviceaccount.namespace=default",
-			"serviceaccount.name=monolith",
-		},
-		"k8s-{{serviceaccount.name}}",
-		true,
-	)
-	require.NoError(t, err)
+	makeFields := func(namespace, name, uid string) map[string]string {
+		return map[string]string{
+			"serviceaccount.namespace": namespace,
+			"serviceaccount.name":      name,
+			"serviceaccount.uid":       uid,
+		}
+	}
 
 	// Swap out the k8s validator with our own test one.
 	validator := &fakeK8SIdentityProviderValidator{}
 	validator.InstallToken(
 		"fake-web", // no rules
-		map[string]string{
-			"serviceaccount.namespace": "default",
-			"serviceaccount.name":      "web",
-			"serviceaccount.uid":       "abc123",
-		},
+		makeFields("default", "web", "abc123"),
 	)
 	validator.InstallToken(
 		"fake-db", // 1 rule
-		map[string]string{
-			"serviceaccount.namespace": "default",
-			"serviceaccount.name":      "db",
-			"serviceaccount.uid":       "def456",
-		},
+		makeFields("default", "db", "def456"),
 	)
 	validator.InstallToken(
 		"fake-monolith", // 1 rule, must exist
-		map[string]string{
-			"serviceaccount.namespace": "default",
-			"serviceaccount.name":      "monolith",
-			"serviceaccount.uid":       "ghi789",
-		},
+		makeFields("default", "monolith", "ghi789"),
 	)
 	s1.aclIDPValidatorCreateTestHook = func(orig IdentityProviderValidator) (IdentityProviderValidator, error) {
 		if k8s, ok := orig.(*k8sIdentityProviderValidator); ok {
@@ -3820,6 +3743,23 @@ func TestACLEndpoint_Login(t *testing.T) {
 		}
 		return orig, nil
 	}
+
+	// Ensure we create any binding rules AFTER monkeypatching the validator
+	// cache because binding rule validation resolves the idp during mutations.
+
+	ruleDB, err := upsertTestBindingRule(
+		codec, "root", "dc1", idp.Name,
+		"serviceaccount.namespace==default and serviceaccount.name==db",
+		"k8s-{{serviceaccount.name}}",
+		false,
+	)
+	_, err = upsertTestBindingRule(
+		codec, "root", "dc1", idp.Name,
+		"serviceaccount.namespace==default and serviceaccount.name==monolith",
+		"k8s-{{serviceaccount.name}}",
+		true,
+	)
+	require.NoError(t, err)
 
 	t.Run("do not provide a token", func(t *testing.T) {
 		req := structs.ACLLoginRequest{
@@ -3928,6 +3868,7 @@ func TestACLEndpoint_Login(t *testing.T) {
 
 		monolithRoleID = out.ID
 	}
+	s1.purgeIdentityProviderValidators()
 
 	t.Run("valid idp token 1 binding must exist and now exists", func(t *testing.T) {
 		req := structs.ACLLoginRequest{
@@ -3984,7 +3925,7 @@ func TestACLEndpoint_Login(t *testing.T) {
 				IDPName:   ruleDB.IDPName,
 				RoleName:  ruleDB.RoleName,
 				MustExist: false,
-				Matches:   nil,
+				Selector:  "",
 			},
 			WriteRequest: structs.WriteRequest{Token: "root"},
 		}
@@ -4131,9 +4072,7 @@ func TestACLEndpoint_Login_k8s(t *testing.T) {
 
 	_, err = upsertTestBindingRule(
 		codec, "root", "dc1", idp.Name,
-		[]string{
-			"serviceaccount.namespace=default",
-		},
+		"serviceaccount.namespace==default",
 		"{{serviceaccount.name}}",
 		false,
 	)
@@ -4237,7 +4176,7 @@ func TestACLEndpoint_Logout(t *testing.T) {
 
 	_, err = upsertTestBindingRule(
 		codec, "root", "dc1", idp.Name,
-		nil,
+		"",
 		"k8s-{{serviceaccount.name}}",
 		false,
 	)
@@ -4668,7 +4607,7 @@ func upsertTestBindingRule(
 	masterToken string,
 	datacenter string,
 	idpName string,
-	singleSelector []string,
+	selector string,
 	roleName string,
 	mustExist bool,
 ) (*structs.ACLBindingRule, error) {
@@ -4678,15 +4617,9 @@ func upsertTestBindingRule(
 			IDPName:   idpName,
 			RoleName:  roleName,
 			MustExist: mustExist,
+			Selector:  selector,
 		},
 		WriteRequest: structs.WriteRequest{Token: masterToken},
-	}
-	if len(singleSelector) > 0 {
-		req.BindingRule.Matches = []*structs.ACLBindingRuleMatch{
-			&structs.ACLBindingRuleMatch{
-				Selector: singleSelector,
-			},
-		}
 	}
 
 	var out structs.ACLBindingRule
@@ -4740,5 +4673,11 @@ func requireErrorContains(t *testing.T, err error, expectedErrorMessage string) 
 	}
 }
 
+// 'default/consul-idp-token-review-account-token-m62ds'
 const goodJWT_A = "eyJhbGciOiJSUzI1NiIsImtpZCI6IiJ9.eyJpc3MiOiJrdWJlcm5ldGVzL3NlcnZpY2VhY2NvdW50Iiwia3ViZXJuZXRlcy5pby9zZXJ2aWNlYWNjb3VudC9uYW1lc3BhY2UiOiJkZWZhdWx0Iiwia3ViZXJuZXRlcy5pby9zZXJ2aWNlYWNjb3VudC9zZWNyZXQubmFtZSI6ImNvbnN1bC1pZHAtdG9rZW4tcmV2aWV3LWFjY291bnQtdG9rZW4tbTYyZHMiLCJrdWJlcm5ldGVzLmlvL3NlcnZpY2VhY2NvdW50L3NlcnZpY2UtYWNjb3VudC5uYW1lIjoiY29uc3VsLWlkcC10b2tlbi1yZXZpZXctYWNjb3VudCIsImt1YmVybmV0ZXMuaW8vc2VydmljZWFjY291bnQvc2VydmljZS1hY2NvdW50LnVpZCI6Ijc1ZTNjYmVhLTRiNTYtMTFlOS1hYzRiLTcwOGIxMTgwMWNiZSIsInN1YiI6InN5c3RlbTpzZXJ2aWNlYWNjb3VudDpkZWZhdWx0OmNvbnN1bC1pZHAtdG9rZW4tcmV2aWV3LWFjY291bnQifQ.uMb66tZ8d8gNzS8EnjlkzbrGKc5M-BESwS5B46IUbKfdMtajsCwgBXICytWKQ2X7wfm4QQykHVaElijBlO8QVvYeYzQE0uy75eH9EXNXmRh862YL_Qcy_doPC0R6FQXZW99S5Joc-3riKsq7N-sjEDBshOqyfDaGfan3hxaiV4Bv4hXXWRFUQ9aTAfPVvk1FQi21U9Fbml9ufk8kkk6gAmIEA_o7p-ve6WIhm48t7MJv314YhyVqXdrvmRykPdMwj4TfwSn3pTJ82P4NgSbXMJhwNkwIadJPZrM8EfN5ISpR4EW3jzP3IHtgQxrIovWQ9TQib1Z5zdRaLWaFVm6XaQ"
+
+// 'default/demo'
 const goodJWT_B = "eyJhbGciOiJSUzI1NiIsImtpZCI6IiJ9.eyJpc3MiOiJrdWJlcm5ldGVzL3NlcnZpY2VhY2NvdW50Iiwia3ViZXJuZXRlcy5pby9zZXJ2aWNlYWNjb3VudC9uYW1lc3BhY2UiOiJkZWZhdWx0Iiwia3ViZXJuZXRlcy5pby9zZXJ2aWNlYWNjb3VudC9zZWNyZXQubmFtZSI6ImRlbW8tdG9rZW4ta21iOW4iLCJrdWJlcm5ldGVzLmlvL3NlcnZpY2VhY2NvdW50L3NlcnZpY2UtYWNjb3VudC5uYW1lIjoiZGVtbyIsImt1YmVybmV0ZXMuaW8vc2VydmljZWFjY291bnQvc2VydmljZS1hY2NvdW50LnVpZCI6Ijc2MDkxYWY0LTRiNTYtMTFlOS1hYzRiLTcwOGIxMTgwMWNiZSIsInN1YiI6InN5c3RlbTpzZXJ2aWNlYWNjb3VudDpkZWZhdWx0OmRlbW8ifQ.ZiAHjijBAOsKdum0Aix6lgtkLkGo9_Tu87dWQ5Zfwnn3r2FejEWDAnftTft1MqqnMzivZ9Wyyki5ZjQRmTAtnMPJuHC-iivqY4Wh4S6QWCJ1SivBv5tMZR79t5t8mE7R1-OHwst46spru1pps9wt9jsA04d3LpV0eeKYgdPTVaQKklxTm397kIMUugA6yINIBQ3Rh8eQqBgNwEmL4iqyYubzHLVkGkoP9MJikFI05vfRiHtYr-piXz6JFDzXMQj9rW6xtMmrBSn79ChbyvC5nz-Nj2rJPnHsb_0rDUbmXY5PpnMhBpdSH-CbZ4j8jsiib6DtaGJhVZeEQ1GjsFAZwQ"
+
+// 'default/monolith'
+const goodJWT_C = "eyJhbGciOiJSUzI1NiIsImtpZCI6IiJ9.eyJpc3MiOiJrdWJlcm5ldGVzL3NlcnZpY2VhY2NvdW50Iiwia3ViZXJuZXRlcy5pby9zZXJ2aWNlYWNjb3VudC9uYW1lc3BhY2UiOiJkZWZhdWx0Iiwia3ViZXJuZXRlcy5pby9zZXJ2aWNlYWNjb3VudC9zZWNyZXQubmFtZSI6Im1vbm9saXRoLXRva2VuLWp6amQ2Iiwia3ViZXJuZXRlcy5pby9zZXJ2aWNlYWNjb3VudC9zZXJ2aWNlLWFjY291bnQubmFtZSI6Im1vbm9saXRoIiwia3ViZXJuZXRlcy5pby9zZXJ2aWNlYWNjb3VudC9zZXJ2aWNlLWFjY291bnQudWlkIjoiY2IyZTAyM2UtNjA3YS0xMWU5LWIxOWUtNDhlNmM4YjhlY2I1Iiwic3ViIjoic3lzdGVtOnNlcnZpY2VhY2NvdW50OmRlZmF1bHQ6bW9ub2xpdGgifQ.b-Q3M-DDdhTkxY4GCKU7tZIbGdB07ASY7D0K5ci5omTRrjqBw73M4CQU3g2yWAv5Lkb9koUvMcnFNc9PpoqXBFweZg9z82sBcUFX2QmQGy4uIOY6qkIVqLjer_c26-lGvdlAnidkrAOXqNPrc-Iqcfo1Qc4pqnLMOQLDuEGnjPcVoQzB3kPVchwOG8r3uhYfnqfmmilRk88IwTCjmZL-YEnFXEkrypCFGAVZvK992CY0zEonEC3Dr19-72HpC0U6xWuqi6nprX4__S-phd708u43drHNGpff84BkAuImbSTGvpEU5oJ8_Z27swi2DBI-bozKLFEebgx-Y53BAMtXtA"

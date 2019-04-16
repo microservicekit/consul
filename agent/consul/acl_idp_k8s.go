@@ -7,6 +7,12 @@ import (
 	"github.com/hashicorp/consul/agent/structs"
 )
 
+const (
+	serviceAccountNamespaceField = "serviceaccount.namespace"
+	serviceAccountNameField      = "serviceaccount.name"
+	serviceAccountUIDField       = "serviceaccount.uid"
+)
+
 type k8sIdentityProviderValidator struct {
 	// idp is the underlying state store object with configuration settings
 	idp *structs.ACLIdentityProvider
@@ -74,19 +80,18 @@ func newK8SIdentityProviderValidator(idp *structs.ACLIdentityProvider) (*k8sIden
 	}, nil
 }
 
-func k8sValidateIdentityProvider(idp *structs.ACLIdentityProvider) error {
-	_, err := newK8SIdentityProviderValidator(idp)
-	return err
+func (v *k8sIdentityProviderValidator) Name() string {
+	return v.idp.Name
 }
 
-func (v *k8sIdentityProviderValidator) ValidateLogin(req *LoginValidationRequest) (*LoginValidationResponse, error) {
-	sa, err := k8sidp.ParseAndValidateJWT(req.Token, v.publicKeys)
+func (v *k8sIdentityProviderValidator) ValidateLogin(loginToken string) (map[string]string, error) {
+	sa, err := k8sidp.ParseAndValidateJWT(loginToken, v.publicKeys)
 	if err != nil {
 		return nil, fmt.Errorf("failed to parse and validate JWT: %v", err)
 	}
 
 	// look up the JWT token in the kubernetes API
-	r, err := v.tr.Review(req.Token)
+	r, err := v.tr.Review(loginToken)
 	if err != nil {
 		return nil, err
 	}
@@ -105,21 +110,37 @@ func (v *k8sIdentityProviderValidator) ValidateLogin(req *LoginValidationRequest
 		return nil, fmt.Errorf("JWT UIDs did not match")
 	}
 
-	return &LoginValidationResponse{
-		Fields: map[string]string{
-			"serviceaccount.namespace": r.Namespace,
-			"serviceaccount.name":      r.Name, // return the one that could be overridden
-			"serviceaccount.uid":       r.UID,
-		},
+	return map[string]string{
+		serviceAccountNamespaceField: r.Namespace,
+		serviceAccountNameField:      r.Name, // return the one that could be overridden
+		serviceAccountUIDField:       r.UID,
 	}, nil
 }
 
-var k8sAvailableFields = []string{
-	"serviceaccount.namespace",
-	"serviceaccount.name",
-	"serviceaccount.uid",
+func (v *k8sIdentityProviderValidator) MakeFieldMapSelectable(fieldMap map[string]string) interface{} {
+	return &k8sFieldDetails{
+		ServiceAccount: k8sFieldDetailsServiceAccount{
+			Namespace: fieldMap[serviceAccountNamespaceField],
+			Name:      fieldMap[serviceAccountNameField],
+			UID:       fieldMap[serviceAccountUIDField],
+		},
+	}
+}
+
+type k8sFieldDetails struct {
+	ServiceAccount k8sFieldDetailsServiceAccount `bexpr:"serviceaccount"`
+}
+
+type k8sFieldDetailsServiceAccount struct {
+	Namespace string `bexpr:"namespace"`
+	Name      string `bexpr:"name"`
+	UID       string `bexpr:"uid"`
 }
 
 func (p *k8sIdentityProviderValidator) AvailableFields() []string {
-	return k8sAvailableFields
+	return []string{
+		serviceAccountNamespaceField,
+		serviceAccountNameField,
+		serviceAccountUIDField,
+	}
 }

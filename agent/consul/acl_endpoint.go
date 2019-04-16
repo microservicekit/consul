@@ -15,6 +15,7 @@ import (
 	"github.com/hashicorp/consul/agent/consul/state"
 	"github.com/hashicorp/consul/agent/structs"
 	"github.com/hashicorp/consul/lib"
+	"github.com/hashicorp/go-bexpr"
 	memdb "github.com/hashicorp/go-memdb"
 	uuid "github.com/hashicorp/go-uuid"
 )
@@ -1530,11 +1531,15 @@ func (a *ACL) BindingRuleSet(args *structs.ACLBindingRuleSetRequest, reply *stru
 		return fmt.Errorf("Invalid Binding Rule: no IDPName is set")
 	}
 
-	_, idp, err := state.ACLIdentityProviderGetByName(nil, rule.IDPName)
+	idpIdx, idp, err := state.ACLIdentityProviderGetByName(nil, rule.IDPName)
 	if err != nil {
 		return fmt.Errorf("acl identity provider lookup failed: %v", err)
 	} else if idp == nil {
 		return fmt.Errorf("cannot find identity provider with name %q", rule.IDPName)
+	}
+	validator, err := a.srv.loadIdentityProviderValidator(idpIdx, idp)
+	if err != nil {
+		return err
 	}
 
 	if rule.ID == "" {
@@ -1563,32 +1568,18 @@ func (a *ACL) BindingRuleSet(args *structs.ACLBindingRuleSetRequest, reply *stru
 		}
 	}
 
-	for _, match := range rule.Matches {
-		if len(match.Selector) == 0 {
-			return fmt.Errorf("Invalid Binding Rule: Match must have Selector set")
-		}
-		fields := make(map[string]struct{})
-		for _, sel := range match.Selector {
-			lhs, _, ok := parseExactMatchSelector(sel)
-			if !ok {
-				return fmt.Errorf("invalid match selector %q", sel)
-			}
-			if _, ok := fields[lhs]; ok {
-				return fmt.Errorf("binding rule selector uses the same field twice: %q", lhs)
-			}
-			fields[lhs] = struct{}{}
-
-			unknown := findUnknownIdentityProviderFields(idp.Type, []string{lhs})
-			if len(unknown) > 0 {
-				return fmt.Errorf("binding rule selector uses unknown field: %q", unknown[0])
-			}
+	if rule.Selector != "" {
+		selectableVars := validator.MakeFieldMapSelectable(map[string]string{})
+		_, err := bexpr.CreateEvaluatorForType(rule.Selector, nil, selectableVars)
+		if err != nil {
+			return fmt.Errorf("invalid Binding Rule: Selector is invalid: %v", err)
 		}
 	}
 
 	if rule.RoleName == "" {
 		return fmt.Errorf("Invalid Binding Rule: no RoleName is set")
 	}
-	if valid, err := isValidBindingRuleRoleName(idp.Type, rule.RoleName); err != nil {
+	if valid, err := isValidBindingRuleRoleName(validator, idp.Type, rule.RoleName); err != nil {
 		return fmt.Errorf("binding rule role name is invalid: %v", err)
 	} else if !valid {
 		return fmt.Errorf("binding rule role name is invalid")
@@ -1614,7 +1605,7 @@ func (a *ACL) BindingRuleSet(args *structs.ACLBindingRuleSetRequest, reply *stru
 	return nil
 }
 
-func isValidBindingRuleRoleName(idpType, roleName string) (bool, error) {
+func isValidBindingRuleRoleName(validator IdentityProviderValidator, idpType, roleName string) (bool, error) {
 	if idpType == "" || roleName == "" {
 		return false, nil
 	}
@@ -1628,7 +1619,8 @@ func isValidBindingRuleRoleName(idpType, roleName string) (bool, error) {
 		return validRoleName.MatchString(roleName), nil
 	}
 
-	unknown := findUnknownIdentityProviderFields(idpType, vars)
+	allowed := validator.AvailableFields()
+	unknown := setDiff(vars, allowed)
 	if len(unknown) > 0 {
 		return false, fmt.Errorf("contains unknown variables: %v", unknown)
 	}
@@ -1646,6 +1638,32 @@ func isValidBindingRuleRoleName(idpType, roleName string) (bool, error) {
 	}
 
 	return validRoleName.MatchString(generatedName), nil
+}
+
+// setDiff(A, B) removes the elements in B from A and returns the result.
+//
+// This should only be used on slices that are VERY short.
+func setDiff(a, b []string) []string {
+	if len(b) == 0 {
+		return nil
+	}
+
+	var retained []string
+
+	for _, av := range a {
+		found := false
+		for _, bv := range b {
+			if av == bv {
+				found = true
+				break
+			}
+		}
+		if !found {
+			retained = append(retained, av)
+		}
+	}
+
+	return retained
 }
 
 func (a *ACL) BindingRuleDelete(args *structs.ACLBindingRuleDeleteRequest, reply *bool) error {
@@ -1789,7 +1807,9 @@ func (a *ACL) IdentityProviderSet(args *structs.ACLIdentityProviderSetRequest, r
 		return fmt.Errorf("Invalid Identity Provider: Type should be one of [kubernetes]")
 	}
 
-	if err := a.srv.validateIdentityProviderSpecificFields(idp); err != nil {
+	// Instantiate a validator but do not cache it yet. This will validate the
+	// configuration.
+	if _, err := a.srv.createIdentityProviderValidator(idp); err != nil {
 		return fmt.Errorf("Invalid Identity Provider: %v", err)
 	}
 
@@ -1928,22 +1948,30 @@ func (a *ACL) Login(args *structs.ACLLoginRequest, reply *structs.ACLToken) erro
 	auth := args.Auth
 
 	// 1. take args.Data.IDPName to get an IdentityProvider Validator
-	idp, err := a.srv.getIdentityProvider(auth.IDPType, auth.IDPName)
+	idx, idp, err := a.srv.fsm.State().ACLIdentityProviderGetByName(nil, auth.IDPName)
+	if err != nil {
+		return err
+	} else if idp == nil {
+		return acl.ErrNotFound
+	}
+
+	if idp.Type != auth.IDPType {
+		return fmt.Errorf("identity provider with name %q is of type %q not %q", idp.Name, idp.Type, auth.IDPType)
+	}
+
+	validator, err := a.srv.loadIdentityProviderValidator(idx, idp)
 	if err != nil {
 		return err
 	}
 
 	// 2. Send args.Data.IDPToken to idp validator and get back a fields map
-	validationReq := &LoginValidationRequest{
-		Token: auth.IDPToken,
-	}
-	validationResp, err := idp.ValidateLogin(validationReq)
+	verifiedFields, err := validator.ValidateLogin(auth.IDPToken)
 	if err != nil {
 		return err
 	}
 
 	// 3. send map through role bindings
-	roleLinks, err := a.srv.evaluateRoleBindings(auth.IDPName, validationResp)
+	roleLinks, err := a.srv.evaluateRoleBindings(validator, verifiedFields)
 	if err != nil {
 		return err
 	}

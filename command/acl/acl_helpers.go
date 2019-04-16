@@ -199,16 +199,10 @@ func PrintBindingRule(rule *api.ACLBindingRule, ui cli.Ui, showMeta bool) {
 	ui.Info(fmt.Sprintf("Description:  %s", rule.Description))
 	ui.Info(fmt.Sprintf("RoleName:     %s", rule.RoleName))
 	ui.Info(fmt.Sprintf("MustExist:    %v", rule.MustExist))
+	ui.Info(fmt.Sprintf("Selector:     %s", rule.Selector))
 	if showMeta {
 		ui.Info(fmt.Sprintf("Create Index: %d", rule.CreateIndex))
 		ui.Info(fmt.Sprintf("Modify Index: %d", rule.ModifyIndex))
-	}
-	ui.Info(fmt.Sprintf("Matches:"))
-	for i, match := range rule.Matches {
-		ui.Info(fmt.Sprintf("   %d:", i))
-		for _, sel := range match.Selector {
-			ui.Info(fmt.Sprintf("      %s", sel))
-		}
 	}
 }
 
@@ -218,16 +212,10 @@ func PrintBindingRuleListEntry(rule *api.ACLBindingRule, ui cli.Ui, showMeta boo
 	ui.Info(fmt.Sprintf("   Description:  %s", rule.Description))
 	ui.Info(fmt.Sprintf("   RoleName:     %s", rule.RoleName))
 	ui.Info(fmt.Sprintf("   MustExist:    %v", rule.MustExist))
+	ui.Info(fmt.Sprintf("   Selector:     %s", rule.Selector))
 	if showMeta {
 		ui.Info(fmt.Sprintf("   Create Index: %d", rule.CreateIndex))
 		ui.Info(fmt.Sprintf("   Modify Index: %d", rule.ModifyIndex))
-	}
-	ui.Info(fmt.Sprintf("   Matches:"))
-	for i, match := range rule.Matches {
-		ui.Info(fmt.Sprintf("      %d:", i))
-		for _, sel := range match.Selector {
-			ui.Info(fmt.Sprintf("         %s", sel))
-		}
 	}
 }
 
@@ -438,30 +426,6 @@ func ExtractServiceIdentities(serviceIdents []string) ([]*api.ACLServiceIdentity
 		}
 	}
 	return out, nil
-}
-
-func ParseBindingRuleMatchSelectors(matchSelectors []string) ([]*api.ACLBindingRuleMatch, error) {
-	var found []*api.ACLBindingRuleMatch
-
-	for _, rawMatch := range matchSelectors {
-		rawSelectors := strings.Split(rawMatch, ",")
-		if len(rawSelectors) == 0 {
-			return nil, fmt.Errorf("Invalid match selector: %s", rawMatch)
-		}
-
-		var m api.ACLBindingRuleMatch
-		for _, rawSelector := range rawSelectors {
-			selector := strings.TrimSpace(rawSelector)
-			if selector == "" {
-				return nil, fmt.Errorf("Invalid match selector: %s", rawMatch)
-			}
-			m.Selector = append(m.Selector, selector)
-		}
-
-		found = append(found, &m)
-	}
-
-	return found, nil
 }
 
 // TestKubernetesJWT_A is a valid service account jwt extracted from a minikube setup.
