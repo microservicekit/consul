@@ -49,7 +49,7 @@ load helpers
   echo "$output"
   echo "COUNT: $COUNT"
 
-  [ "$status" == 0 ]
+  [ "$status" == 1 ]
   [ "$COUNT" -gt "0" ]
 }
 

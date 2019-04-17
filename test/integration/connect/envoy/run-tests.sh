@@ -15,11 +15,10 @@ FILTER_TESTS=${FILTER_TESTS:-}
 # useful for debugging.
 LEAVE_CONSUL_UP=${LEAVE_CONSUL_UP:-}
 
-# PROXY_LOGS_ON_FAIL=1 can be used in teardown scripts to dump logs from Envoy
-# containers before stopping them. This can be useful for debugging but is very
-# verbose so not done by default on a fail. See example in
-# case-statsd-udp/teardown.sh for how to use it.
-PROXY_LOGS_ON_FAIL=${PROXY_LOGS_ON_FAIL:-}
+# CONTAINER_LOGS_ON_FAIL=1 can be used in teardown scripts to dump logs from all
+# test containers before stopping them. This can be useful for debugging but is
+# very verbose so not done by default on a fail.
+CONTAINER_LOGS_ON_FAIL=${CONTAINER_LOGS_ON_FAIL:-}
 
 # QUIESCE_SECS=1 will cause the runner to sleep for 1 second after setup but
 # before veirfy container is run this is useful for CI which seems to pass more
@@ -100,6 +99,11 @@ for c in ./case-*/ ; do
     # can't use shared volumes)
     docker cp etc/. envoy_workdir_1:/workdir
 
+    # Start containers required
+    if [ ! -z "$REQUIRED_SERVICES" ] ; then
+      docker-compose up -d $REQUIRED_SERVICES
+    fi
+
     if [ ! -z "$QUIESCE_SECS" ] ; then
       echo "Sleeping for $QUIESCE_SECS seconds"
       sleep $QUIESCE_SECS
@@ -117,8 +121,16 @@ for c in ./case-*/ ; do
       fi
     fi
 
-    # Run test case teardown
-    source ${c}teardown.sh
+    # Teardown
+    if [ ! -z "$REQUIRED_SERVICES" ] ; then
+      if [[ "$RESULT" == 0  && ! -z "$CONTAINER_LOGS_ON_FAIL" ]] ; then
+        # doing this in one command interleaves the logs which is gross
+        for cont in $REQUIRED_SERVICES; do
+          docker-compose logs $cont
+        done
+      fi
+      docker-compose stop $REQUIRED_SERVICES
+    fi
   done
 done
 
