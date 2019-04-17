@@ -989,7 +989,7 @@ func TestACLEndpoint_TokenSet(t *testing.T) {
 				Description: "foobar",
 				Roles: []structs.ACLTokenRoleLink{
 					structs.ACLTokenRoleLink{
-						BoundName: "web",
+						BoundName: "service:web",
 					},
 				},
 				Local: true,
@@ -1017,7 +1017,7 @@ func TestACLEndpoint_TokenSet(t *testing.T) {
 				Roles: []structs.ACLTokenRoleLink{
 					structs.ACLTokenRoleLink{
 						ID:        "abc",
-						BoundName: "web",
+						BoundName: "service:web",
 					},
 				},
 				Local: true,
@@ -1045,7 +1045,7 @@ func TestACLEndpoint_TokenSet(t *testing.T) {
 				Roles: []structs.ACLTokenRoleLink{
 					structs.ACLTokenRoleLink{
 						Name:      "def",
-						BoundName: "web",
+						BoundName: "service:web",
 					},
 				},
 				Local: true,
@@ -1058,6 +1058,8 @@ func TestACLEndpoint_TokenSet(t *testing.T) {
 		err := acl.TokenSet(&req, &resp)
 		requireErrorContains(t, err, "Role links can either set BoundName OR ID/Name but not both")
 	})
+
+	// TODO: verify "existing" bind types and also invalid ones
 
 	t.Run("Create fails with an empty IDPName when faking login", func(t *testing.T) {
 		acl := ACL{
@@ -1099,13 +1101,13 @@ func TestACLEndpoint_TokenSet(t *testing.T) {
 				Description: "foobar",
 				Roles: []structs.ACLTokenRoleLink{
 					structs.ACLTokenRoleLink{
-						BoundName: "web",
+						BoundName: "service:web",
 					},
 					structs.ACLTokenRoleLink{
-						BoundName: "db",
+						BoundName: "service:db",
 					},
 					structs.ACLTokenRoleLink{
-						BoundName: "web", // add web twice to test dedupe
+						BoundName: "service:web", // add web twice to test dedupe
 					},
 				},
 				Local: true,
@@ -1124,8 +1126,8 @@ func TestACLEndpoint_TokenSet(t *testing.T) {
 		token := tokenResp.Token
 
 		require.Len(t, token.Roles, 2)
-		require.Equal(t, "web", token.Roles[0].BoundName)
-		require.Equal(t, "db", token.Roles[1].BoundName)
+		require.Equal(t, "service:web", token.Roles[0].BoundName)
+		require.Equal(t, "service:db", token.Roles[1].BoundName)
 	})
 
 	t.Run("Create it with invalid service identity (empty)", func(t *testing.T) {
@@ -2794,7 +2796,7 @@ func TestACLEndpoint_RoleResolve(t *testing.T) {
 						ID: r1.ID,
 					},
 					structs.ACLTokenRoleLink{
-						BoundName: "my-magic-role",
+						BoundName: "service:my-magic-role",
 					},
 				},
 			},
@@ -3915,7 +3917,7 @@ func TestACLEndpoint_Login(t *testing.T) {
 		role := resp.Roles[0]
 		require.Empty(t, role.ID)
 		require.Empty(t, role.Name)
-		require.Equal(t, "k8s-db", role.BoundName)
+		require.Equal(t, "service:k8s-db", role.BoundName)
 	})
 
 	{
@@ -3955,7 +3957,7 @@ func TestACLEndpoint_Login(t *testing.T) {
 		role := resp.Roles[0]
 		require.Empty(t, role.ID)
 		require.Empty(t, role.Name)
-		require.Equal(t, "k8s-db", role.BoundName)
+		require.Equal(t, "service:k8s-db", role.BoundName)
 	})
 
 	{
@@ -4099,7 +4101,7 @@ func TestACLEndpoint_Login_k8s(t *testing.T) {
 		role := resp.Roles[0]
 		require.Empty(t, role.ID)
 		require.Empty(t, role.Name)
-		require.Equal(t, "demo", role.BoundName)
+		require.Equal(t, "service:demo", role.BoundName)
 	})
 
 	// annotate the account
@@ -4132,7 +4134,7 @@ func TestACLEndpoint_Login_k8s(t *testing.T) {
 		role := resp.Roles[0]
 		require.Empty(t, role.ID)
 		require.Empty(t, role.Name)
-		require.Equal(t, "alternate-name", role.BoundName)
+		require.Equal(t, "service:alternate-name", role.BoundName)
 	})
 }
 

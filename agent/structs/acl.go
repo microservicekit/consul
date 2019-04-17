@@ -143,10 +143,13 @@ type ACLTokenPolicyLink struct {
 
 // ACLTokenRoleLink is a way to link a Role to a Token. At the storage layer
 // one of ID or BoundName is required. BoundName can only be set during a Login
-// operation when BindingRules are evaluated. If the optional Name is
-// presented during link creation it is resolved to an ID and persisted
-// alongside a snapshot of the current Role's name, but the Name should not be
-// considered a long-term link to the Role, as the ID is used for that.
+// operation when BindingRules are evaluated. A bound name is a concatenation of
+// the RoleBindType and the RoleName joined with a ":", like "service:db".
+//
+// If the optional Name is presented during link creation it is resolved to an
+// ID and persisted alongside a snapshot of the current Role's name, but the
+// Name should not be considered a long-term link to the Role, as the ID is
+// used for that.
 type ACLTokenRoleLink struct {
 	ID        string `json:",omitempty"`
 	Name      string `json:",omitempty" hash:"ignore"`

@@ -5,6 +5,7 @@ import (
 	"log"
 	"os"
 	"sort"
+	"strings"
 	"sync"
 	"time"
 
@@ -880,30 +881,37 @@ func (r *ACLResolver) collectRolesForIdentity(identity structs.ACLIdentity, role
 		return nil, err
 	}
 
-	boundRolesByName, err := r.collectBoundRolesForIdentity(identity, boundRoleNames)
+	boundRolesByRoleName, err := r.collectBoundRolesForIdentity(identity, boundRoleNames)
 	if err != nil {
 		return nil, err
 	}
 
 	for _, boundRoleName := range boundRoleNames {
-		if boundRolesByName != nil {
-			if boundRole, ok := boundRolesByName[boundRoleName]; ok {
+		bindType, roleName := splitBoundRoleName(boundRoleName)
+		if bindType == "" || roleName == "" {
+			continue
+		}
+
+		if boundRolesByRoleName != nil {
+			if boundRole, ok := boundRolesByRoleName[roleName]; ok {
 				roles = append(roles, boundRole)
 				continue
 			}
 		}
 		if includeSynthetic {
-			role := &structs.ACLRole{
-				Name:        boundRoleName,
-				Description: "synthetic role",
-				ServiceIdentities: []*structs.ACLServiceIdentity{
-					&structs.ACLServiceIdentity{
-						ServiceName: boundRoleName,
+			if bindType == structs.BindingRuleRoleBindTypeService {
+				role := &structs.ACLRole{
+					Name:        roleName,
+					Description: "synthetic role",
+					ServiceIdentities: []*structs.ACLServiceIdentity{
+						&structs.ACLServiceIdentity{
+							ServiceName: roleName,
+						},
 					},
-				},
+				}
+				role.SetHash(true)
+				roles = append(roles, role)
 			}
-			role.SetHash(true)
-			roles = append(roles, role)
 		}
 	}
 
@@ -999,6 +1007,14 @@ func (r *ACLResolver) collectNormalRolesForIdentityInto(roles []*structs.ACLRole
 	return roles, nil
 }
 
+func splitBoundRoleName(boundRoleName string) (bindType, roleName string) {
+	parts := strings.Split(boundRoleName, ":")
+	if len(parts) != 2 {
+		return "", ""
+	}
+	return parts[0], parts[1]
+}
+
 func (r *ACLResolver) collectBoundRolesForIdentity(identity structs.ACLIdentity, boundRoleNames []string) (map[string]*structs.ACLRole, error) {
 	if len(boundRoleNames) == 0 {
 		return nil, nil
@@ -1011,22 +1027,27 @@ func (r *ACLResolver) collectBoundRolesForIdentity(identity structs.ACLIdentity,
 	found := make(map[string]*structs.ACLRole) // map key is bound role name
 
 	for _, boundRoleName := range boundRoleNames {
-		if done, role, err := r.delegate.ResolveRoleFromName(boundRoleName); done {
+		bindType, roleName := splitBoundRoleName(boundRoleName)
+		if bindType != structs.BindingRuleRoleBindTypeService || roleName == "" {
+			continue // "service" is the only type that is supported here
+		}
+
+		if done, role, err := r.delegate.ResolveRoleFromName(roleName); done {
 			if err != nil && !acl.IsErrNotFound(err) {
 				return nil, err
 			}
 
 			if role != nil {
-				found[boundRoleName] = role
+				found[roleName] = role
 			}
 
 			continue
 		}
 
 		// create the missing list which we can execute an RPC to get all the missing roles at once
-		entry := r.cache.GetRoleByName(boundRoleName)
+		entry := r.cache.GetRoleByName(roleName)
 		if entry == nil {
-			missing = append(missing, boundRoleName)
+			missing = append(missing, roleName)
 			continue
 		}
 
@@ -1037,9 +1058,9 @@ func (r *ACLResolver) collectBoundRolesForIdentity(identity structs.ACLIdentity,
 
 		if entry.Age() >= r.config.ACLRoleTTL {
 			expired = append(expired, entry.Role)
-			expCacheMap[boundRoleName] = entry
+			expCacheMap[roleName] = entry
 		} else {
-			found[boundRoleName] = entry.Role
+			found[roleName] = entry.Role
 		}
 	}
 

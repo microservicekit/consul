@@ -8,6 +8,7 @@ import (
 	"os"
 	"path/filepath"
 	"regexp"
+	"strings"
 	"time"
 
 	metrics "github.com/armon/go-metrics"
@@ -502,6 +503,10 @@ func (a *ACL) tokenSetInternal(args *structs.ACLTokenSetRequest, reply *structs.
 				return fmt.Errorf("Role links can either set BoundName OR ID/Name but not both")
 			}
 
+			if !isValidBoundRoleName(link.BoundName) {
+				return fmt.Errorf("BoundName %q is invalid", link.BoundName)
+			}
+
 			// dedup role links by bound name (note we do not dedupe BoundName
 			// and Name fields within the same request)
 			if _, ok := roleBoundNames[link.BoundName]; !ok {
@@ -590,6 +595,26 @@ func isValidServiceIdentityName(name string) bool {
 		return false
 	}
 	return validServiceIdentityName.MatchString(name)
+}
+
+// isValidBoundRoleName returns true if the provided bound name is a valid
+// string of the form "BIND_TYPE:ROLE_NAME" with BIND_TYPE having allowed
+// values of "service" and "existing"
+func isValidBoundRoleName(boundName string) bool {
+	parts := strings.Split(boundName, ":")
+	if len(parts) != 2 {
+		return false
+	}
+	bindType, roleName := parts[0], parts[1]
+
+	// Note: BindingRuleRoleBindTypeExisting is not valid here, because it is
+	// used at token-create time to create a standard role link and is not
+	// persisted further.
+	if bindType != structs.BindingRuleRoleBindTypeService {
+		return false
+	}
+
+	return validRoleName.MatchString(roleName)
 }
 
 func (a *ACL) TokenDelete(args *structs.ACLTokenDeleteRequest, reply *string) error {
@@ -1436,7 +1461,11 @@ func (a *ACL) RoleResolve(args *structs.ACLRoleBatchGetRequest, reply *structs.A
 		idMap[roleID] = nil
 	}
 	for _, boundRoleName := range identity.BoundRoleNames() {
-		nameMap[boundRoleName] = nil
+		bindType, roleName := splitBoundRoleName(boundRoleName)
+		if bindType == "" || roleName == "" {
+			continue
+		}
+		nameMap[roleName] = nil
 	}
 
 	for _, role := range roles {

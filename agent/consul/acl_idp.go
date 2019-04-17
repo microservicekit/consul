@@ -166,7 +166,7 @@ func (s *Server) evaluateRoleBindings(validator IdentityProviderValidator, verif
 			// that real role may still take effect, it's just not REQUIRED in
 			// the way that BindingRuleRoleBindTypeExisting implies.
 			roleLinks = append(roleLinks, structs.ACLTokenRoleLink{
-				BoundName: roleName,
+				BoundName: rule.RoleBindType + ":" + roleName,
 			})
 
 		case structs.BindingRuleRoleBindTypeExisting:

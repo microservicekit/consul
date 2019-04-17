@@ -146,7 +146,7 @@ func testIdentityForToken(token string) (bool, structs.ACLIdentity, error) {
 			IDPName:    "k8s",
 			Roles: []structs.ACLTokenRoleLink{
 				structs.ACLTokenRoleLink{
-					BoundName: "synthetic",
+					BoundName: "service:synthetic",
 				},
 			},
 		}, nil
@@ -157,7 +157,7 @@ func testIdentityForToken(token string) (bool, structs.ACLIdentity, error) {
 			IDPName:    "k8s",
 			Roles: []structs.ACLTokenRoleLink{
 				structs.ACLTokenRoleLink{
-					BoundName: "acl-ro",
+					BoundName: "service:acl-ro",
 				},
 			},
 		}, nil
