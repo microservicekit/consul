@@ -26,6 +26,9 @@ CONTAINER_LOGS_ON_FAIL=${CONTAINER_LOGS_ON_FAIL:-}
 # start, and our tests retry.
 QUIESCE_SECS=${QUIESCE_SECS:-}
 
+# ENVOY_VERSIONS is the list of envoy versions to run each test against
+ENVOY_VERSIONS=${ENVOY_VERSIONS:-"1.8.0 1.9.1"}
+
 if [ ! -z "$DEBUG" ] ; then
   set -x
 fi
@@ -34,7 +37,6 @@ DIR=$(cd -P -- "$(dirname -- "$0")" && pwd -P)
 
 cd $DIR
 
-ENVOY_VERSIONS="1.8.0 1.9.1"
 
 FILTER_TESTS=${FILTER_TESTS:-}
 LEAVE_CONSUL_UP=${LEAVE_CONSUL_UP:-}
