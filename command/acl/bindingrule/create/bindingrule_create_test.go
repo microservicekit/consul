@@ -140,4 +140,22 @@ func TestBindingRuleCreateCommand(t *testing.T) {
 		require.Equal(t, code, 0)
 		require.Empty(t, ui.ErrorWriter.String())
 	})
+
+	t.Run("create it with an exact match", func(t *testing.T) {
+		args := []string{
+			"-http-addr=" + a.HTTPAddr(),
+			"-token=root",
+			"-idp-name=k8s",
+			"-role-bind-type", "existing",
+			"-role-name=demo",
+			"-selector", "serviceaccount.namespace==default and serviceaccount.name==vault",
+		}
+
+		ui := cli.NewMockUi()
+		cmd := New(ui)
+
+		code := cmd.Run(args)
+		require.Equal(t, code, 0)
+		require.Empty(t, ui.ErrorWriter.String())
+	})
 }

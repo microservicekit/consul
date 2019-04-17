@@ -1542,6 +1542,16 @@ func (a *ACL) BindingRuleSet(args *structs.ACLBindingRuleSetRequest, reply *stru
 		return err
 	}
 
+	if rule.RoleBindType == "" {
+		rule.RoleBindType = structs.BindingRuleRoleBindTypeService
+	}
+	switch rule.RoleBindType {
+	case structs.BindingRuleRoleBindTypeService:
+	case structs.BindingRuleRoleBindTypeExisting:
+	default:
+		return fmt.Errorf("unknown role bind type: %s", rule.RoleBindType)
+	}
+
 	if rule.ID == "" {
 		// with no binding rule ID one will be generated
 		var err error

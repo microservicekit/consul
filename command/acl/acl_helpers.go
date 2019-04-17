@@ -197,8 +197,8 @@ func PrintBindingRule(rule *api.ACLBindingRule, ui cli.Ui, showMeta bool) {
 	ui.Info(fmt.Sprintf("ID:           %s", rule.ID))
 	ui.Info(fmt.Sprintf("IDPName:      %s", rule.IDPName))
 	ui.Info(fmt.Sprintf("Description:  %s", rule.Description))
+	ui.Info(fmt.Sprintf("RoleBindType: %s", rule.RoleBindType))
 	ui.Info(fmt.Sprintf("RoleName:     %s", rule.RoleName))
-	ui.Info(fmt.Sprintf("MustExist:    %v", rule.MustExist))
 	ui.Info(fmt.Sprintf("Selector:     %s", rule.Selector))
 	if showMeta {
 		ui.Info(fmt.Sprintf("Create Index: %d", rule.CreateIndex))
@@ -210,8 +210,8 @@ func PrintBindingRuleListEntry(rule *api.ACLBindingRule, ui cli.Ui, showMeta boo
 	ui.Info(fmt.Sprintf("%s:", rule.ID))
 	ui.Info(fmt.Sprintf("   IDPName:      %s", rule.IDPName))
 	ui.Info(fmt.Sprintf("   Description:  %s", rule.Description))
+	ui.Info(fmt.Sprintf("   RoleBindType: %s", rule.RoleBindType))
 	ui.Info(fmt.Sprintf("   RoleName:     %s", rule.RoleName))
-	ui.Info(fmt.Sprintf("   MustExist:    %v", rule.MustExist))
 	ui.Info(fmt.Sprintf("   Selector:     %s", rule.Selector))
 	if showMeta {
 		ui.Info(fmt.Sprintf("   Create Index: %d", rule.CreateIndex))

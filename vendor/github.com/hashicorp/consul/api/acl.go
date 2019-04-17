@@ -133,21 +133,39 @@ type ACLRole struct {
 	ModifyIndex       uint64
 }
 
+// BindingRuleRoleBindType is the type of binding rule mechanism used.
+type BindingRuleRoleBindType string
+
+const (
+	// BindingRuleRoleBindTypeExisting only binds to pre-existing roles at login-time.
+	BindingRuleRoleBindTypeExisting BindingRuleRoleBindType = "existing"
+
+	// BindingRuleRoleBindTypeService binds either to a pre-existing role at
+	// resolve-time OR dynamically binds to a synthetic role on the fly as if
+	// it were defined as:
+	//
+	// &ACLRole{
+	//   Name:        "<computed RoleName>",
+	//   Description: "synthetic role",
+	//   ServiceIdentities: []*ACLServiceIdentity{
+	//     &ACLServiceIdentity{
+	//       ServiceName: "<computed RoleName>",
+	//     },
+	//   },
+	// }
+	BindingRuleRoleBindTypeService BindingRuleRoleBindType = "service"
+)
+
 type ACLBindingRule struct {
-	ID          string
-	Description string
-	IDPName     string
-	Selector    string
-	RoleName    string
-	MustExist   bool `json:",omitempty"`
+	ID           string
+	Description  string
+	IDPName      string
+	Selector     string
+	RoleBindType BindingRuleRoleBindType
+	RoleName     string
 
 	CreateIndex uint64
 	ModifyIndex uint64
-}
-
-// TODO: deprecate
-type ACLBindingRuleMatch struct {
-	Selector []string
 }
 
 type ACLIdentityProvider struct {

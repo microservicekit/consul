@@ -159,20 +159,27 @@ func (s *Server) evaluateRoleBindings(validator IdentityProviderValidator, verif
 			return nil, fmt.Errorf("cannot compute role name for bind target: %v", err)
 		}
 
-		var link structs.ACLTokenRoleLink
-		if rule.MustExist {
-			// We are opting out of synthetic roles, so set Name here. This
-			// will let the normal machinery take care of resolving the Name to
-			// ID during the token persistence operation.
-			link.Name = roleName
-		} else {
+		switch rule.RoleBindType {
+		case structs.BindingRuleRoleBindTypeService:
 			// This is how you declare a synthetic role mapping. Note that if a
 			// role with this name is present during a token resolve operation
 			// that real role may still take effect, it's just not REQUIRED in
-			// the way that MustExist=true implies.
-			link.BoundName = roleName
+			// the way that BindingRuleRoleBindTypeExisting implies.
+			roleLinks = append(roleLinks, structs.ACLTokenRoleLink{
+				BoundName: roleName,
+			})
+
+		case structs.BindingRuleRoleBindTypeExisting:
+			// We are opting out of synthetic roles, so set Name here. This
+			// will let the normal machinery take care of resolving the Name to
+			// ID during the token persistence operation.
+			roleLinks = append(roleLinks, structs.ACLTokenRoleLink{
+				Name: roleName,
+			})
+
+		default:
+			// skip unknown bind type; don't grant privileges
 		}
-		roleLinks = append(roleLinks, link)
 	}
 
 	return roleLinks, nil

@@ -24,10 +24,10 @@ type cmd struct {
 
 	ruleID string
 
-	description string
-	selector    string
-	roleName    string
-	mustExist   bool
+	description  string
+	selector     string
+	roleBindType string
+	roleName     string
 
 	noMerge  bool
 	showMeta bool
@@ -66,18 +66,17 @@ func (c *cmd) init() {
 			"attributes returned from the identity provider during login.",
 	)
 	c.flags.StringVar(
+		&c.roleBindType,
+		"role-bind-type",
+		string(api.BindingRuleRoleBindTypeService),
+		"Type of role binding to perform (\"service\" or \"existing\").",
+	)
+	c.flags.StringVar(
 		&c.roleName,
 		"role-name",
 		"",
 		"Name of role to bind on match. Can use {{var}} interpolation. "+
 			"This flag is required.",
-	)
-	c.flags.BoolVar(
-		&c.mustExist,
-		"must-exist",
-		false,
-		"If true, a role with a name matching the one specified with -role-name "+
-			"must exist at login time for the login to succeed.",
 	)
 
 	c.flags.BoolVar(
@@ -136,12 +135,12 @@ func (c *cmd) Run(args []string) int {
 		}
 
 		rule = &api.ACLBindingRule{
-			ID:          ruleID,
-			IDPName:     currentRule.IDPName, // immutable
-			Description: c.description,
-			RoleName:    c.roleName,
-			MustExist:   c.mustExist,
-			Selector:    c.selector,
+			ID:           ruleID,
+			IDPName:      currentRule.IDPName, // immutable
+			Description:  c.description,
+			RoleBindType: api.BindingRuleRoleBindType(c.roleBindType),
+			RoleName:     c.roleName,
+			Selector:     c.selector,
 		}
 
 	} else {
@@ -153,8 +152,8 @@ func (c *cmd) Run(args []string) int {
 		if c.roleName != "" {
 			rule.RoleName = c.roleName
 		}
-		if isFlagSet(c.flags, "must-exist") {
-			rule.MustExist = c.mustExist
+		if isFlagSet(c.flags, "role-bind-type") {
+			rule.RoleBindType = api.BindingRuleRoleBindType(c.roleBindType) // empty is valid
 		}
 		if isFlagSet(c.flags, "selector") {
 			rule.Selector = c.selector // empty is valid
@@ -203,7 +202,7 @@ Usage: consul acl binding-rule update -id ID [options]
      $ consul acl binding-rule update \
             -id=43cb72df-9c6f-4315-ac8a-01a9d98155ef \
             -description="new description" \
+            -role-bind-type=existing \
             -role-name="k8s-{{serviceaccount.name}}" \
-            -must-exist \
             -selector='serviceaccount.namespace==default and serviceaccount.name==web'
 `

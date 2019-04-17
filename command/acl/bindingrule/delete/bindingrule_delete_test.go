@@ -69,7 +69,6 @@ func TestBindingRuleDeleteCommand(t *testing.T) {
 				IDPName:     "k8s",
 				Description: "test rule",
 				RoleName:    "k8s-{{serviceaccount.name}}",
-				MustExist:   false,
 				Selector:    "serviceaccount.namespace==default",
 			},
 			&api.WriteOptions{Token: "root"},

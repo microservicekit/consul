@@ -82,7 +82,6 @@ func TestBindingRuleListCommand(t *testing.T) {
 				IDPName:     idpName,
 				Description: description,
 				RoleName:    "k8s-{{serviceaccount.name}}",
-				MustExist:   false,
 				Selector:    "serviceaccount.namespace==default",
 			},
 			&api.WriteOptions{Token: "root"},

@@ -22,11 +22,11 @@ type cmd struct {
 	http  *flags.HTTPFlags
 	help  string
 
-	idpName     string
-	description string
-	selector    string
-	roleName    string
-	mustExist   bool
+	idpName      string
+	description  string
+	selector     string
+	roleBindType string
+	roleName     string
 
 	showMeta bool
 }
@@ -63,18 +63,17 @@ func (c *cmd) init() {
 			"attributes returned from the identity provider during login.",
 	)
 	c.flags.StringVar(
+		&c.roleBindType,
+		"role-bind-type",
+		string(api.BindingRuleRoleBindTypeService),
+		"Type of role binding to perform (\"service\" or \"existing\").",
+	)
+	c.flags.StringVar(
 		&c.roleName,
 		"role-name",
 		"",
 		"Name of role to bind on match. Can use {{var}} interpolation. "+
 			"This flag is required.",
-	)
-	c.flags.BoolVar(
-		&c.mustExist,
-		"must-exist",
-		false,
-		"If true, a role with a name matching the one specified with -role-name "+
-			"must exist at login time for the login to succeed.",
 	)
 
 	c.http = &flags.HTTPFlags{}
@@ -99,11 +98,11 @@ func (c *cmd) Run(args []string) int {
 	}
 
 	newRule := &api.ACLBindingRule{
-		Description: c.description,
-		IDPName:     c.idpName,
-		RoleName:    c.roleName,
-		MustExist:   c.mustExist,
-		Selector:    c.selector,
+		Description:  c.description,
+		IDPName:      c.idpName,
+		RoleBindType: api.BindingRuleRoleBindType(c.roleBindType),
+		RoleName:     c.roleName,
+		Selector:     c.selector,
 	}
 
 	client, err := c.http.APIClient()

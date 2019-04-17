@@ -3194,16 +3194,16 @@ func TestACLEndpoint_IdentityProviderDelete_RuleCascade(t *testing.T) {
 		codec, "root", "dc1",
 		idp1.Name,
 		"serviceaccount.name==abc",
+		structs.BindingRuleRoleBindTypeService,
 		"abc",
-		false,
 	)
 	require.NoError(t, err)
 	i1_r2, err := upsertTestBindingRule(
 		codec, "root", "dc1",
 		idp1.Name,
 		"serviceaccount.name==def",
+		structs.BindingRuleRoleBindTypeService,
 		"def",
-		false,
 	)
 	require.NoError(t, err)
 
@@ -3213,16 +3213,16 @@ func TestACLEndpoint_IdentityProviderDelete_RuleCascade(t *testing.T) {
 		codec, "root", "dc1",
 		idp2.Name,
 		"serviceaccount.name==abc",
+		structs.BindingRuleRoleBindTypeService,
 		"abc",
-		false,
 	)
 	require.NoError(t, err)
 	i2_r2, err := upsertTestBindingRule(
 		codec, "root", "dc1",
 		idp2.Name,
 		"serviceaccount.name==def",
+		structs.BindingRuleRoleBindTypeService,
 		"def",
-		false,
 	)
 	require.NoError(t, err)
 
@@ -3378,7 +3378,7 @@ func TestACLEndpoint_BindingRuleSet(t *testing.T) {
 		require.Equal(t, rule.IDPName, testIDP.Name)
 		require.Equal(t, "serviceaccount.name==abc", rule.Selector)
 		require.Equal(t, "abc", rule.RoleName)
-		require.False(t, rule.MustExist)
+		require.Equal(t, structs.BindingRuleRoleBindTypeService, rule.RoleBindType)
 
 		ruleID = rule.ID
 	})
@@ -3396,7 +3396,7 @@ func TestACLEndpoint_BindingRuleSet(t *testing.T) {
 		reqRule.Description = "foobar modified"
 		reqRule.Selector = "serviceaccount.namespace==def"
 		reqRule.RoleName = "def"
-		reqRule.MustExist = true
+		reqRule.RoleBindType = structs.BindingRuleRoleBindTypeExisting
 
 		req := structs.ACLBindingRuleSetRequest{
 			Datacenter:   "dc1",
@@ -3419,7 +3419,7 @@ func TestACLEndpoint_BindingRuleSet(t *testing.T) {
 		require.Equal(t, rule.IDPName, testIDP.Name)
 		require.Equal(t, "serviceaccount.namespace==def", rule.Selector)
 		require.Equal(t, "def", rule.RoleName)
-		require.True(t, rule.MustExist)
+		require.Equal(t, structs.BindingRuleRoleBindTypeExisting, rule.RoleBindType)
 	})
 
 	t.Run("Create fails; empty idp name", func(t *testing.T) {
@@ -3507,8 +3507,8 @@ func TestACLEndpoint_BindingRuleDelete(t *testing.T) {
 		codec, "root", "dc1",
 		testIDP.Name,
 		"serviceaccount.name==abc",
+		structs.BindingRuleRoleBindTypeService,
 		"abc",
-		false,
 	)
 	require.NoError(t, err)
 
@@ -3570,8 +3570,8 @@ func TestACLEndpoint_BindingRuleList(t *testing.T) {
 		codec, "root", "dc1",
 		testIDP.Name,
 		"serviceaccount.name==abc",
+		structs.BindingRuleRoleBindTypeService,
 		"abc",
-		false,
 	)
 	require.NoError(t, err)
 
@@ -3579,8 +3579,8 @@ func TestACLEndpoint_BindingRuleList(t *testing.T) {
 		codec, "root", "dc1",
 		testIDP.Name,
 		"serviceaccount.name==def",
+		structs.BindingRuleRoleBindTypeService,
 		"def",
-		false,
 	)
 	require.NoError(t, err)
 
@@ -3750,14 +3750,14 @@ func TestACLEndpoint_Login(t *testing.T) {
 	ruleDB, err := upsertTestBindingRule(
 		codec, "root", "dc1", idp.Name,
 		"serviceaccount.namespace==default and serviceaccount.name==db",
+		structs.BindingRuleRoleBindTypeService,
 		"k8s-{{serviceaccount.name}}",
-		false,
 	)
 	_, err = upsertTestBindingRule(
 		codec, "root", "dc1", idp.Name,
 		"serviceaccount.namespace==default and serviceaccount.name==monolith",
+		structs.BindingRuleRoleBindTypeExisting,
 		"k8s-{{serviceaccount.name}}",
-		true,
 	)
 	require.NoError(t, err)
 
@@ -3852,7 +3852,7 @@ func TestACLEndpoint_Login(t *testing.T) {
 		require.Error(t, acl.Login(&req, &resp))
 	})
 
-	// create the role so that the mustexist login works
+	// create the role so that the bindtype=existing login works
 	var monolithRoleID string
 	{
 		arg := structs.ACLRoleSetRequest{
@@ -3922,10 +3922,10 @@ func TestACLEndpoint_Login(t *testing.T) {
 		req := structs.ACLBindingRuleSetRequest{
 			Datacenter: "dc1",
 			BindingRule: structs.ACLBindingRule{
-				IDPName:   ruleDB.IDPName,
-				RoleName:  ruleDB.RoleName,
-				MustExist: false,
-				Selector:  "",
+				IDPName:      ruleDB.IDPName,
+				RoleBindType: structs.BindingRuleRoleBindTypeService,
+				RoleName:     ruleDB.RoleName,
+				Selector:     "",
 			},
 			WriteRequest: structs.WriteRequest{Token: "root"},
 		}
@@ -4073,8 +4073,8 @@ func TestACLEndpoint_Login_k8s(t *testing.T) {
 	_, err = upsertTestBindingRule(
 		codec, "root", "dc1", idp.Name,
 		"serviceaccount.namespace==default",
+		structs.BindingRuleRoleBindTypeService,
 		"{{serviceaccount.name}}",
-		false,
 	)
 	require.NoError(t, err)
 
@@ -4177,8 +4177,8 @@ func TestACLEndpoint_Logout(t *testing.T) {
 	_, err = upsertTestBindingRule(
 		codec, "root", "dc1", idp.Name,
 		"",
+		structs.BindingRuleRoleBindTypeService,
 		"k8s-{{serviceaccount.name}}",
-		false,
 	)
 	require.NoError(t, err)
 
@@ -4608,16 +4608,16 @@ func upsertTestBindingRule(
 	datacenter string,
 	idpName string,
 	selector string,
+	roleBindType string,
 	roleName string,
-	mustExist bool,
 ) (*structs.ACLBindingRule, error) {
 	req := structs.ACLBindingRuleSetRequest{
 		Datacenter: datacenter,
 		BindingRule: structs.ACLBindingRule{
-			IDPName:   idpName,
-			RoleName:  roleName,
-			MustExist: mustExist,
-			Selector:  selector,
+			IDPName:      idpName,
+			RoleBindType: roleBindType,
+			RoleName:     roleName,
+			Selector:     selector,
 		},
 		WriteRequest: structs.WriteRequest{Token: masterToken},
 	}

@@ -133,11 +133,11 @@ func TestBindingRuleUpdateCommand(t *testing.T) {
 	createRule := func(t *testing.T) string {
 		rule, _, err := client.ACL().BindingRuleCreate(
 			&api.ACLBindingRule{
-				IDPName:     "k8s",
-				Description: "test rule",
-				RoleName:    "k8s-{{serviceaccount.name}}",
-				MustExist:   false,
-				Selector:    "serviceaccount.namespace==default",
+				IDPName:      "k8s",
+				Description:  "test rule",
+				RoleBindType: api.BindingRuleRoleBindTypeService,
+				RoleName:     "k8s-{{serviceaccount.name}}",
+				Selector:     "serviceaccount.namespace==default",
 			},
 			&api.WriteOptions{Token: "root"},
 		)
@@ -214,8 +214,8 @@ func TestBindingRuleUpdateCommand(t *testing.T) {
 			"-token=root",
 			"-id", id,
 			"-description=test rule edited",
+			"-role-bind-type", "existing",
 			"-role-name=role-updated",
-			"-must-exist=true",
 			"-selector=serviceaccount.namespace==alt and serviceaccount.name==demo",
 		}
 
@@ -232,7 +232,7 @@ func TestBindingRuleUpdateCommand(t *testing.T) {
 
 		require.Equal(t, "test rule edited", rule.Description)
 		require.Equal(t, "role-updated", rule.RoleName)
-		require.True(t, rule.MustExist)
+		require.Equal(t, api.BindingRuleRoleBindTypeExisting, rule.RoleBindType)
 		require.Equal(t, "serviceaccount.namespace==alt and serviceaccount.name==demo", rule.Selector)
 	})
 
@@ -249,8 +249,8 @@ func TestBindingRuleUpdateCommand(t *testing.T) {
 			"-token=root",
 			"-id", id[0:5],
 			"-description=test rule edited",
+			"-role-bind-type", "existing",
 			"-role-name=role-updated",
-			"-must-exist=true",
 			"-selector=serviceaccount.namespace==alt and serviceaccount.name==demo",
 		}
 
@@ -267,7 +267,7 @@ func TestBindingRuleUpdateCommand(t *testing.T) {
 
 		require.Equal(t, "test rule edited", rule.Description)
 		require.Equal(t, "role-updated", rule.RoleName)
-		require.True(t, rule.MustExist)
+		require.Equal(t, api.BindingRuleRoleBindTypeExisting, rule.RoleBindType)
 		require.Equal(t, "serviceaccount.namespace==alt and serviceaccount.name==demo", rule.Selector)
 	})
 
@@ -281,8 +281,8 @@ func TestBindingRuleUpdateCommand(t *testing.T) {
 			"-http-addr=" + a.HTTPAddr(),
 			"-token=root",
 			"-id", id,
+			"-role-bind-type", "existing",
 			"-role-name=role-updated",
-			"-must-exist=true",
 			"-selector=serviceaccount.namespace==alt and serviceaccount.name==demo",
 		}
 
@@ -299,7 +299,7 @@ func TestBindingRuleUpdateCommand(t *testing.T) {
 
 		require.Equal(t, "test rule", rule.Description)
 		require.Equal(t, "role-updated", rule.RoleName)
-		require.True(t, rule.MustExist)
+		require.Equal(t, api.BindingRuleRoleBindTypeExisting, rule.RoleBindType)
 		require.Equal(t, "serviceaccount.namespace==alt and serviceaccount.name==demo", rule.Selector)
 	})
 
@@ -314,7 +314,7 @@ func TestBindingRuleUpdateCommand(t *testing.T) {
 			"-token=root",
 			"-id", id,
 			"-description=test rule edited",
-			"-must-exist=true",
+			"-role-bind-type", "existing",
 			"-selector=serviceaccount.namespace==alt and serviceaccount.name==demo",
 		}
 
@@ -331,7 +331,7 @@ func TestBindingRuleUpdateCommand(t *testing.T) {
 
 		require.Equal(t, "test rule edited", rule.Description)
 		require.Equal(t, "k8s-{{serviceaccount.name}}", rule.RoleName)
-		require.True(t, rule.MustExist)
+		require.Equal(t, api.BindingRuleRoleBindTypeExisting, rule.RoleBindType)
 		require.Equal(t, "serviceaccount.namespace==alt and serviceaccount.name==demo", rule.Selector)
 	})
 
@@ -363,7 +363,7 @@ func TestBindingRuleUpdateCommand(t *testing.T) {
 
 		require.Equal(t, "test rule edited", rule.Description)
 		require.Equal(t, "role-updated", rule.RoleName)
-		require.False(t, rule.MustExist)
+		require.Equal(t, api.BindingRuleRoleBindTypeService, rule.RoleBindType)
 		require.Equal(t, "serviceaccount.namespace==alt and serviceaccount.name==demo", rule.Selector)
 	})
 
@@ -378,8 +378,8 @@ func TestBindingRuleUpdateCommand(t *testing.T) {
 			"-token=root",
 			"-id", id,
 			"-description=test rule edited",
+			"-role-bind-type", "existing",
 			"-role-name=role-updated",
-			"-must-exist=true",
 		}
 
 		code := cmd.Run(args)
@@ -395,7 +395,7 @@ func TestBindingRuleUpdateCommand(t *testing.T) {
 
 		require.Equal(t, "test rule edited", rule.Description)
 		require.Equal(t, "role-updated", rule.RoleName)
-		require.True(t, rule.MustExist)
+		require.Equal(t, api.BindingRuleRoleBindTypeExisting, rule.RoleBindType)
 		require.Equal(t, "serviceaccount.namespace==default", rule.Selector)
 	})
 
@@ -410,8 +410,8 @@ func TestBindingRuleUpdateCommand(t *testing.T) {
 			"-token=root",
 			"-id", id,
 			"-description=test rule edited",
+			"-role-bind-type", "existing",
 			"-role-name=role-updated",
-			"-must-exist=true",
 			"-selector=",
 		}
 
@@ -428,7 +428,7 @@ func TestBindingRuleUpdateCommand(t *testing.T) {
 
 		require.Equal(t, "test rule edited", rule.Description)
 		require.Equal(t, "role-updated", rule.RoleName)
-		require.True(t, rule.MustExist)
+		require.Equal(t, api.BindingRuleRoleBindTypeExisting, rule.RoleBindType)
 		require.Empty(t, rule.Selector)
 	})
 }
@@ -543,11 +543,11 @@ func TestBindingRuleUpdateCommand_noMerge(t *testing.T) {
 	createRule := func(t *testing.T) string {
 		rule, _, err := client.ACL().BindingRuleCreate(
 			&api.ACLBindingRule{
-				IDPName:     "k8s",
-				Description: "test rule",
-				RoleName:    "k8s-{{serviceaccount.name}}",
-				MustExist:   true,
-				Selector:    "serviceaccount.namespace==default",
+				IDPName:      "k8s",
+				Description:  "test rule",
+				RoleBindType: api.BindingRuleRoleBindTypeExisting,
+				RoleName:     "k8s-{{serviceaccount.name}}",
+				Selector:     "serviceaccount.namespace==default",
 			},
 			&api.WriteOptions{Token: "root"},
 		)
@@ -608,8 +608,8 @@ func TestBindingRuleUpdateCommand_noMerge(t *testing.T) {
 			"-no-merge",
 			"-id", id,
 			"-description=test rule edited",
+			"-role-bind-type", "service",
 			"-role-name=role-updated",
-			"-must-exist=false",
 			"-selector", "foo",
 		}
 
@@ -630,8 +630,8 @@ func TestBindingRuleUpdateCommand_noMerge(t *testing.T) {
 			"-no-merge",
 			"-id", id,
 			"-description=test rule edited",
+			"-role-bind-type", "service",
 			"-role-name=role-updated",
-			"-must-exist=false",
 			"-selector=serviceaccount.namespace==alt and serviceaccount.name==demo",
 		}
 
@@ -648,7 +648,7 @@ func TestBindingRuleUpdateCommand_noMerge(t *testing.T) {
 
 		require.Equal(t, "test rule edited", rule.Description)
 		require.Equal(t, "role-updated", rule.RoleName)
-		require.False(t, rule.MustExist)
+		require.Equal(t, api.BindingRuleRoleBindTypeService, rule.RoleBindType)
 		require.Equal(t, "serviceaccount.namespace==alt and serviceaccount.name==demo", rule.Selector)
 	})
 
@@ -666,8 +666,8 @@ func TestBindingRuleUpdateCommand_noMerge(t *testing.T) {
 			"-no-merge",
 			"-id", id[0:5],
 			"-description=test rule edited",
+			"-role-bind-type", "service",
 			"-role-name=role-updated",
-			"-must-exist=false",
 			"-selector=serviceaccount.namespace==alt and serviceaccount.name==demo",
 		}
 
@@ -684,7 +684,7 @@ func TestBindingRuleUpdateCommand_noMerge(t *testing.T) {
 
 		require.Equal(t, "test rule edited", rule.Description)
 		require.Equal(t, "role-updated", rule.RoleName)
-		require.False(t, rule.MustExist)
+		require.Equal(t, api.BindingRuleRoleBindTypeService, rule.RoleBindType)
 		require.Equal(t, "serviceaccount.namespace==alt and serviceaccount.name==demo", rule.Selector)
 	})
 
@@ -699,8 +699,8 @@ func TestBindingRuleUpdateCommand_noMerge(t *testing.T) {
 			"-token=root",
 			"-no-merge",
 			"-id", id,
+			"-role-bind-type", "service",
 			"-role-name=role-updated",
-			"-must-exist=false",
 			"-selector=serviceaccount.namespace==alt and serviceaccount.name==demo",
 		}
 
@@ -717,7 +717,7 @@ func TestBindingRuleUpdateCommand_noMerge(t *testing.T) {
 
 		require.Empty(t, rule.Description)
 		require.Equal(t, "role-updated", rule.RoleName)
-		require.False(t, rule.MustExist)
+		require.Equal(t, api.BindingRuleRoleBindTypeService, rule.RoleBindType)
 		require.Equal(t, "serviceaccount.namespace==alt and serviceaccount.name==demo", rule.Selector)
 	})
 
@@ -732,7 +732,7 @@ func TestBindingRuleUpdateCommand_noMerge(t *testing.T) {
 			"-no-merge",
 			"-id=" + id,
 			"-description=test rule edited",
-			"-must-exist=true",
+			"-role-bind-type", "existing",
 			"-selector=serviceaccount.namespace==alt and serviceaccount.name==demo",
 		}
 
@@ -770,7 +770,7 @@ func TestBindingRuleUpdateCommand_noMerge(t *testing.T) {
 
 		require.Equal(t, "test rule edited", rule.Description)
 		require.Equal(t, "role-updated", rule.RoleName)
-		require.False(t, rule.MustExist) // reset to zero value
+		require.Equal(t, api.BindingRuleRoleBindTypeService, rule.RoleBindType) // reset to zero value
 		require.Equal(t, "serviceaccount.namespace==alt and serviceaccount.name==demo", rule.Selector)
 	})
 
@@ -786,8 +786,8 @@ func TestBindingRuleUpdateCommand_noMerge(t *testing.T) {
 			"-no-merge",
 			"-id", id,
 			"-description=test rule edited",
+			"-role-bind-type", "service",
 			"-role-name=role-updated",
-			"-must-exist=false",
 		}
 
 		code := cmd.Run(args)
@@ -803,7 +803,7 @@ func TestBindingRuleUpdateCommand_noMerge(t *testing.T) {
 
 		require.Equal(t, "test rule edited", rule.Description)
 		require.Equal(t, "role-updated", rule.RoleName)
-		require.False(t, rule.MustExist)
+		require.Equal(t, api.BindingRuleRoleBindTypeService, rule.RoleBindType)
 		require.Empty(t, rule.Selector)
 	})
 }

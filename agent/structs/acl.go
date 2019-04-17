@@ -853,6 +853,34 @@ func (r *ACLRole) EstimateSize() int {
 	return size
 }
 
+const (
+	// BindingRuleRoleBindTypeExisting is the binding rule role bind type that
+	// only allows the binding rule to function if a role with the given name
+	// exists at login-time. This lets operators explicitly customize the ACLs
+	// as they may already enjoy doing.
+	//
+	// If it does not exist at login-time the rule is ignored.
+	BindingRuleRoleBindTypeExisting = "existing"
+
+	// BindingRuleRoleBindTypeService is the binding rule role bind type that
+	// either uses an existing role that may exist with the given name at
+	// resolve-time OR synthesizes a role on the fly as if it were defined as:
+	//
+	// &ACLRole{
+	//   Name:        "<computed RoleName>",
+	//   Description: "synthetic role",
+	//   ServiceIdentities: []*ACLServiceIdentity{
+	//     &ACLServiceIdentity{
+	//       ServiceName: "<computed RoleName>",
+	//     },
+	//   },
+	// }
+	//
+	// This type of synthetic role is suitable for an application to
+	// participate in the Connect mesh.
+	BindingRuleRoleBindTypeService = "service"
+)
+
 type ACLBindingRule struct {
 	// ID is the internal UUID associated with the binding rule
 	ID string
@@ -868,34 +896,18 @@ type ACLBindingRule struct {
 	// attributes returned from the identity provider during login.
 	Selector string
 
+	// RoleBindType adjusts how this binding rule is applied at login or
+	// resolution time. The valid values are:
+	//
+	//  - BindingRuleRoleBindTypeExisting = "existing"
+	//  - BindingRuleRoleBindTypeService =  "service"
+	//
+	// If not provided, "service" is used as the default.
+	RoleBindType string
+
 	// RoleName is the named ACL Role to bind to. Can be lightly templated
 	// using {{ foo }} syntax from available field names.
 	RoleName string
-
-	// MustExist controls if 'synthetic roles' are allowed. The default is
-	// that this is false and synthetic roles are allowed.
-	//
-	// When attempting to bind this role to a token during login, if a Role
-	// with the bound name exists in the database then that Role is used as-is
-	// (by name). This lets operators explicitly customize the ACLs as they may
-	// already enjoy doing.
-	//
-	// If it does not exist and MustExist=true, the Match is discarded and
-	// access is not granted.
-	//
-	// If it does not exist and MustExist=false, a Role is synthesized on the
-	// fly as if it were defined as:
-	//
-	// &ACLRole{
-	// 	Name         : "<computed RoleName>",
-	// 	Description  : "Synthetic Role for: <computed RoleName>",
-	// 	ServiceIdentities: []*ACLServiceIdentity{
-	// 		&ACLServiceIdentity{
-	// 			ServiceName: "<computed RoleName>",
-	// 		},
-	// 	},
-	// }
-	MustExist bool `json:",omitempty"`
 
 	// Embedded Raft Metadata
 	RaftIndex `hash:"ignore"`
