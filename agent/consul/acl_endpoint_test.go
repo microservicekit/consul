@@ -1059,7 +1059,59 @@ func TestACLEndpoint_TokenSet(t *testing.T) {
 		requireErrorContains(t, err, "Role links can either set BoundName OR ID/Name but not both")
 	})
 
-	// TODO: verify "existing" bind types and also invalid ones
+	t.Run("Create fails linking a role with invalid bind type in BoundName", func(t *testing.T) {
+		acl := ACL{
+			srv:                                   s1,
+			disableLoginOnlyRestrictionOnTokenSet: true,
+		}
+
+		req := structs.ACLTokenSetRequest{
+			Datacenter: "dc1",
+			ACLToken: structs.ACLToken{
+				IDPName:     "k8s",
+				Description: "foobar",
+				Roles: []structs.ACLTokenRoleLink{
+					structs.ACLTokenRoleLink{
+						BoundName: "invalid:web",
+					},
+				},
+				Local: true,
+			},
+			WriteRequest: structs.WriteRequest{Token: "root"},
+		}
+
+		resp := structs.ACLToken{}
+
+		err := acl.TokenSet(&req, &resp)
+		requireErrorContains(t, err, "BoundName \"invalid:web\" is invalid")
+	})
+
+	t.Run("Create fails linking a role with 'existing' bind type in BoundName which is not allowed", func(t *testing.T) {
+		acl := ACL{
+			srv:                                   s1,
+			disableLoginOnlyRestrictionOnTokenSet: true,
+		}
+
+		req := structs.ACLTokenSetRequest{
+			Datacenter: "dc1",
+			ACLToken: structs.ACLToken{
+				IDPName:     "k8s",
+				Description: "foobar",
+				Roles: []structs.ACLTokenRoleLink{
+					structs.ACLTokenRoleLink{
+						BoundName: "existing:web",
+					},
+				},
+				Local: true,
+			},
+			WriteRequest: structs.WriteRequest{Token: "root"},
+		}
+
+		resp := structs.ACLToken{}
+
+		err := acl.TokenSet(&req, &resp)
+		requireErrorContains(t, err, "BoundName \"existing:web\" is invalid")
+	})
 
 	t.Run("Create fails with an empty IDPName when faking login", func(t *testing.T) {
 		acl := ACL{
