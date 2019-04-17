@@ -1280,6 +1280,69 @@ func TestACLEndpoint_TokenSet(t *testing.T) {
 		})
 	}
 
+	t.Run("Create it with two of the same service identities", func(t *testing.T) {
+		req := structs.ACLTokenSetRequest{
+			Datacenter: "dc1",
+			ACLToken: structs.ACLToken{
+				Description: "foobar",
+				Policies:    nil,
+				Local:       false,
+				ServiceIdentities: []*structs.ACLServiceIdentity{
+					&structs.ACLServiceIdentity{ServiceName: "example"},
+					&structs.ACLServiceIdentity{ServiceName: "example"},
+				},
+			},
+			WriteRequest: structs.WriteRequest{Token: "root"},
+		}
+
+		resp := structs.ACLToken{}
+
+		err := acl.TokenSet(&req, &resp)
+		require.NoError(t, err)
+
+		// Get the token directly to validate that it exists
+		tokenResp, err := retrieveTestToken(codec, "root", "dc1", resp.AccessorID)
+		require.NoError(t, err)
+		token := tokenResp.Token
+		require.Len(t, token.ServiceIdentities, 1)
+	})
+
+	t.Run("Create it with two of the same service identities and different DCs", func(t *testing.T) {
+		req := structs.ACLTokenSetRequest{
+			Datacenter: "dc1",
+			ACLToken: structs.ACLToken{
+				Description: "foobar",
+				Policies:    nil,
+				Local:       false,
+				ServiceIdentities: []*structs.ACLServiceIdentity{
+					&structs.ACLServiceIdentity{
+						ServiceName: "example",
+						Datacenters: []string{"dc2", "dc3"},
+					},
+					&structs.ACLServiceIdentity{
+						ServiceName: "example",
+						Datacenters: []string{"dc1", "dc2"},
+					},
+				},
+			},
+			WriteRequest: structs.WriteRequest{Token: "root"},
+		}
+
+		resp := structs.ACLToken{}
+
+		err := acl.TokenSet(&req, &resp)
+		require.NoError(t, err)
+
+		// Get the token directly to validate that it exists
+		tokenResp, err := retrieveTestToken(codec, "root", "dc1", resp.AccessorID)
+		require.NoError(t, err)
+		token := tokenResp.Token
+		require.Len(t, token.ServiceIdentities, 1)
+		svcid := token.ServiceIdentities[0]
+		require.Equal(t, "example", svcid.ServiceName)
+		require.ElementsMatch(t, []string{"dc1", "dc2", "dc3"}, svcid.Datacenters)
+	})
+
 	t.Run("Create it with invalid service identity (datacenters set on local token)", func(t *testing.T) {
 		req := structs.ACLTokenSetRequest{
 			Datacenter: "dc1",
@@ -2605,6 +2668,67 @@ func TestACLEndpoint_RoleSet(t *testing.T) {
 			}
 		})
 	}
+
+	t.Run("Create it with two of the same service identities", func(t *testing.T) {
+		req := structs.ACLRoleSetRequest{
+			Datacenter: "dc1",
+			Role: structs.ACLRole{
+				Description: "foobar",
+				Name:        roleNameGen(t),
+				ServiceIdentities: []*structs.ACLServiceIdentity{
+					&structs.ACLServiceIdentity{ServiceName: "example"},
+					&structs.ACLServiceIdentity{ServiceName: "example"},
+				},
+			},
+			WriteRequest: structs.WriteRequest{Token: "root"},
+		}
+
+		resp := structs.ACLRole{}
+
+		err := acl.RoleSet(&req, &resp)
+		require.NoError(t, err)
+
+		// Get the role directly to validate that it exists
+		roleResp, err := retrieveTestRole(codec, "root", "dc1", resp.ID)
+		require.NoError(t, err)
+		role := roleResp.Role
+		require.Len(t, role.ServiceIdentities, 1)
+	})
+
+	t.Run("Create it with two of the same service identities and different DCs", func(t *testing.T) {
+		req := structs.ACLRoleSetRequest{
+			Datacenter: "dc1",
+			Role: structs.ACLRole{
+				Description: "foobar",
+				Name:        roleNameGen(t),
+				ServiceIdentities: []*structs.ACLServiceIdentity{
+					&structs.ACLServiceIdentity{
+						ServiceName: "example",
+						Datacenters: []string{"dc2", "dc3"},
+					},
+					&structs.ACLServiceIdentity{
+						ServiceName: "example",
+						Datacenters: []string{"dc1", "dc2"},
+					},
+				},
+			},
+			WriteRequest: structs.WriteRequest{Token: "root"},
+		}
+
+		resp := structs.ACLRole{}
+
+		err := acl.RoleSet(&req, &resp)
+		require.NoError(t, err)
+
+		// Get the role directly to validate that it exists
+		roleResp, err := retrieveTestRole(codec, "root", "dc1", resp.ID)
+		require.NoError(t, err)
+		role := roleResp.Role
+		require.Len(t, role.ServiceIdentities, 1)
+		svcid := role.ServiceIdentities[0]
+		require.Equal(t, "example", svcid.ServiceName)
+		require.ElementsMatch(t, []string{"dc1", "dc2", "dc3"}, svcid.Datacenters)
+	})
 }
 
 func TestACLEndpoint_RoleSet_names(t *testing.T) {

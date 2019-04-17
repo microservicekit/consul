@@ -548,6 +548,7 @@ func (a *ACL) tokenSetInternal(args *structs.ACLTokenSetRequest, reply *structs.
 			return fmt.Errorf("Service identity %q has an invalid name. Only alphanumeric characters, '-' and '_' are allowed", svcid.ServiceName)
 		}
 	}
+	token.ServiceIdentities = dedupeServiceIdentities(token.ServiceIdentities)
 
 	if token.Rules != "" {
 		return fmt.Errorf("Rules cannot be specified for this token")
@@ -1326,6 +1327,7 @@ func (a *ACL) RoleSet(args *structs.ACLRoleSetRequest, reply *structs.ACLRole) e
 			return fmt.Errorf("Service identity %q has an invalid name. Only alphanumeric characters, '-' and '_' are allowed", svcid.ServiceName)
 		}
 	}
+	role.ServiceIdentities = dedupeServiceIdentities(role.ServiceIdentities)
 
 	// calculate the hash for this role
 	role.SetHash(true)
