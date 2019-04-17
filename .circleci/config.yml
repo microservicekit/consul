@@ -229,7 +229,7 @@ jobs:
           command: make test-envoy-integ SKIP_DOCKER=1
           environment:
             # tput complains if this isn't set to something.
-            TERM: dumb
+            TERM: xterm
 
 workflows:
   version: 2
