@@ -11,12 +11,12 @@ type IdentityProviderValidator interface {
 	// Name returns the name of the identity provider backing this validator.
 	Name() string
 
-	// ValidateToken takes raw user-provided IdP metadata and ensures it is
+	// ValidateLogin takes raw user-provided IdP metadata and ensures it is
 	// sane, provably correct, and currently valid. Relevant identifying data
 	// is extracted and returned for immediate use by the role binding process.
 	//
 	// Depending upon the provider, it may make sense to use these calls to
-	// continue to extend the life of the underlying token
+	// continue to extend the life of the underlying token.
 	//
 	// Returns IdP specific metadata suitable for the Role Binding process.
 	ValidateLogin(loginToken string) (map[string]string, error)
