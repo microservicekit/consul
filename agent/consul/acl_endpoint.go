@@ -370,6 +370,9 @@ func (a *ACL) tokenSetInternal(args *structs.ACLTokenSetRequest, reply *structs.
 			if token.IDPName == "" {
 				return fmt.Errorf("IDPName field is required during Login")
 			}
+			if !token.Local {
+				return fmt.Errorf("Cannot create Global token via Login")
+			}
 		} else {
 			if token.IDPName != "" {
 				return fmt.Errorf("IDPName field is disallowed outside of Login")

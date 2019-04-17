@@ -1135,6 +1135,28 @@ func TestACLEndpoint_TokenSet(t *testing.T) {
 		requireErrorContains(t, err, "IDPName field is required during Login")
 	})
 
+	t.Run("Create fails to create global token linked to an IDP when faking login", func(t *testing.T) {
+		acl := ACL{
+			srv:                                   s1,
+			disableLoginOnlyRestrictionOnTokenSet: true,
+		}
+
+		req := structs.ACLTokenSetRequest{
+			Datacenter: "dc1",
+			ACLToken: structs.ACLToken{
+				IDPName:     "k8s",
+				Description: "foobar",
+				Local:       false,
+			},
+			WriteRequest: structs.WriteRequest{Token: "root"},
+		}
+
+		resp := structs.ACLToken{}
+
+		err := acl.TokenSet(&req, &resp)
+		requireErrorContains(t, err, "Cannot create Global token via Login")
+	})
+
 	t.Run("Create it using bound Roles by faking login", func(t *testing.T) {
 		// This allows for testing things that are only possible via Login, but
 		// just cumbersome to wire up (multiple binding rules, etc)
