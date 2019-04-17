@@ -1000,22 +1000,12 @@ type ACLIdentityProvider struct {
 	// Required for Type=kubernetes.
 	KubernetesServiceAccountJWT string `json:",omitempty"`
 
-	// Optional list of PEM-formatted public keys or certificates used to
-	// verify the signatures of Kubernetes service account JWTs. If a
-	// certificate is given, its public key will be extracted. Not every
-	// installation of Kubernetes exposes these keys.
-	//
-	// Only relevant for Type=kubernetes.
-	// TODO:DEPRECATED
-	KubernetesPEMKeys []string `json:",omitempty"`
-
 	// Embedded Raft Metadata
 	RaftIndex `hash:"ignore"`
 }
 
 func (p *ACLIdentityProvider) Clone() *ACLIdentityProvider {
 	p2 := *p
-	p2.KubernetesPEMKeys = cloneStringSlice(p.KubernetesPEMKeys)
 	return &p2
 }
 

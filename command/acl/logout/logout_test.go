@@ -6,7 +6,7 @@ import (
 	"testing"
 
 	"github.com/hashicorp/consul/agent"
-	"github.com/hashicorp/consul/agent/consul/kubernetesidp"
+	"github.com/hashicorp/consul/agent/consul/kubeidp"
 	"github.com/hashicorp/consul/api"
 	"github.com/hashicorp/consul/command/acl"
 	"github.com/hashicorp/consul/logger"
@@ -101,7 +101,7 @@ func TestLogoutCommand(t *testing.T) {
 	// require.NoError(t, ioutil.WriteFile(idpTokenFile, []byte(acl.TestKubernetesJWT_B), 0600))
 
 	// spin up a fake api server
-	testSrv := kubernetesidp.StartTestAPIServer(t)
+	testSrv := kubeidp.StartTestAPIServer(t)
 	defer testSrv.Stop()
 
 	testSrv.AuthorizeJWT(acl.TestKubernetesJWT_A)

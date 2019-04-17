@@ -84,11 +84,6 @@ github.com/beorn7/perks/quantile
 github.com/bgentry/speakeasy
 # github.com/boltdb/bolt v1.3.1
 github.com/boltdb/bolt
-# github.com/briankassouf/jose v0.9.2-0.20180619214549-d2569464773f
-github.com/briankassouf/jose/crypto
-github.com/briankassouf/jose/jws
-github.com/briankassouf/jose/jwt
-github.com/briankassouf/jose
 # github.com/circonus-labs/circonus-gometrics v0.0.0-20161109192337-d17a8420c36e
 github.com/circonus-labs/circonus-gometrics
 github.com/circonus-labs/circonus-gometrics/api
@@ -488,6 +483,7 @@ golang.org/x/crypto/ed25519/internal/edwards25519
 golang.org/x/crypto/cryptobyte
 golang.org/x/crypto/cryptobyte/asn1
 golang.org/x/crypto/ssh
+golang.org/x/crypto/pbkdf2
 golang.org/x/crypto/ssh/agent
 golang.org/x/crypto/curve25519
 golang.org/x/crypto/internal/chacha20
@@ -593,6 +589,11 @@ gopkg.in/mgo.v2/bson
 gopkg.in/mgo.v2/internal/sasl
 gopkg.in/mgo.v2/internal/scram
 gopkg.in/mgo.v2/internal/json
+# gopkg.in/square/go-jose.v2 v2.3.1
+gopkg.in/square/go-jose.v2/jwt
+gopkg.in/square/go-jose.v2
+gopkg.in/square/go-jose.v2/json
+gopkg.in/square/go-jose.v2/cipher
 # gopkg.in/yaml.v2 v2.2.1
 gopkg.in/yaml.v2
 # k8s.io/api v0.0.0-20190325185214-7544f9db76f6
@@ -662,6 +663,7 @@ k8s.io/apimachinery/pkg/apis/meta/v1beta1
 k8s.io/apimachinery/pkg/util/framer
 k8s.io/apimachinery/pkg/apis/meta/v1/unstructured
 # k8s.io/client-go v8.0.0+incompatible
+k8s.io/client-go/util/cert
 k8s.io/client-go/kubernetes
 k8s.io/client-go/kubernetes/typed/authentication/v1
 k8s.io/client-go/kubernetes/typed/core/v1
@@ -705,7 +707,6 @@ k8s.io/client-go/rest/watch
 k8s.io/client-go/tools/clientcmd/api
 k8s.io/client-go/tools/metrics
 k8s.io/client-go/transport
-k8s.io/client-go/util/cert
 k8s.io/client-go/plugin/pkg/client/auth/azure
 k8s.io/client-go/plugin/pkg/client/auth/gcp
 k8s.io/client-go/plugin/pkg/client/auth/oidc

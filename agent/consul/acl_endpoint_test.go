@@ -13,7 +13,7 @@ import (
 
 	"github.com/hashicorp/consul/acl"
 	"github.com/hashicorp/consul/agent/connect"
-	"github.com/hashicorp/consul/agent/consul/kubernetesidp"
+	"github.com/hashicorp/consul/agent/consul/kubeidp"
 	"github.com/hashicorp/consul/agent/structs"
 	tokenStore "github.com/hashicorp/consul/agent/token"
 	"github.com/hashicorp/consul/lib"
@@ -3603,7 +3603,7 @@ func TestACLEndpoint_BindingRuleList(t *testing.T) {
 type fakeK8SIdentityProviderValidator struct {
 	data map[string]map[string]string
 
-	*k8sIdentityProviderValidator
+	IdentityProviderValidator
 }
 
 func (p *fakeK8SIdentityProviderValidator) Reset() {
@@ -3739,8 +3739,8 @@ func TestACLEndpoint_Login(t *testing.T) {
 		makeFields("default", "monolith", "ghi789"),
 	)
 	s1.aclIDPValidatorCreateTestHook = func(orig IdentityProviderValidator) (IdentityProviderValidator, error) {
-		if k8s, ok := orig.(*k8sIdentityProviderValidator); ok {
-			validator.k8sIdentityProviderValidator = k8s
+		if orig.Name() == idp.Name {
+			validator.IdentityProviderValidator = orig
 			return validator, nil
 		}
 		return orig, nil
@@ -3979,8 +3979,8 @@ func TestACLEndpoint_Login(t *testing.T) {
 	// ensure our create hook does something different this time
 	validator2 := &fakeK8SIdentityProviderValidator{}
 	s1.aclIDPValidatorCreateTestHook = func(orig IdentityProviderValidator) (IdentityProviderValidator, error) {
-		if k8s, ok := orig.(*k8sIdentityProviderValidator); ok {
-			validator2.k8sIdentityProviderValidator = k8s
+		if orig.Name() == idp.Name {
+			validator2.IdentityProviderValidator = orig
 			return validator2, nil
 		}
 		return orig, nil
@@ -4022,7 +4022,7 @@ func TestACLEndpoint_Login_k8s(t *testing.T) {
 	acl := ACL{srv: s1}
 
 	// spin up a fake api server
-	testSrv := kubernetesidp.StartTestAPIServer(t)
+	testSrv := kubeidp.StartTestAPIServer(t)
 	defer testSrv.Stop()
 
 	testSrv.AuthorizeJWT(goodJWT_A)
@@ -4156,7 +4156,7 @@ func TestACLEndpoint_Logout(t *testing.T) {
 	acl := ACL{srv: s1}
 
 	// spin up a fake api server
-	testSrv := kubernetesidp.StartTestAPIServer(t)
+	testSrv := kubeidp.StartTestAPIServer(t)
 	defer testSrv.Stop()
 
 	testSrv.AuthorizeJWT(goodJWT_A)

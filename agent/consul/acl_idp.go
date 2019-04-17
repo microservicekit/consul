@@ -3,6 +3,7 @@ package consul
 import (
 	"fmt"
 
+	"github.com/hashicorp/consul/agent/consul/kubeidp"
 	"github.com/hashicorp/consul/agent/structs"
 	"github.com/hashicorp/go-bexpr"
 )
@@ -38,7 +39,7 @@ type IdentityProviderValidator interface {
 func (s *Server) createIdentityProviderValidator(idp *structs.ACLIdentityProvider) (IdentityProviderValidator, error) {
 	switch idp.Type {
 	case "kubernetes":
-		return newK8SIdentityProviderValidator(idp)
+		return kubeidp.NewValidator(idp)
 	default:
 		return nil, fmt.Errorf("identity provider with name %q found with unknown type %q", idp.Name, idp.Type)
 	}

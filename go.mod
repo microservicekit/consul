@@ -25,7 +25,6 @@ require (
 	github.com/bitly/go-hostpool v0.0.0-20171023180738-a3a6125de932 // indirect
 	github.com/bmizerany/assert v0.0.0-20160611221934-b7ed37b82869 // indirect
 	github.com/boltdb/bolt v1.3.1 // indirect
-	github.com/briankassouf/jose v0.9.2-0.20180619214549-d2569464773f
 	github.com/cenkalti/backoff v2.1.1+incompatible // indirect
 	github.com/circonus-labs/circonus-gometrics v0.0.0-20161109192337-d17a8420c36e // indirect
 	github.com/circonus-labs/circonusllhist v0.0.0-20161110002650-365d370cc145 // indirect
@@ -54,7 +53,6 @@ require (
 	github.com/gotestyourself/gotestyourself v2.2.0+incompatible // indirect
 	github.com/hashicorp/consul/api v1.0.1
 	github.com/hashicorp/consul/sdk v0.1.0
-	github.com/hashicorp/errwrap v1.0.0
 	github.com/hashicorp/go-bexpr v0.1.0
 	github.com/hashicorp/go-checkpoint v0.0.0-20171009173528-1545e56e46de
 	github.com/hashicorp/go-cleanhttp v0.5.1
@@ -125,6 +123,7 @@ require (
 	gopkg.in/asn1-ber.v1 v1.0.0-20181015200546-f715ec2f112d // indirect
 	gopkg.in/mgo.v2 v2.0.0-20160818020120-3f83fa500528 // indirect
 	gopkg.in/ory-am/dockertest.v3 v3.3.4 // indirect
+	gopkg.in/square/go-jose.v2 v2.3.1
 	gotest.tools v2.2.0+incompatible // indirect
 	k8s.io/api v0.0.0-20190325185214-7544f9db76f6
 	k8s.io/apimachinery v0.0.0-20190223001710-c182ff3b9841
