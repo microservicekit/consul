@@ -3348,8 +3348,8 @@ func TestACLEndpoint_IdentityProviderDelete(t *testing.T) {
 	})
 }
 
-// Deleting an identity provider atomically deletes all rules as well.
-func TestACLEndpoint_IdentityProviderDelete_RuleCascade(t *testing.T) {
+// Deleting an identity provider atomically deletes all rules and tokens as well.
+func TestACLEndpoint_IdentityProviderDelete_RuleAndTokenCascade(t *testing.T) {
 	t.Parallel()
 
 	dir1, s1 := testServerWithConfig(t, func(c *Config) {
@@ -3365,6 +3365,28 @@ func TestACLEndpoint_IdentityProviderDelete_RuleCascade(t *testing.T) {
 	testrpc.WaitForLeader(t, s1.RPC, "dc1")
 
 	ca := connect.TestCA(t, nil)
+
+	createToken := func(idpName string) *structs.ACLToken {
+		acl := ACL{
+			srv:                                   s1,
+			disableLoginOnlyRestrictionOnTokenSet: true,
+		}
+		req := structs.ACLTokenSetRequest{
+			Datacenter: "dc1",
+			ACLToken: structs.ACLToken{
+				IDPName: idpName,
+				Local:   true,
+			},
+			WriteRequest: structs.WriteRequest{Token: "root"},
+		}
+
+		resp := structs.ACLToken{}
+
+		err := acl.TokenSet(&req, &resp)
+		require.NoError(t, err)
+
+		return &resp
+	}
 
 	idp1, err := upsertTestIDP(codec, "root", "dc1", ca.RootCert)
 	require.NoError(t, err)
@@ -3384,6 +3406,8 @@ func TestACLEndpoint_IdentityProviderDelete_RuleCascade(t *testing.T) {
 		"def",
 	)
 	require.NoError(t, err)
+	i1_t1 := createToken(idp1.Name)
+	i1_t2 := createToken(idp1.Name)
 
 	idp2, err := upsertTestIDP(codec, "root", "dc1", ca.RootCert)
 	require.NoError(t, err)
@@ -3403,6 +3427,8 @@ func TestACLEndpoint_IdentityProviderDelete_RuleCascade(t *testing.T) {
 		"def",
 	)
 	require.NoError(t, err)
+	i2_t1 := createToken(idp2.Name)
+	i2_t2 := createToken(idp2.Name)
 
 	acl := ACL{srv: s1}
 
@@ -3421,18 +3447,28 @@ func TestACLEndpoint_IdentityProviderDelete_RuleCascade(t *testing.T) {
 	require.NoError(t, err)
 	require.Nil(t, idpResp.IdentityProvider)
 
-	// Make sure the rules are gone.
+	// Make sure the rules and tokens are gone.
 	for _, id := range []string{i1_r1.ID, i1_r2.ID} {
 		ruleResp, err := retrieveTestBindingRule(codec, "root", "dc1", id)
 		require.NoError(t, err)
 		require.Nil(t, ruleResp.BindingRule)
 	}
+	for _, id := range []string{i1_t1.AccessorID, i1_t2.AccessorID} {
+		tokResp, err := retrieveTestToken(codec, "root", "dc1", id)
+		require.NoError(t, err)
+		require.Nil(t, tokResp.Token)
+	}
 
-	// Make sure the rules for the untouched IDP are still there.
+	// Make sure the rules and tokens for the untouched IDP are still there.
 	for _, id := range []string{i2_r1.ID, i2_r2.ID} {
 		ruleResp, err := retrieveTestBindingRule(codec, "root", "dc1", id)
 		require.NoError(t, err)
 		require.NotNil(t, ruleResp.BindingRule)
+	}
+	for _, id := range []string{i2_t1.AccessorID, i2_t2.AccessorID} {
+		tokResp, err := retrieveTestToken(codec, "root", "dc1", id)
+		require.NoError(t, err)
+		require.NotNil(t, tokResp.Token)
 	}
 }
 

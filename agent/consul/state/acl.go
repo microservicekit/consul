@@ -1231,6 +1231,35 @@ func (s *Store) aclTokenDeleteTxn(tx *memdb.Txn, idx uint64, value, index string
 	return nil
 }
 
+func (s *Store) aclTokenDeleteAllForIdentityProviderTxn(tx *memdb.Txn, idx uint64, idpName string) error {
+	// collect them all
+	iter, err := tx.Get("acl-tokens", "idp", idpName)
+	if err != nil {
+		return fmt.Errorf("failed acl token lookup: %v", err)
+	}
+
+	var tokens structs.ACLTokens
+	for raw := iter.Next(); raw != nil; raw = iter.Next() {
+		token := raw.(*structs.ACLToken)
+		tokens = append(tokens, token)
+	}
+
+	if len(tokens) > 0 {
+		// delete them all
+		for _, token := range tokens {
+			if err := tx.Delete("acl-tokens", token); err != nil {
+				return fmt.Errorf("failed deleting acl token: %v", err)
+			}
+		}
+
+		if err := indexUpdateMaxTxn(tx, idx, "acl-tokens"); err != nil {
+			return fmt.Errorf("failed updating index: %v", err)
+		}
+	}
+
+	return nil
+}
+
 func (s *Store) ACLPolicyBatchSet(idx uint64, policies structs.ACLPolicies) error {
 	tx := s.db.Txn(true)
 	defer tx.Abort()
@@ -2079,6 +2108,10 @@ func (s *Store) aclIdentityProviderDeleteTxn(tx *memdb.Txn, idx uint64, value, i
 	idp := rawidp.(*structs.ACLIdentityProvider)
 
 	if err := s.aclBindingRuleDeleteAllForIdentityProviderTxn(tx, idx, idp.Name); err != nil {
+		return err
+	}
+
+	if err := s.aclTokenDeleteAllForIdentityProviderTxn(tx, idx, idp.Name); err != nil {
 		return err
 	}
 

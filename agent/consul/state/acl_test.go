@@ -2903,8 +2903,8 @@ func TestStateStore_ACLIdentityProvider_Delete(t *testing.T) {
 	})
 }
 
-// Deleting an identity provider atomically deletes all rules as well.
-func TestStateStore_ACLIdentityProvider_Delete_RuleCascade(t *testing.T) {
+// Deleting an identity provider atomically deletes all rules and tokens as well.
+func TestStateStore_ACLIdentityProvider_Delete_RuleAndTokenCascade(t *testing.T) {
 	t.Parallel()
 
 	s := testACLStateStore(t)
@@ -2954,6 +2954,41 @@ func TestStateStore_ACLIdentityProvider_Delete_RuleCascade(t *testing.T) {
 	}
 	require.NoError(t, s.ACLBindingRuleBatchSet(3, rules))
 
+	const ( // accessors
+		idp1_tok1 = "6d020c5d-c4fd-4348-ba79-beac37ed0b9c"
+		idp1_tok2 = "169160dc-34ab-45c6-aba7-ff65e9ace9cb"
+		idp2_tok1 = "8e14628e-7dde-4573-aca1-6386c0f2095d"
+		idp2_tok2 = "291e5af9-c68e-4dd3-8824-b2bdfdcc89e6"
+	)
+
+	tokens := structs.ACLTokens{
+		&structs.ACLToken{
+			AccessorID:  idp1_tok1,
+			SecretID:    "7a1950c6-79dc-441c-acd2-e22cd3db0240",
+			Description: "test-i1-t1",
+			IDPName:     "k8s-1",
+		},
+		&structs.ACLToken{
+			AccessorID:  idp1_tok2,
+			SecretID:    "442cee4c-353f-4957-adbb-33db2f9e267f",
+			Description: "test-i1-t2",
+			IDPName:     "k8s-1",
+		},
+		&structs.ACLToken{
+			AccessorID:  idp2_tok1,
+			SecretID:    "d9399b7d-6c34-46bd-a675-c1352fadb6fd",
+			Description: "test-i2-t1",
+			IDPName:     "k8s-2",
+		},
+		&structs.ACLToken{
+			AccessorID:  idp2_tok2,
+			SecretID:    "3b72fc27-9230-42ab-a1e8-02cb489ab177",
+			Description: "test-i2-t2",
+			IDPName:     "k8s-2",
+		},
+	}
+	require.NoError(t, s.ACLTokenBatchSet(4, tokens, false))
+
 	// Delete one idp.
 	require.NoError(t, s.ACLIdentityProviderDeleteByName(4, "k8s-1"))
 
@@ -2962,18 +2997,28 @@ func TestStateStore_ACLIdentityProvider_Delete_RuleCascade(t *testing.T) {
 	require.NoError(t, err)
 	require.Nil(t, ridp)
 
-	// Make sure the rules are gone.
+	// Make sure the rules and tokens are gone.
 	for _, ruleID := range []string{idp1_rule1, idp1_rule2} {
 		_, rrule, err := s.ACLBindingRuleGetByID(nil, ruleID)
 		require.NoError(t, err)
 		require.Nil(t, rrule)
 	}
+	for _, tokID := range []string{idp1_tok1, idp1_tok2} {
+		_, tok, err := s.ACLTokenGetByAccessor(nil, tokID)
+		require.NoError(t, err)
+		require.Nil(t, tok)
+	}
 
-	// Make sure the rules for the untouched IDP are still there.
+	// Make sure the rules and tokens for the untouched IDP are still there.
 	for _, ruleID := range []string{idp2_rule1, idp2_rule2} {
 		_, rrule, err := s.ACLBindingRuleGetByID(nil, ruleID)
 		require.NoError(t, err)
 		require.NotNil(t, rrule)
+	}
+	for _, tokID := range []string{idp2_tok1, idp2_tok2} {
+		_, tok, err := s.ACLTokenGetByAccessor(nil, tokID)
+		require.NoError(t, err)
+		require.NotNil(t, tok)
 	}
 }
 
