@@ -4977,7 +4977,6 @@ func deleteTestIDP(codec rpc.ClientCodec, masterToken string, datacenter string,
 	return err
 }
 
-// KEEP THIS
 func upsertTestIDP(
 	codec rpc.ClientCodec, masterToken string, datacenter string,
 	caCert, kubeHost, kubeJWT string,
