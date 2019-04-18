@@ -61,8 +61,6 @@ func (s *TokenPoliciesIndex) PrefixFromArgs(args ...interface{}) ([]byte, error)
 }
 
 type TokenRolesIndex struct {
-	// boundNames=true means index the BoundName field, otherwise index the ID
-	boundNames bool
 }
 
 func (s *TokenRolesIndex) FromObject(obj interface{}) (bool, [][]byte, error) {
@@ -80,11 +78,7 @@ func (s *TokenRolesIndex) FromObject(obj interface{}) (bool, [][]byte, error) {
 
 	vals := make([][]byte, 0, numLinks)
 	for _, link := range links {
-		if link.BoundName != "" && s.boundNames {
-			vals = append(vals, []byte(link.BoundName+"\x00"))
-		} else if link.ID != "" && !s.boundNames {
-			vals = append(vals, []byte(link.ID+"\x00"))
-		}
+		vals = append(vals, []byte(link.ID+"\x00"))
 	}
 
 	return true, vals, nil
@@ -249,7 +243,7 @@ func tokensTableSchema() *memdb.TableSchema {
 				Name:         "roles",
 				AllowMissing: true,
 				Unique:       false,
-				Indexer:      &TokenRolesIndex{boundNames: false},
+				Indexer:      &TokenRolesIndex{},
 			},
 			"idp": &memdb.IndexSchema{
 				Name:         "idp",
@@ -259,13 +253,6 @@ func tokensTableSchema() *memdb.TableSchema {
 					Field:     "IDPName",
 					Lowercase: false,
 				},
-			},
-			// TODO(rb): remove if not necessary for UI work
-			"bound-roles": &memdb.IndexSchema{
-				Name:         "bound-roles",
-				AllowMissing: true,
-				Unique:       false,
-				Indexer:      &TokenRolesIndex{boundNames: true},
 			},
 			"local": &memdb.IndexSchema{
 				Name:         "local",
@@ -660,8 +647,6 @@ func (s *Store) resolveTokenRoleLinks(tx *memdb.Txn, token *structs.ACLToken, al
 			} else if !allowMissing {
 				return fmt.Errorf("No such role with ID: %s", link.ID)
 			}
-		} else if link.BoundName != "" {
-			// skip expected
 		} else {
 			return fmt.Errorf("Encountered a Token with roles linked by Name in the state store")
 		}
@@ -685,12 +670,7 @@ func (s *Store) fixupTokenRoleLinks(tx *memdb.Txn, original *structs.ACLToken) (
 	}
 
 	for linkIndex, link := range original.Roles {
-		if link.BoundName != "" {
-			if owned {
-				token.Roles = append(token.Roles, link)
-			}
-			continue
-		} else if link.ID == "" {
+		if link.ID == "" {
 			return nil, fmt.Errorf("Detected corrupted token within the state store - missing role link ID")
 		}
 
@@ -1579,23 +1559,13 @@ func (s *Store) ACLRoleGetByName(ws memdb.WatchSet, name string) (uint64, *struc
 	return s.aclRoleGet(ws, name, "name")
 }
 
-func (s *Store) ACLRoleBatchGet(ws memdb.WatchSet, ids, names []string) (uint64, structs.ACLRoles, error) {
+func (s *Store) ACLRoleBatchGet(ws memdb.WatchSet, ids []string) (uint64, structs.ACLRoles, error) {
 	tx := s.db.Txn(false)
 	defer tx.Abort()
 
-	roles := make(structs.ACLRoles, 0, len(ids)+len(names))
+	roles := make(structs.ACLRoles, 0, len(ids))
 	for _, rid := range ids {
 		role, err := s.getRoleWithTxn(tx, ws, rid, "id")
-		if err != nil {
-			return 0, nil, err
-		}
-
-		if role != nil {
-			roles = append(roles, role)
-		}
-	}
-	for _, rname := range names {
-		role, err := s.getRoleWithTxn(tx, ws, rname, "name")
 		if err != nil {
 			return 0, nil, err
 		}

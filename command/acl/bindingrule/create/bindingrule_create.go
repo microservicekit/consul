@@ -22,11 +22,11 @@ type cmd struct {
 	http  *flags.HTTPFlags
 	help  string
 
-	idpName      string
-	description  string
-	selector     string
-	roleBindType string
-	roleName     string
+	idpName     string
+	description string
+	selector    string
+	bindType    string
+	bindName    string
 
 	showMeta bool
 }
@@ -63,16 +63,16 @@ func (c *cmd) init() {
 			"attributes returned from the identity provider during login.",
 	)
 	c.flags.StringVar(
-		&c.roleBindType,
-		"role-bind-type",
-		string(api.BindingRuleRoleBindTypeService),
-		"Type of role binding to perform (\"service\" or \"existing\").",
+		&c.bindType,
+		"bind-type",
+		string(api.BindingRuleBindTypeService),
+		"Type of binding to perform (\"service\" or \"role\").",
 	)
 	c.flags.StringVar(
-		&c.roleName,
-		"role-name",
+		&c.bindName,
+		"bind-name",
 		"",
-		"Name of role to bind on match. Can use ${var} interpolation. "+
+		"Name to bind on match. Can use ${var} interpolation. "+
 			"This flag is required.",
 	)
 
@@ -91,18 +91,22 @@ func (c *cmd) Run(args []string) int {
 		c.UI.Error(fmt.Sprintf("Missing required '-idp-name' flag"))
 		c.UI.Error(c.Help())
 		return 1
-	} else if c.roleName == "" {
-		c.UI.Error(fmt.Sprintf("Missing required '-role-name' flag"))
+	} else if c.bindType == "" {
+		c.UI.Error(fmt.Sprintf("Missing required '-bind-type' flag"))
+		c.UI.Error(c.Help())
+		return 1
+	} else if c.bindName == "" {
+		c.UI.Error(fmt.Sprintf("Missing required '-bind-name' flag"))
 		c.UI.Error(c.Help())
 		return 1
 	}
 
 	newRule := &api.ACLBindingRule{
-		Description:  c.description,
-		IDPName:      c.idpName,
-		RoleBindType: api.BindingRuleRoleBindType(c.roleBindType),
-		RoleName:     c.roleName,
-		Selector:     c.selector,
+		Description: c.description,
+		IDPName:     c.idpName,
+		BindType:    api.BindingRuleBindType(c.bindType),
+		BindName:    c.bindName,
+		Selector:    c.selector,
 	}
 
 	client, err := c.http.APIClient()
@@ -138,6 +142,7 @@ Usage: consul acl binding-rule create [options]
 
      $ consul acl binding-rule create \
             -idp-name=minikube \
-            -role-name='k8s-${serviceaccount.name}' \
+            -bind-type=service \
+            -bind-name='k8s-${serviceaccount.name}' \
             -selector='serviceaccount.namespace==default and serviceaccount.name==web'
 `

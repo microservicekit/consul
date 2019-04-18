@@ -76,11 +76,12 @@ func TestBindingRuleCreateCommand(t *testing.T) {
 		require.Contains(t, ui.ErrorWriter.String(), "Missing required '-idp-name' flag")
 	})
 
-	t.Run("role name required", func(t *testing.T) {
+	t.Run("bind type required", func(t *testing.T) {
 		args := []string{
 			"-http-addr=" + a.HTTPAddr(),
 			"-token=root",
 			"-idp-name=k8s",
+			"-bind-type=",
 		}
 
 		ui := cli.NewMockUi()
@@ -88,7 +89,23 @@ func TestBindingRuleCreateCommand(t *testing.T) {
 
 		code := cmd.Run(args)
 		require.Equal(t, code, 1)
-		require.Contains(t, ui.ErrorWriter.String(), "Missing required '-role-name' flag")
+		require.Contains(t, ui.ErrorWriter.String(), "Missing required '-bind-type' flag")
+	})
+
+	t.Run("bind name required", func(t *testing.T) {
+		args := []string{
+			"-http-addr=" + a.HTTPAddr(),
+			"-token=root",
+			"-idp-name=k8s",
+			"-bind-type=service",
+		}
+
+		ui := cli.NewMockUi()
+		cmd := New(ui)
+
+		code := cmd.Run(args)
+		require.Equal(t, code, 1)
+		require.Contains(t, ui.ErrorWriter.String(), "Missing required '-bind-name' flag")
 	})
 
 	t.Run("must use roughly valid selector", func(t *testing.T) {
@@ -96,7 +113,8 @@ func TestBindingRuleCreateCommand(t *testing.T) {
 			"-http-addr=" + a.HTTPAddr(),
 			"-token=root",
 			"-idp-name=k8s",
-			"-role-name=demo",
+			"-bind-type=service",
+			"-bind-name=demo",
 			"-selector", "foo",
 		}
 
@@ -113,7 +131,8 @@ func TestBindingRuleCreateCommand(t *testing.T) {
 			"-http-addr=" + a.HTTPAddr(),
 			"-token=root",
 			"-idp-name=k8s",
-			"-role-name=demo",
+			"-bind-type=service",
+			"-bind-name=demo",
 		}
 
 		ui := cli.NewMockUi()
@@ -129,7 +148,8 @@ func TestBindingRuleCreateCommand(t *testing.T) {
 			"-http-addr=" + a.HTTPAddr(),
 			"-token=root",
 			"-idp-name=k8s",
-			"-role-name=demo",
+			"-bind-type=service",
+			"-bind-name=demo",
 			"-selector", "serviceaccount.namespace==default and serviceaccount.name==vault",
 		}
 
@@ -141,13 +161,13 @@ func TestBindingRuleCreateCommand(t *testing.T) {
 		require.Empty(t, ui.ErrorWriter.String())
 	})
 
-	t.Run("create it with an exact match", func(t *testing.T) {
+	t.Run("create it with type role", func(t *testing.T) {
 		args := []string{
 			"-http-addr=" + a.HTTPAddr(),
 			"-token=root",
 			"-idp-name=k8s",
-			"-role-bind-type", "existing",
-			"-role-name=demo",
+			"-bind-type=role",
+			"-bind-name=demo",
 			"-selector", "serviceaccount.namespace==default and serviceaccount.name==vault",
 		}
 

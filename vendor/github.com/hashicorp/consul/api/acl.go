@@ -21,9 +21,8 @@ type ACLTokenPolicyLink struct {
 	Name string
 }
 type ACLTokenRoleLink struct {
-	ID        string
-	Name      string
-	BoundName string `json:",omitempty"`
+	ID   string
+	Name string
 }
 
 // ACLToken represents an ACL Token
@@ -133,36 +132,24 @@ type ACLRole struct {
 	ModifyIndex       uint64
 }
 
-// BindingRuleRoleBindType is the type of binding rule mechanism used.
-type BindingRuleRoleBindType string
+// BindingRuleBindType is the type of binding rule mechanism used.
+type BindingRuleBindType string
 
 const (
-	// BindingRuleRoleBindTypeExisting only binds to pre-existing roles at login-time.
-	BindingRuleRoleBindTypeExisting BindingRuleRoleBindType = "existing"
+	// BindingRuleBindTypeService binds to a service identity with the given name.
+	BindingRuleBindTypeService BindingRuleBindType = "service"
 
-	// BindingRuleRoleBindTypeService binds either to a pre-existing role at
-	// resolve-time OR dynamically binds to a synthetic role on the fly as if
-	// it were defined as:
-	//
-	// &ACLRole{
-	//   Name:        "<computed RoleName>",
-	//   Description: "synthetic role",
-	//   ServiceIdentities: []*ACLServiceIdentity{
-	//     &ACLServiceIdentity{
-	//       ServiceName: "<computed RoleName>",
-	//     },
-	//   },
-	// }
-	BindingRuleRoleBindTypeService BindingRuleRoleBindType = "service"
+	// BindingRuleBindTypeRole binds to pre-existing roles with the given name.
+	BindingRuleBindTypeRole BindingRuleBindType = "role"
 )
 
 type ACLBindingRule struct {
-	ID           string
-	Description  string
-	IDPName      string
-	Selector     string
-	RoleBindType BindingRuleRoleBindType
-	RoleName     string
+	ID          string
+	Description string
+	IDPName     string
+	Selector    string
+	BindType    BindingRuleBindType
+	BindName    string
 
 	CreateIndex uint64
 	ModifyIndex uint64

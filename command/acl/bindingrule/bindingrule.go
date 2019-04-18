@@ -35,9 +35,9 @@ Usage: consul acl binding-rule <subcommand> [options] [args]
 
       $ consul acl binding-rule create \
              -idp-name=minikube \
-             -role-name='k8s-${serviceaccount.name}' \
-             -match-selector='serviceaccount.namespace=default,serviceaccount.name=web' \
-             -match-selector='serviceaccount.namespace=default,serviceaccount.name=db'
+             -bind-type=service \
+             -bind-name='k8s-${serviceaccount.name}' \
+             -selector='serviceaccount.namespace==default and serviceaccount.name==web'
 
   List all binding rules:
 
@@ -46,7 +46,7 @@ Usage: consul acl binding-rule <subcommand> [options] [args]
   Update a binding rule:
 
       $ consul acl binding-rule update -id=43cb72df-9c6f-4315-ac8a-01a9d98155ef \
-             -role-name='k8s-${serviceaccount.name}'
+             -bind-name='k8s-${serviceaccount.name}'
 
   Read a binding rule:
 
@@ -54,7 +54,7 @@ Usage: consul acl binding-rule <subcommand> [options] [args]
 
   Delete a binding rule:
 
-      $ consul acl binding-rule delete -name -id 0479e93e-091c-4475-9b06-79a004765c24
+      $ consul acl binding-rule delete -id 0479e93e-091c-4475-9b06-79a004765c24
 
   For more examples, ask for subcommand help or view the documentation.
 `

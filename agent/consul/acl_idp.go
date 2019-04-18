@@ -128,14 +128,17 @@ func (s *Server) purgeIdentityProviderValidators() {
 // given identity provider against the verified data returned from the idp
 // authentication process.
 //
-// A list of token role links suitable for creating a new token are returned.
-func (s *Server) evaluateRoleBindings(validator IdentityProviderValidator, verifiedFields map[string]string) ([]structs.ACLTokenRoleLink, error) {
+// A list of role links and service identities are returned.
+func (s *Server) evaluateRoleBindings(
+	validator IdentityProviderValidator,
+	verifiedFields map[string]string,
+) ([]*structs.ACLServiceIdentity, []structs.ACLTokenRoleLink, error) {
 	// Only fetch rules that are relevant for this idp.
 	_, rules, err := s.fsm.State().ACLBindingRuleList(nil, validator.Name())
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	} else if len(rules) == 0 {
-		return nil, nil
+		return nil, nil, nil
 	}
 
 	// Convert the fields into something suitable for go-bexpr.
@@ -149,35 +152,31 @@ func (s *Server) evaluateRoleBindings(validator IdentityProviderValidator, verif
 		}
 	}
 	if len(matchingRules) == 0 {
-		return nil, nil
+		return nil, nil, nil
 	}
 
-	// For all matching rules compute the role links.
-	var roleLinks []structs.ACLTokenRoleLink
+	// For all matching rules compute the attributes of a token.
+	var (
+		roleLinks         []structs.ACLTokenRoleLink
+		serviceIdentities []*structs.ACLServiceIdentity
+	)
 	for _, rule := range matchingRules {
-		roleName, valid, err := computeBindingRuleRoleName(rule.RoleName, verifiedFields)
+		bindName, valid, err := computeBindingRuleBindName(rule.BindType, rule.BindName, verifiedFields)
 		if err != nil {
-			return nil, fmt.Errorf("cannot compute role name for bind target: %v", err)
+			return nil, nil, fmt.Errorf("cannot compute %q bind name for bind target: %v", rule.BindType, err)
 		} else if !valid {
-			return nil, fmt.Errorf("computed role name for bind target is invalid: %q", roleName)
+			return nil, nil, fmt.Errorf("computed %q bind name for bind target is invalid: %q", rule.BindType, bindName)
 		}
 
-		switch rule.RoleBindType {
-		case structs.BindingRuleRoleBindTypeService:
-			// This is how you declare a synthetic role mapping. Note that if a
-			// role with this name is present during a token resolve operation
-			// that real role may still take effect, it's just not REQUIRED in
-			// the way that BindingRuleRoleBindTypeExisting implies.
-			roleLinks = append(roleLinks, structs.ACLTokenRoleLink{
-				BoundName: rule.RoleBindType + ":" + roleName,
+		switch rule.BindType {
+		case structs.BindingRuleBindTypeService:
+			serviceIdentities = append(serviceIdentities, &structs.ACLServiceIdentity{
+				ServiceName: bindName,
 			})
 
-		case structs.BindingRuleRoleBindTypeExisting:
-			// We are opting out of synthetic roles, so set Name here. This
-			// will let the normal machinery take care of resolving the Name to
-			// ID during the token persistence operation.
+		case structs.BindingRuleBindTypeRole:
 			roleLinks = append(roleLinks, structs.ACLTokenRoleLink{
-				Name: roleName,
+				Name: bindName,
 			})
 
 		default:
@@ -185,7 +184,7 @@ func (s *Server) evaluateRoleBindings(validator IdentityProviderValidator, verif
 		}
 	}
 
-	return roleLinks, nil
+	return serviceIdentities, roleLinks, nil
 }
 
 // doesBindingRuleMatch checks that a single binding rule matches the provided

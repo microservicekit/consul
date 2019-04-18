@@ -8,7 +8,6 @@ import (
 	"os"
 	"path/filepath"
 	"regexp"
-	"strings"
 	"time"
 
 	metrics "github.com/armon/go-metrics"
@@ -491,53 +490,29 @@ func (a *ACL) tokenSetInternal(args *structs.ACLTokenSetRequest, reply *structs.
 	}
 	token.Policies = policies
 
-	var (
-		roleIDs        = make(map[string]struct{})
-		roleBoundNames = make(map[string]struct{})
-		roles          []structs.ACLTokenRoleLink
-	)
+	roleIDs := make(map[string]struct{})
+	var roles []structs.ACLTokenRoleLink
 
-	// Validate all the role names and convert them to role IDs except the ones
-	// that originate from binding rules.
+	// Validate all the role names and convert them to role IDs.
 	for _, link := range token.Roles {
-		if link.BoundName != "" {
-			if !fromLogin {
-				return fmt.Errorf("Cannot link a role to a token using a bound name outside of login")
+		if link.ID == "" {
+			_, role, err := state.ACLRoleGetByName(nil, link.Name)
+			if err != nil {
+				return fmt.Errorf("Error looking up role for name %q: %v", link.Name, err)
 			}
-			if link.ID != "" || link.Name != "" {
-				return fmt.Errorf("Role links can either set BoundName OR ID/Name but not both")
+			if role == nil {
+				return fmt.Errorf("No such ACL role with name %q", link.Name)
 			}
+			link.ID = role.ID
+		}
 
-			if !isValidBoundRoleName(link.BoundName) {
-				return fmt.Errorf("BoundName %q is invalid", link.BoundName)
-			}
+		// Do not store the role name within raft/memdb as the role could be renamed in the future.
+		link.Name = ""
 
-			// dedup role links by bound name (note we do not dedupe BoundName
-			// and Name fields within the same request)
-			if _, ok := roleBoundNames[link.BoundName]; !ok {
-				roles = append(roles, link)
-				roleBoundNames[link.BoundName] = struct{}{}
-			}
-		} else {
-			if link.ID == "" {
-				_, role, err := state.ACLRoleGetByName(nil, link.Name)
-				if err != nil {
-					return fmt.Errorf("Error looking up role for name %q: %v", link.Name, err)
-				}
-				if role == nil {
-					return fmt.Errorf("No such ACL role with name %q", link.Name)
-				}
-				link.ID = role.ID
-			}
-
-			// Do not store the role name within raft/memdb as the role could be renamed in the future.
-			link.Name = ""
-
-			// dedup role links by id
-			if _, ok := roleIDs[link.ID]; !ok {
-				roles = append(roles, link)
-				roleIDs[link.ID] = struct{}{}
-			}
+		// dedup role links by id
+		if _, ok := roleIDs[link.ID]; !ok {
+			roles = append(roles, link)
+			roleIDs[link.ID] = struct{}{}
 		}
 	}
 	token.Roles = roles
@@ -592,25 +567,8 @@ func (a *ACL) tokenSetInternal(args *structs.ACLTokenSetRequest, reply *structs.
 	return nil
 }
 
-// computeBindingRuleRoleName processes the HIL for the provided role name
-// using the verified fields.
-//
-// - If the HIL is invalid ("", false, AN_ERROR) is returned.
-// - If the computed role name is not valid ("INVALID_ROLE_NAME", false, nil) is returned.
-// - If the computed role name is valid ("ROLE_NAME", true, nil) is returned.
-func computeBindingRuleRoleName(roleName string, verifiedFields map[string]string) (string, bool, error) {
-	roleName, err := InterpolateHIL(roleName, verifiedFields)
-	if err != nil {
-		return "", false, err
-	}
-	if !validRoleName.MatchString(roleName) {
-		return "", false, nil
-	}
-	return roleName, true, nil
-}
-
-func isValidBindingRuleRoleName(roleName string, availableFields []string) (bool, error) {
-	if roleName == "" {
+func validateBindingRuleBindName(bindType, bindName string, availableFields []string) (bool, error) {
+	if bindType == "" || bindName == "" {
 		return false, nil
 	}
 
@@ -619,11 +577,39 @@ func isValidBindingRuleRoleName(roleName string, availableFields []string) (bool
 		fakeVarMap[v] = "fake"
 	}
 
-	_, valid, err := computeBindingRuleRoleName(roleName, fakeVarMap)
+	_, valid, err := computeBindingRuleBindName(bindType, bindName, fakeVarMap)
 	if err != nil {
 		return false, err
 	}
 	return valid, nil
+}
+
+// computeBindingRuleBindName processes the HIL for the provided bind type+name
+// using the verified fields.
+//
+// - If the HIL is invalid ("", false, AN_ERROR) is returned.
+// - If the computed name is not valid for the type ("INVALID_NAME", false, nil) is returned.
+// - If the computed name is valid for the type ("VALID_NAME", true, nil) is returned.
+func computeBindingRuleBindName(bindType, bindName string, verifiedFields map[string]string) (string, bool, error) {
+	bindName, err := InterpolateHIL(bindName, verifiedFields)
+	if err != nil {
+		return "", false, err
+	}
+
+	valid := false
+
+	switch bindType {
+	case structs.BindingRuleBindTypeService:
+		valid = isValidServiceIdentityName(bindName)
+
+	case structs.BindingRuleBindTypeRole:
+		valid = validRoleName.MatchString(bindName)
+
+	default:
+		return "", false, fmt.Errorf("unknown binding rule bind type: %s", bindType)
+	}
+
+	return bindName, valid, nil
 }
 
 // isValidServiceIdentityName returns true if the provided name can be used as
@@ -635,26 +621,6 @@ func isValidServiceIdentityName(name string) bool {
 		return false
 	}
 	return validServiceIdentityName.MatchString(name)
-}
-
-// isValidBoundRoleName returns true if the provided bound name is a valid
-// string of the form "BIND_TYPE:ROLE_NAME" with BIND_TYPE having allowed
-// values of "service" and "existing"
-func isValidBoundRoleName(boundName string) bool {
-	parts := strings.Split(boundName, ":")
-	if len(parts) != 2 {
-		return false
-	}
-	bindType, roleName := parts[0], parts[1]
-
-	// Note: BindingRuleRoleBindTypeExisting is not valid here, because it is
-	// used at token-create time to create a standard role link and is not
-	// persisted further.
-	if bindType != structs.BindingRuleRoleBindTypeService {
-		return false
-	}
-
-	return validRoleName.MatchString(roleName)
 }
 
 func (a *ACL) TokenDelete(args *structs.ACLTokenDeleteRequest, reply *string) error {
@@ -1244,7 +1210,7 @@ func (a *ACL) RoleBatchRead(args *structs.ACLRoleBatchGetRequest, reply *structs
 
 	return a.srv.blockingQuery(&args.QueryOptions, &reply.QueryMeta,
 		func(ws memdb.WatchSet, state *state.Store) error {
-			index, roles, err := state.ACLRoleBatchGet(ws, args.RoleIDs, args.RoleNames)
+			index, roles, err := state.ACLRoleBatchGet(ws, args.RoleIDs)
 			if err != nil {
 				return err
 			}
@@ -1292,7 +1258,6 @@ func (a *ACL) RoleSet(args *structs.ACLRoleSetRequest, reply *structs.ACLRole) e
 		return fmt.Errorf("Invalid Role: invalid Name. Only alphanumeric characters, '-' and '_' are allowed")
 	}
 
-	var formerName string
 	if role.ID == "" {
 		// with no role ID one will be generated
 		var err error
@@ -1327,7 +1292,6 @@ func (a *ACL) RoleSet(args *structs.ACLRoleSetRequest, reply *structs.ACLRole) e
 			} else if nameMatch != nil {
 				return fmt.Errorf("Invalid Role: A role with name %q already exists", role.Name)
 			}
-			formerName = existing.Name
 		}
 	}
 
@@ -1381,10 +1345,7 @@ func (a *ACL) RoleSet(args *structs.ACLRoleSetRequest, reply *structs.ACLRole) e
 	}
 
 	// Remove from the cache to prevent stale cache usage
-	a.srv.acls.cache.RemoveRole(role.ID, role.Name)
-	if formerName != "" {
-		a.srv.acls.cache.RemoveRole("", formerName)
-	}
+	a.srv.acls.cache.RemoveRole(role.ID)
 
 	if respErr, ok := resp.(error); ok {
 		return respErr
@@ -1437,7 +1398,7 @@ func (a *ACL) RoleDelete(args *structs.ACLRoleDeleteRequest, reply *string) erro
 		return fmt.Errorf("Failed to apply role delete request: %v", err)
 	}
 
-	a.srv.acls.cache.RemoveRole(role.ID, role.Name)
+	a.srv.acls.cache.RemoveRole(role.ID)
 
 	if respErr, ok := resp.(error); ok {
 		return respErr
@@ -1479,8 +1440,6 @@ func (a *ACL) RoleList(args *structs.ACLRoleListRequest, reply *structs.ACLRoleL
 
 // RoleResolve is used to retrieve a subset of the roles associated with a given token
 // The role ids in the args simply act as a filter on the role set assigned to the token
-//
-// This does not return synthetic roles.
 func (a *ACL) RoleResolve(args *structs.ACLRoleBatchGetRequest, reply *structs.ACLRoleBatchResponse) error {
 	if err := a.aclPreCheck(); err != nil {
 		return err
@@ -1491,27 +1450,17 @@ func (a *ACL) RoleResolve(args *structs.ACLRoleBatchGetRequest, reply *structs.A
 	}
 
 	// get full list of roles for this token
-	identity, roles, err := a.srv.acls.resolveTokenToIdentityAndRoles(args.Token, false)
+	identity, roles, err := a.srv.acls.resolveTokenToIdentityAndRoles(args.Token)
 	if err != nil {
 		return err
 	}
 
 	idMap := make(map[string]*structs.ACLRole)
-	nameMap := make(map[string]*structs.ACLRole)
 	for _, roleID := range identity.RoleIDs() {
 		idMap[roleID] = nil
 	}
-	for _, boundRoleName := range identity.BoundRoleNames() {
-		bindType, roleName := splitBoundRoleName(boundRoleName)
-		if bindType == "" || roleName == "" {
-			continue
-		}
-		nameMap[roleName] = nil
-	}
-
 	for _, role := range roles {
 		idMap[role.ID] = role
-		nameMap[role.Name] = role
 	}
 
 	for _, roleID := range args.RoleIDs {
@@ -1523,18 +1472,6 @@ func (a *ACL) RoleResolve(args *structs.ACLRoleBatchGetRequest, reply *structs.A
 		} else {
 			// send a permission denied to indicate that the request included
 			// role ids not associated with this token
-			return acl.ErrPermissionDenied
-		}
-	}
-	for _, roleName := range args.RoleNames {
-		if role, ok := nameMap[roleName]; ok {
-			// only add non-deleted roles
-			if role != nil {
-				reply.Roles = append(reply.Roles, role)
-			}
-		} else {
-			// send a permission denied to indicate that the request included
-			// role names not associated with this token
 			return acl.ErrPermissionDenied
 		}
 	}
@@ -1597,16 +1534,6 @@ func (a *ACL) BindingRuleSet(args *structs.ACLBindingRuleSetRequest, reply *stru
 	rule := &args.BindingRule
 	state := a.srv.fsm.State()
 
-	if rule.RoleBindType == "" {
-		rule.RoleBindType = structs.BindingRuleRoleBindTypeService
-	}
-	switch rule.RoleBindType {
-	case structs.BindingRuleRoleBindTypeService:
-	case structs.BindingRuleRoleBindTypeExisting:
-	default:
-		return fmt.Errorf("unknown role bind type: %s", rule.RoleBindType)
-	}
-
 	if rule.ID == "" {
 		// with no binding rule ID one will be generated
 		var err error
@@ -1658,14 +1585,25 @@ func (a *ACL) BindingRuleSet(args *structs.ACLBindingRuleSetRequest, reply *stru
 		}
 	}
 
-	if rule.RoleName == "" {
-		return fmt.Errorf("Invalid Binding Rule: no RoleName is set")
+	if rule.BindType == "" {
+		return fmt.Errorf("Invalid Binding Rule: no BindType is set")
 	}
 
-	if valid, err := isValidBindingRuleRoleName(rule.RoleName, validator.AvailableFields()); err != nil {
-		return fmt.Errorf("binding rule role name is invalid: %v", err)
+	if rule.BindName == "" {
+		return fmt.Errorf("Invalid Binding Rule: no BindName is set")
+	}
+
+	switch rule.BindType {
+	case structs.BindingRuleBindTypeService:
+	case structs.BindingRuleBindTypeRole:
+	default:
+		return fmt.Errorf("Invalid Binding Rule: unknown BindType %q", rule.BindType)
+	}
+
+	if valid, err := validateBindingRuleBindName(rule.BindType, rule.BindName, validator.AvailableFields()); err != nil {
+		return fmt.Errorf("Invalid Binding Rule: invalid BindName: %v", err)
 	} else if !valid {
-		return fmt.Errorf("binding rule role name is invalid")
+		return fmt.Errorf("Invalid Binding Rule: invalid BindName")
 	}
 
 	req := &structs.ACLBindingRuleBatchSetRequest{
@@ -1995,12 +1933,12 @@ func (a *ACL) Login(args *structs.ACLLoginRequest, reply *structs.ACLToken) erro
 	}
 
 	// 3. send map through role bindings
-	roleLinks, err := a.srv.evaluateRoleBindings(validator, verifiedFields)
+	serviceIdentities, roleLinks, err := a.srv.evaluateRoleBindings(validator, verifiedFields)
 	if err != nil {
 		return err
 	}
 
-	if len(roleLinks) == 0 {
+	if len(serviceIdentities) == 0 && len(roleLinks) == 0 {
 		return acl.ErrPermissionDenied
 	}
 
@@ -2017,10 +1955,11 @@ func (a *ACL) Login(args *structs.ACLLoginRequest, reply *structs.ACLToken) erro
 	createReq := structs.ACLTokenSetRequest{
 		Datacenter: args.Datacenter,
 		ACLToken: structs.ACLToken{
-			Description: description,
-			Local:       true,
-			IDPName:     auth.IDPName,
-			Roles:       roleLinks,
+			Description:       description,
+			Local:             true,
+			IDPName:           auth.IDPName,
+			ServiceIdentities: serviceIdentities,
+			Roles:             roleLinks,
 		},
 		WriteRequest: args.WriteRequest,
 	}

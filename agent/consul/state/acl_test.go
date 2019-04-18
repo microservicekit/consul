@@ -2187,7 +2187,7 @@ func TestStateStore_ACLRoles_UpsertBatchRead(t *testing.T) {
 
 		require.NoError(t, s.ACLRoleBatchSet(2, roles))
 
-		idx, rroles, err := s.ACLRoleBatchGet(nil, []string{testRoleID_A, testRoleID_B}, nil)
+		idx, rroles, err := s.ACLRoleBatchGet(nil, []string{testRoleID_A, testRoleID_B})
 		require.NoError(t, err)
 		require.Equal(t, uint64(2), idx)
 		require.Len(t, rroles, 2)
@@ -2257,7 +2257,7 @@ func TestStateStore_ACLRoles_UpsertBatchRead(t *testing.T) {
 
 		require.NoError(t, s.ACLRoleBatchSet(3, updates))
 
-		idx, rroles, err := s.ACLRoleBatchGet(nil, []string{testRoleID_A, testRoleID_B}, nil)
+		idx, rroles, err := s.ACLRoleBatchGet(nil, []string{testRoleID_A, testRoleID_B})
 
 		require.NoError(t, err)
 		require.Equal(t, uint64(3), idx)
@@ -2441,7 +2441,7 @@ func TestStateStore_ACLRole_FixupPolicyLinks(t *testing.T) {
 	require.True(t, found)
 
 	// batch get without stale links
-	_, roles, err = s.ACLRoleBatchGet(nil, []string{role.ID}, nil)
+	_, roles, err = s.ACLRoleBatchGet(nil, []string{role.ID})
 	require.NoError(t, err)
 
 	found = false
@@ -2484,7 +2484,7 @@ func TestStateStore_ACLRole_FixupPolicyLinks(t *testing.T) {
 	require.True(t, found)
 
 	// batch get without stale links
-	_, roles, err = s.ACLRoleBatchGet(nil, []string{role.ID}, nil)
+	_, roles, err = s.ACLRoleBatchGet(nil, []string{role.ID})
 	require.NoError(t, err)
 
 	found = false
@@ -3113,7 +3113,8 @@ func TestStateStore_ACLBindingRule_SetGet(t *testing.T) {
 			ID:          "9669b2d7-455c-4d70-b0ac-457fd7969a2e",
 			IDPName:     "k8s",
 			Description: "modified",
-			RoleName:    "web",
+			BindType:    structs.BindingRuleBindTypeService,
+			BindName:    "web",
 		}
 
 		require.NoError(t, s.ACLBindingRuleSet(3, &update))
@@ -3125,7 +3126,8 @@ func TestStateStore_ACLBindingRule_SetGet(t *testing.T) {
 		require.Equal(t, rule.ID, rrule.ID)
 		require.Equal(t, "k8s", rrule.IDPName)
 		require.Equal(t, "modified", rrule.Description)
-		require.Equal(t, "web", rrule.RoleName)
+		require.Equal(t, structs.BindingRuleBindTypeService, rrule.BindType)
+		require.Equal(t, "web", rrule.BindName)
 		require.Equal(t, uint64(2), rrule.CreateIndex)
 		require.Equal(t, uint64(3), rrule.ModifyIndex)
 	})
@@ -3193,13 +3195,15 @@ func TestStateStore_ACLBindingRules_UpsertBatchRead(t *testing.T) {
 				ID:          "9669b2d7-455c-4d70-b0ac-457fd7969a2e",
 				IDPName:     "k8s",
 				Description: "test-1 modified",
-				RoleName:    "web-1",
+				BindType:    structs.BindingRuleBindTypeService,
+				BindName:    "web-1",
 			},
 			&structs.ACLBindingRule{
 				ID:          "3ebcc27b-f8ba-4611-b385-79a065dfb983",
 				IDPName:     "k8s",
 				Description: "test-2 modified",
-				RoleName:    "web-2",
+				BindType:    structs.BindingRuleBindTypeService,
+				BindName:    "web-2",
 			},
 		}
 

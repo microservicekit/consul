@@ -24,10 +24,10 @@ type cmd struct {
 
 	ruleID string
 
-	description  string
-	selector     string
-	roleBindType string
-	roleName     string
+	description string
+	selector    string
+	bindType    string
+	bindName    string
 
 	noMerge  bool
 	showMeta bool
@@ -66,16 +66,16 @@ func (c *cmd) init() {
 			"attributes returned from the identity provider during login.",
 	)
 	c.flags.StringVar(
-		&c.roleBindType,
-		"role-bind-type",
-		string(api.BindingRuleRoleBindTypeService),
-		"Type of role binding to perform (\"service\" or \"existing\").",
+		&c.bindType,
+		"bind-type",
+		string(api.BindingRuleBindTypeService),
+		"Type of binding to perform (\"service\" or \"role\").",
 	)
 	c.flags.StringVar(
-		&c.roleName,
-		"role-name",
+		&c.bindName,
+		"bind-name",
 		"",
-		"Name of role to bind on match. Can use ${var} interpolation. "+
+		"Name to bind on match. Can use ${var} interpolation. "+
 			"This flag is required.",
 	)
 
@@ -128,19 +128,23 @@ func (c *cmd) Run(args []string) int {
 
 	var rule *api.ACLBindingRule
 	if c.noMerge {
-		if c.roleName == "" {
-			c.UI.Error(fmt.Sprintf("Missing required '-role-name' flag"))
+		if c.bindType == "" {
+			c.UI.Error(fmt.Sprintf("Missing required '-bind-type' flag"))
+			c.UI.Error(c.Help())
+			return 1
+		} else if c.bindName == "" {
+			c.UI.Error(fmt.Sprintf("Missing required '-bind-name' flag"))
 			c.UI.Error(c.Help())
 			return 1
 		}
 
 		rule = &api.ACLBindingRule{
-			ID:           ruleID,
-			IDPName:      currentRule.IDPName, // immutable
-			Description:  c.description,
-			RoleBindType: api.BindingRuleRoleBindType(c.roleBindType),
-			RoleName:     c.roleName,
-			Selector:     c.selector,
+			ID:          ruleID,
+			IDPName:     currentRule.IDPName, // immutable
+			Description: c.description,
+			BindType:    api.BindingRuleBindType(c.bindType),
+			BindName:    c.bindName,
+			Selector:    c.selector,
 		}
 
 	} else {
@@ -149,11 +153,11 @@ func (c *cmd) Run(args []string) int {
 		if c.description != "" {
 			rule.Description = c.description
 		}
-		if c.roleName != "" {
-			rule.RoleName = c.roleName
+		if c.bindType != "" {
+			rule.BindType = api.BindingRuleBindType(c.bindType)
 		}
-		if isFlagSet(c.flags, "role-bind-type") {
-			rule.RoleBindType = api.BindingRuleRoleBindType(c.roleBindType) // empty is valid
+		if c.bindName != "" {
+			rule.BindName = c.bindName
 		}
 		if isFlagSet(c.flags, "selector") {
 			rule.Selector = c.selector // empty is valid
@@ -202,7 +206,7 @@ Usage: consul acl binding-rule update -id ID [options]
      $ consul acl binding-rule update \
             -id=43cb72df-9c6f-4315-ac8a-01a9d98155ef \
             -description="new description" \
-            -role-bind-type=existing \
-            -role-name='k8s-${serviceaccount.name}' \
+            -bind-type=role \
+            -bind-name='k8s-${serviceaccount.name}' \
             -selector='serviceaccount.namespace==default and serviceaccount.name==web'
 `

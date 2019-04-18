@@ -130,7 +130,6 @@ type ACLIdentity interface {
 	SecretToken() string
 	PolicyIDs() []string
 	RoleIDs() []string
-	BoundRoleNames() []string
 	EmbeddedPolicy() *ACLPolicy
 	ServiceIdentityList() []*ACLServiceIdentity
 	IsExpired(asOf time.Time) bool
@@ -141,19 +140,9 @@ type ACLTokenPolicyLink struct {
 	Name string `hash:"ignore"`
 }
 
-// ACLTokenRoleLink is a way to link a Role to a Token. At the storage layer
-// one of ID or BoundName is required. BoundName can only be set during a Login
-// operation when BindingRules are evaluated. A bound name is a concatenation of
-// the RoleBindType and the RoleName joined with a ":", like "service:db".
-//
-// If the optional Name is presented during link creation it is resolved to an
-// ID and persisted alongside a snapshot of the current Role's name, but the
-// Name should not be considered a long-term link to the Role, as the ID is
-// used for that.
 type ACLTokenRoleLink struct {
-	ID        string `json:",omitempty"`
-	Name      string `json:",omitempty" hash:"ignore"`
-	BoundName string `json:",omitempty"`
+	ID   string
+	Name string `hash:"ignore"`
 }
 
 // ACLServiceIdentity represents a high-level grant of all necessary privileges
@@ -338,16 +327,6 @@ func (t *ACLToken) RoleIDs() []string {
 	return ids
 }
 
-func (t *ACLToken) BoundRoleNames() []string {
-	var names []string
-	for _, link := range t.Roles {
-		if link.BoundName != "" {
-			names = append(names, link.BoundName)
-		}
-	}
-	return names
-}
-
 func (t *ACLToken) ServiceIdentityList() []*ACLServiceIdentity {
 	if len(t.ServiceIdentities) == 0 {
 		return nil
@@ -443,11 +422,7 @@ func (t *ACLToken) SetHash(force bool) []byte {
 		}
 
 		for _, link := range t.Roles {
-			if link.BoundName != "" {
-				hash.Write([]byte(link.BoundName))
-			} else {
-				hash.Write([]byte(link.ID))
-			}
+			hash.Write([]byte(link.ID))
 		}
 
 		for _, srvid := range t.ServiceIdentities {
@@ -857,31 +832,34 @@ func (r *ACLRole) EstimateSize() int {
 }
 
 const (
-	// BindingRuleRoleBindTypeExisting is the binding rule role bind type that
-	// only allows the binding rule to function if a role with the given name
-	// exists at login-time. This lets operators explicitly customize the ACLs
-	// as they may already enjoy doing.
+	// BindingRuleBindTypeService is the binding rule bind type that
+	// assigns a Service Identity to the token that is created using the value
+	// of the computed BindName as the ServiceName like:
 	//
-	// If it does not exist at login-time the rule is ignored.
-	BindingRuleRoleBindTypeExisting = "existing"
-
-	// BindingRuleRoleBindTypeService is the binding rule role bind type that
-	// either uses an existing role that may exist with the given name at
-	// resolve-time OR synthesizes a role on the fly as if it were defined as:
-	//
-	// &ACLRole{
-	//   Name:        "<computed RoleName>",
-	//   Description: "synthetic role",
+	// &ACLToken{
+	//   ...other fields...
 	//   ServiceIdentities: []*ACLServiceIdentity{
 	//     &ACLServiceIdentity{
-	//       ServiceName: "<computed RoleName>",
+	//       ServiceName: "<computed BindName>",
 	//     },
 	//   },
 	// }
+	BindingRuleBindTypeService = "service"
+
+	// BindingRuleBindTypeRole is the binding rule bind type that only allows
+	// the binding rule to function if a role with the given name (BindName)
+	// exists at login-time. If it does the token that is created is directly
+	// linked to that role like:
 	//
-	// This type of synthetic role is suitable for an application to
-	// participate in the Connect mesh.
-	BindingRuleRoleBindTypeService = "service"
+	// &ACLToken{
+	//   ...other fields...
+	//   Roles: []ACLTokenRoleLink{
+	//     { Name: "<computed BindName>" }
+	//   }
+	// }
+	//
+	// If it does not exist at login-time the rule is ignored.
+	BindingRuleBindTypeRole = "role"
 )
 
 type ACLBindingRule struct {
@@ -899,18 +877,17 @@ type ACLBindingRule struct {
 	// attributes returned from the identity provider during login.
 	Selector string
 
-	// RoleBindType adjusts how this binding rule is applied at login or
-	// resolution time. The valid values are:
+	// BindType adjusts how this binding rule is applied at login time.  The
+	// valid values are:
 	//
-	//  - BindingRuleRoleBindTypeExisting = "existing"
-	//  - BindingRuleRoleBindTypeService =  "service"
-	//
-	// If not provided, "service" is used as the default.
-	RoleBindType string
+	//  - BindingRuleBindTypeService = "service"
+	//  - BindingRuleBindTypeRole    = "role"
+	BindType string
 
-	// RoleName is the named ACL Role to bind to. Can be lightly templated
-	// using HIL ${foo} syntax from available field names.
-	RoleName string
+	// BindName is the target of the binding. Can be lightly templated using
+	// HIL ${foo} syntax from available field names. How it is used depends
+	// upon the BindType.
+	BindName string
 
 	// Embedded Raft Metadata
 	RaftIndex `hash:"ignore"`
@@ -1311,7 +1288,6 @@ type ACLRoleListResponse struct {
 // the roles associated with the token used for retrieval
 type ACLRoleBatchGetRequest struct {
 	RoleIDs    []string // List of role ids to fetch
-	RoleNames  []string // List of role names to fetch
 	Datacenter string   // The datacenter to perform the request within
 	QueryOptions
 }

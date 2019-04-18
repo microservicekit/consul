@@ -663,11 +663,11 @@ k8s.io/apimachinery/pkg/apis/meta/v1beta1
 k8s.io/apimachinery/pkg/util/framer
 k8s.io/apimachinery/pkg/apis/meta/v1/unstructured
 # k8s.io/client-go v8.0.0+incompatible
-k8s.io/client-go/util/cert
 k8s.io/client-go/kubernetes
 k8s.io/client-go/kubernetes/typed/authentication/v1
 k8s.io/client-go/kubernetes/typed/core/v1
 k8s.io/client-go/rest
+k8s.io/client-go/util/cert
 k8s.io/client-go/plugin/pkg/client/auth
 k8s.io/client-go/tools/clientcmd
 k8s.io/client-go/discovery

@@ -982,137 +982,6 @@ func TestACLEndpoint_TokenSet(t *testing.T) {
 		requireErrorContains(t, err, "IDPName field is disallowed outside of Login")
 	})
 
-	t.Run("Create fails using bound Roles outside of login", func(t *testing.T) {
-		req := structs.ACLTokenSetRequest{
-			Datacenter: "dc1",
-			ACLToken: structs.ACLToken{
-				Description: "foobar",
-				Roles: []structs.ACLTokenRoleLink{
-					structs.ACLTokenRoleLink{
-						BoundName: "service:web",
-					},
-				},
-				Local: true,
-			},
-			WriteRequest: structs.WriteRequest{Token: "root"},
-		}
-
-		resp := structs.ACLToken{}
-
-		err := acl.TokenSet(&req, &resp)
-		requireErrorContains(t, err, "Cannot link a role to a token using a bound name outside of login")
-	})
-
-	t.Run("Create fails linking a role with BoundName AND id", func(t *testing.T) {
-		acl := ACL{
-			srv:                                   s1,
-			disableLoginOnlyRestrictionOnTokenSet: true,
-		}
-
-		req := structs.ACLTokenSetRequest{
-			Datacenter: "dc1",
-			ACLToken: structs.ACLToken{
-				IDPName:     "k8s",
-				Description: "foobar",
-				Roles: []structs.ACLTokenRoleLink{
-					structs.ACLTokenRoleLink{
-						ID:        "abc",
-						BoundName: "service:web",
-					},
-				},
-				Local: true,
-			},
-			WriteRequest: structs.WriteRequest{Token: "root"},
-		}
-
-		resp := structs.ACLToken{}
-
-		err := acl.TokenSet(&req, &resp)
-		requireErrorContains(t, err, "Role links can either set BoundName OR ID/Name but not both")
-	})
-
-	t.Run("Create fails linking a role with BoundName AND Name", func(t *testing.T) {
-		acl := ACL{
-			srv:                                   s1,
-			disableLoginOnlyRestrictionOnTokenSet: true,
-		}
-
-		req := structs.ACLTokenSetRequest{
-			Datacenter: "dc1",
-			ACLToken: structs.ACLToken{
-				IDPName:     "k8s",
-				Description: "foobar",
-				Roles: []structs.ACLTokenRoleLink{
-					structs.ACLTokenRoleLink{
-						Name:      "def",
-						BoundName: "service:web",
-					},
-				},
-				Local: true,
-			},
-			WriteRequest: structs.WriteRequest{Token: "root"},
-		}
-
-		resp := structs.ACLToken{}
-
-		err := acl.TokenSet(&req, &resp)
-		requireErrorContains(t, err, "Role links can either set BoundName OR ID/Name but not both")
-	})
-
-	t.Run("Create fails linking a role with invalid bind type in BoundName", func(t *testing.T) {
-		acl := ACL{
-			srv:                                   s1,
-			disableLoginOnlyRestrictionOnTokenSet: true,
-		}
-
-		req := structs.ACLTokenSetRequest{
-			Datacenter: "dc1",
-			ACLToken: structs.ACLToken{
-				IDPName:     "k8s",
-				Description: "foobar",
-				Roles: []structs.ACLTokenRoleLink{
-					structs.ACLTokenRoleLink{
-						BoundName: "invalid:web",
-					},
-				},
-				Local: true,
-			},
-			WriteRequest: structs.WriteRequest{Token: "root"},
-		}
-
-		resp := structs.ACLToken{}
-
-		err := acl.TokenSet(&req, &resp)
-		requireErrorContains(t, err, "BoundName \"invalid:web\" is invalid")
-	})
-
-	t.Run("Create fails linking a role with 'existing' bind type in BoundName which is not allowed", func(t *testing.T) {
-		acl := ACL{
-			srv:                                   s1,
-			disableLoginOnlyRestrictionOnTokenSet: true,
-		}
-
-		req := structs.ACLTokenSetRequest{
-			Datacenter: "dc1",
-			ACLToken: structs.ACLToken{
-				IDPName:     "k8s",
-				Description: "foobar",
-				Roles: []structs.ACLTokenRoleLink{
-					structs.ACLTokenRoleLink{
-						BoundName: "existing:web",
-					},
-				},
-				Local: true,
-			},
-			WriteRequest: structs.WriteRequest{Token: "root"},
-		}
-
-		resp := structs.ACLToken{}
-
-		err := acl.TokenSet(&req, &resp)
-		requireErrorContains(t, err, "BoundName \"existing:web\" is invalid")
-	})
-
 	t.Run("Create fails with an empty IDPName when faking login", func(t *testing.T) {
 		acl := ACL{
 			srv:                                   s1,
@@ -1158,7 +1027,7 @@ func TestACLEndpoint_TokenSet(t *testing.T) {
 	})
 
 	var idpLinkedToken *structs.ACLToken
-	t.Run("Create it using bound Roles by faking login", func(t *testing.T) {
+	t.Run("Create it with idp set by faking login", func(t *testing.T) {
 		// This allows for testing things that are only possible via Login, but
 		// just cumbersome to wire up (multiple binding rules, etc)
 		acl := ACL{
@@ -1174,15 +1043,9 @@ func TestACLEndpoint_TokenSet(t *testing.T) {
 			ACLToken: structs.ACLToken{
 				IDPName:     idp.Name,
 				Description: "foobar",
-				Roles: []structs.ACLTokenRoleLink{
-					structs.ACLTokenRoleLink{
-						BoundName: "service:web",
-					},
-					structs.ACLTokenRoleLink{
-						BoundName: "service:db",
-					},
-					structs.ACLTokenRoleLink{
-						BoundName: "service:web", // add web twice to test dedupe
+				ServiceIdentities: []*structs.ACLServiceIdentity{
+					&structs.ACLServiceIdentity{
+						ServiceName: "web",
 					},
 				},
 				Local: true,
@@ -1200,9 +1063,9 @@ func TestACLEndpoint_TokenSet(t *testing.T) {
 		require.NoError(t, err)
 		token := tokenResp.Token
 
-		require.Len(t, token.Roles, 2)
-		require.Equal(t, "service:web", token.Roles[0].BoundName)
-		require.Equal(t, "service:db", token.Roles[1].BoundName)
+		require.Len(t, token.Roles, 0)
+		require.Len(t, token.ServiceIdentities, 1)
+		require.Equal(t, "web", token.ServiceIdentities[0].ServiceName)
 
 		idpLinkedToken = token
 	})
@@ -3011,11 +2874,6 @@ func TestACLEndpoint_RoleResolve(t *testing.T) {
 
 	testrpc.WaitForLeader(t, s1.RPC, "dc1")
 
-	ca := connect.TestCA(t, nil)
-
-	existingIDP, err := upsertTestIDP(codec, "root", "dc1", ca.RootCert, "", "")
-	require.NoError(t, err)
-
 	t.Run("Normal", func(t *testing.T) {
 		r1, err := upsertTestRole(codec, "root", "dc1")
 		require.NoError(t, err)
@@ -3053,82 +2911,6 @@ func TestACLEndpoint_RoleResolve(t *testing.T) {
 		}
 		err = acl.RoleResolve(&req, &resp)
 		require.NoError(t, err)
-		require.ElementsMatch(t, gatherIDs(t, resp.Roles), []string{r1.ID, r2.ID})
-	})
-
-	t.Run("With Bound Roles", func(t *testing.T) {
-		r1, err := upsertTestRole(codec, "root", "dc1")
-		require.NoError(t, err)
-
-		r2, err := upsertTestRole(codec, "root", "dc1")
-		require.NoError(t, err)
-
-		acl := ACL{
-			srv:                                   s1,
-			disableLoginOnlyRestrictionOnTokenSet: true,
-		}
-
-		// Assign the roles to a token, with one bound role that doesn't exist
-		tokenUpsertReq := structs.ACLTokenSetRequest{
-			Datacenter: "dc1",
-			ACLToken: structs.ACLToken{
-				IDPName: existingIDP.Name,
-				Local:   true,
-				Roles: []structs.ACLTokenRoleLink{
-					structs.ACLTokenRoleLink{
-						ID: r1.ID,
-					},
-					structs.ACLTokenRoleLink{
-						BoundName: "service:my-magic-role",
-					},
-				},
-			},
-			WriteRequest: structs.WriteRequest{Token: "root"},
-		}
-		token := structs.ACLToken{}
-		err = acl.TokenSet(&tokenUpsertReq, &token)
-		require.NoError(t, err)
-		require.NotEmpty(t, token.SecretID)
-
-		resp := structs.ACLRoleBatchResponse{}
-		req := structs.ACLRoleBatchGetRequest{
-			Datacenter:   "dc1",
-			RoleIDs:      []string{r1.ID},
-			RoleNames:    []string{"my-magic-role"},
-			QueryOptions: structs.QueryOptions{Token: token.SecretID},
-		}
-		err = acl.RoleResolve(&req, &resp)
-		require.NoError(t, err)
-		// note the synthetic role is not returned
-		require.ElementsMatch(t, gatherIDs(t, resp.Roles), []string{r1.ID})
-
-		// now rename r2 to have a name that matches our bound name
-		{
-			r2.Name = "my-magic-role"
-			arg := structs.ACLRoleSetRequest{
-				Datacenter:   "dc1",
-				Role:         *r2,
-				WriteRequest: structs.WriteRequest{Token: "root"},
-			}
-
-			var out structs.ACLRole
-			err = msgpackrpc.CallWithCodec(codec, "ACL.RoleSet", &arg, &out)
-			require.NoError(t, err)
-			require.Equal(t, r2.ID, out.ID)
-
-			r2 = &out
-		}
-
-		resp = structs.ACLRoleBatchResponse{}
-		req = structs.ACLRoleBatchGetRequest{
-			Datacenter:   "dc1",
-			RoleIDs:      []string{r1.ID},
-			RoleNames:    []string{"my-magic-role"},
-			QueryOptions: structs.QueryOptions{Token: token.SecretID},
-		}
-		err = acl.RoleResolve(&req, &resp)
-		require.NoError(t, err)
-		// note the synthetic role is returned now that it exists
 		require.ElementsMatch(t, gatherIDs(t, resp.Roles), []string{r1.ID, r2.ID})
 	})
 }
@@ -3532,7 +3314,7 @@ func TestACLEndpoint_IdentityProviderDelete_RuleAndTokenCascade(t *testing.T) {
 		codec, "root", "dc1",
 		idp1.Name,
 		"serviceaccount.name==abc",
-		structs.BindingRuleRoleBindTypeService,
+		structs.BindingRuleBindTypeService,
 		"abc",
 	)
 	require.NoError(t, err)
@@ -3540,7 +3322,7 @@ func TestACLEndpoint_IdentityProviderDelete_RuleAndTokenCascade(t *testing.T) {
 		codec, "root", "dc1",
 		idp1.Name,
 		"serviceaccount.name==def",
-		structs.BindingRuleRoleBindTypeService,
+		structs.BindingRuleBindTypeService,
 		"def",
 	)
 	require.NoError(t, err)
@@ -3553,7 +3335,7 @@ func TestACLEndpoint_IdentityProviderDelete_RuleAndTokenCascade(t *testing.T) {
 		codec, "root", "dc1",
 		idp2.Name,
 		"serviceaccount.name==abc",
-		structs.BindingRuleRoleBindTypeService,
+		structs.BindingRuleBindTypeService,
 		"abc",
 	)
 	require.NoError(t, err)
@@ -3561,7 +3343,7 @@ func TestACLEndpoint_IdentityProviderDelete_RuleAndTokenCascade(t *testing.T) {
 		codec, "root", "dc1",
 		idp2.Name,
 		"serviceaccount.name==def",
-		structs.BindingRuleRoleBindTypeService,
+		structs.BindingRuleBindTypeService,
 		"def",
 	)
 	require.NoError(t, err)
@@ -3676,7 +3458,8 @@ func TestACLEndpoint_BindingRuleSet(t *testing.T) {
 			Description: "foobar",
 			IDPName:     testIDP.Name,
 			Selector:    "serviceaccount.name==abc",
-			RoleName:    "abc",
+			BindType:    structs.BindingRuleBindTypeService,
+			BindName:    "abc",
 		}
 	}
 
@@ -3729,8 +3512,8 @@ func TestACLEndpoint_BindingRuleSet(t *testing.T) {
 		require.Equal(t, rule.Description, "foobar")
 		require.Equal(t, rule.IDPName, testIDP.Name)
 		require.Equal(t, "serviceaccount.name==abc", rule.Selector)
-		require.Equal(t, "abc", rule.RoleName)
-		require.Equal(t, structs.BindingRuleRoleBindTypeService, rule.RoleBindType)
+		require.Equal(t, structs.BindingRuleBindTypeService, rule.BindType)
+		require.Equal(t, "abc", rule.BindName)
 
 		ruleID = rule.ID
 	})
@@ -3747,8 +3530,8 @@ func TestACLEndpoint_BindingRuleSet(t *testing.T) {
 		reqRule.ID = ruleID
 		reqRule.Description = "foobar modified 1"
 		reqRule.Selector = "serviceaccount.namespace==def"
-		reqRule.RoleName = "def"
-		reqRule.RoleBindType = structs.BindingRuleRoleBindTypeExisting
+		reqRule.BindType = structs.BindingRuleBindTypeRole
+		reqRule.BindName = "def"
 		reqRule.IDPName = "" // clear
 
 		req := structs.ACLBindingRuleSetRequest{
@@ -3771,8 +3554,8 @@ func TestACLEndpoint_BindingRuleSet(t *testing.T) {
 		require.Equal(t, rule.Description, "foobar modified 1")
 		require.Equal(t, rule.IDPName, testIDP.Name)
 		require.Equal(t, "serviceaccount.namespace==def", rule.Selector)
-		require.Equal(t, "def", rule.RoleName)
-		require.Equal(t, structs.BindingRuleRoleBindTypeExisting, rule.RoleBindType)
+		require.Equal(t, structs.BindingRuleBindTypeRole, rule.BindType)
+		require.Equal(t, "def", rule.BindName)
 	})
 
 	t.Run("Update it - specify idp name", func(t *testing.T) {
@@ -3780,8 +3563,8 @@ func TestACLEndpoint_BindingRuleSet(t *testing.T) {
 		reqRule.ID = ruleID
 		reqRule.Description = "foobar modified 2"
 		reqRule.Selector = "serviceaccount.namespace==def"
-		reqRule.RoleName = "def"
-		reqRule.RoleBindType = structs.BindingRuleRoleBindTypeExisting
+		reqRule.BindType = structs.BindingRuleBindTypeRole
+		reqRule.BindName = "def"
 
 		req := structs.ACLBindingRuleSetRequest{
 			Datacenter:   "dc1",
@@ -3803,8 +3586,8 @@ func TestACLEndpoint_BindingRuleSet(t *testing.T) {
 		require.Equal(t, rule.Description, "foobar modified 2")
 		require.Equal(t, rule.IDPName, testIDP.Name)
 		require.Equal(t, "serviceaccount.namespace==def", rule.Selector)
-		require.Equal(t, "def", rule.RoleName)
-		require.Equal(t, structs.BindingRuleRoleBindTypeExisting, rule.RoleBindType)
+		require.Equal(t, structs.BindingRuleBindTypeRole, rule.BindType)
+		require.Equal(t, "def", rule.BindName)
 	})
 
 	t.Run("Create fails; empty idp name", func(t *testing.T) {
@@ -3839,32 +3622,44 @@ func TestACLEndpoint_BindingRuleSet(t *testing.T) {
 		requireSetErrors(t, reqRule)
 	})
 
-	t.Run("Create fails; empty role name", func(t *testing.T) {
+	t.Run("Create fails; empty bind type", func(t *testing.T) {
 		reqRule := newRule()
-		reqRule.RoleName = ""
+		reqRule.BindType = ""
 		requireSetErrors(t, reqRule)
 	})
 
-	t.Run("Create fails; role name with unknown vars", func(t *testing.T) {
+	t.Run("Create fails; empty bind name", func(t *testing.T) {
 		reqRule := newRule()
-		reqRule.RoleName = "k8s-${serviceaccount.bizarroname}"
+		reqRule.BindName = ""
 		requireSetErrors(t, reqRule)
 	})
 
-	t.Run("Create fails; invalid role name no template", func(t *testing.T) {
+	t.Run("Create fails; invalid bind type", func(t *testing.T) {
 		reqRule := newRule()
-		reqRule.RoleName = "-abc:"
+		reqRule.BindType = "invalid"
 		requireSetErrors(t, reqRule)
 	})
 
-	t.Run("Create fails; invalid role name with template", func(t *testing.T) {
+	t.Run("Create fails; bind name with unknown vars", func(t *testing.T) {
 		reqRule := newRule()
-		reqRule.RoleName = "k8s-${serviceaccount.name"
+		reqRule.BindName = "k8s-${serviceaccount.bizarroname}"
 		requireSetErrors(t, reqRule)
 	})
-	t.Run("Create fails; invalid role name after template computed", func(t *testing.T) {
+
+	t.Run("Create fails; invalid bind name no template", func(t *testing.T) {
 		reqRule := newRule()
-		reqRule.RoleName = "k8s-${serviceaccount.name}:blah-"
+		reqRule.BindName = "-abc:"
+		requireSetErrors(t, reqRule)
+	})
+
+	t.Run("Create fails; invalid bind name with template", func(t *testing.T) {
+		reqRule := newRule()
+		reqRule.BindName = "k8s-${serviceaccount.name"
+		requireSetErrors(t, reqRule)
+	})
+	t.Run("Create fails; invalid bind name after template computed", func(t *testing.T) {
+		reqRule := newRule()
+		reqRule.BindName = "k8s-${serviceaccount.name}:blah-"
 		requireSetErrors(t, reqRule)
 	})
 }
@@ -3892,7 +3687,7 @@ func TestACLEndpoint_BindingRuleDelete(t *testing.T) {
 		codec, "root", "dc1",
 		testIDP.Name,
 		"serviceaccount.name==abc",
-		structs.BindingRuleRoleBindTypeService,
+		structs.BindingRuleBindTypeService,
 		"abc",
 	)
 	require.NoError(t, err)
@@ -3955,7 +3750,7 @@ func TestACLEndpoint_BindingRuleList(t *testing.T) {
 		codec, "root", "dc1",
 		testIDP.Name,
 		"serviceaccount.name==abc",
-		structs.BindingRuleRoleBindTypeService,
+		structs.BindingRuleBindTypeService,
 		"abc",
 	)
 	require.NoError(t, err)
@@ -3964,7 +3759,7 @@ func TestACLEndpoint_BindingRuleList(t *testing.T) {
 		codec, "root", "dc1",
 		testIDP.Name,
 		"serviceaccount.name==def",
-		structs.BindingRuleRoleBindTypeService,
+		structs.BindingRuleBindTypeService,
 		"def",
 	)
 	require.NoError(t, err)
@@ -4135,13 +3930,13 @@ func TestACLEndpoint_Login(t *testing.T) {
 	ruleDB, err := upsertTestBindingRule(
 		codec, "root", "dc1", idp.Name,
 		"serviceaccount.namespace==default and serviceaccount.name==db",
-		structs.BindingRuleRoleBindTypeService,
+		structs.BindingRuleBindTypeService,
 		"k8s-${serviceaccount.name}",
 	)
 	_, err = upsertTestBindingRule(
 		codec, "root", "dc1", idp.Name,
 		"serviceaccount.namespace==default and serviceaccount.name==monolith",
-		structs.BindingRuleRoleBindTypeExisting,
+		structs.BindingRuleBindTypeRole,
 		"k8s-${serviceaccount.name}",
 	)
 	require.NoError(t, err)
@@ -4222,7 +4017,7 @@ func TestACLEndpoint_Login(t *testing.T) {
 		requireErrorContains(t, acl.Login(&req, &resp), "Permission denied")
 	})
 
-	t.Run("valid idp token 1 binding must exist and does not exist", func(t *testing.T) {
+	t.Run("valid idp token 1 role binding must exist and does not exist", func(t *testing.T) {
 		req := structs.ACLLoginRequest{
 			Auth: &structs.ACLLoginParams{
 				IDPType:  "kubernetes",
@@ -4255,7 +4050,7 @@ func TestACLEndpoint_Login(t *testing.T) {
 	}
 	s1.purgeIdentityProviderValidators()
 
-	t.Run("valid idp token 1 binding must exist and now exists", func(t *testing.T) {
+	t.Run("valid idp token 1 role binding must exist and now exists", func(t *testing.T) {
 		req := structs.ACLLoginRequest{
 			Auth: &structs.ACLLoginParams{
 				IDPType:  "kubernetes",
@@ -4272,14 +4067,14 @@ func TestACLEndpoint_Login(t *testing.T) {
 		require.Equal(t, idp.Name, resp.IDPName)
 		require.Equal(t, `token created via login: {"pod":"pod1"}`, resp.Description)
 		require.True(t, resp.Local)
+		require.Len(t, resp.ServiceIdentities, 0)
 		require.Len(t, resp.Roles, 1)
 		role := resp.Roles[0]
 		require.Equal(t, monolithRoleID, role.ID)
 		require.Equal(t, "k8s-monolith", role.Name)
-		require.Empty(t, role.BoundName)
 	})
 
-	t.Run("valid idp token 1 binding", func(t *testing.T) {
+	t.Run("valid idp token 1 service binding", func(t *testing.T) {
 		req := structs.ACLLoginRequest{
 			Auth: &structs.ACLLoginParams{
 				IDPType:  "kubernetes",
@@ -4296,21 +4091,21 @@ func TestACLEndpoint_Login(t *testing.T) {
 		require.Equal(t, idp.Name, resp.IDPName)
 		require.Equal(t, `token created via login: {"pod":"pod1"}`, resp.Description)
 		require.True(t, resp.Local)
-		require.Len(t, resp.Roles, 1)
-		role := resp.Roles[0]
-		require.Empty(t, role.ID)
-		require.Empty(t, role.Name)
-		require.Equal(t, "service:k8s-db", role.BoundName)
+		require.Len(t, resp.Roles, 0)
+		require.Len(t, resp.ServiceIdentities, 1)
+		svcid := resp.ServiceIdentities[0]
+		require.Len(t, svcid.Datacenters, 0)
+		require.Equal(t, "k8s-db", svcid.ServiceName)
 	})
 
 	{
 		req := structs.ACLBindingRuleSetRequest{
 			Datacenter: "dc1",
 			BindingRule: structs.ACLBindingRule{
-				IDPName:      ruleDB.IDPName,
-				RoleBindType: structs.BindingRuleRoleBindTypeService,
-				RoleName:     ruleDB.RoleName,
-				Selector:     "",
+				IDPName:  ruleDB.IDPName,
+				BindType: structs.BindingRuleBindTypeService,
+				BindName: ruleDB.BindName,
+				Selector: "",
 			},
 			WriteRequest: structs.WriteRequest{Token: "root"},
 		}
@@ -4336,11 +4131,11 @@ func TestACLEndpoint_Login(t *testing.T) {
 		require.Equal(t, idp.Name, resp.IDPName)
 		require.Equal(t, `token created via login: {"pod":"pod1"}`, resp.Description)
 		require.True(t, resp.Local)
-		require.Len(t, resp.Roles, 1)
-		role := resp.Roles[0]
-		require.Empty(t, role.ID)
-		require.Empty(t, role.Name)
-		require.Equal(t, "service:k8s-db", role.BoundName)
+		require.Len(t, resp.Roles, 0)
+		require.Len(t, resp.ServiceIdentities, 1)
+		svcid := resp.ServiceIdentities[0]
+		require.Len(t, svcid.Datacenters, 0)
+		require.Equal(t, "k8s-db", svcid.ServiceName)
 	})
 
 	{
@@ -4458,12 +4253,12 @@ func TestACLEndpoint_Login_k8s(t *testing.T) {
 	_, err = upsertTestBindingRule(
 		codec, "root", "dc1", idp.Name,
 		"serviceaccount.namespace==default",
-		structs.BindingRuleRoleBindTypeService,
+		structs.BindingRuleBindTypeService,
 		"${serviceaccount.name}",
 	)
 	require.NoError(t, err)
 
-	t.Run("valid idp token 1 binding", func(t *testing.T) {
+	t.Run("valid idp token 1 service binding", func(t *testing.T) {
 		req := structs.ACLLoginRequest{
 			Auth: &structs.ACLLoginParams{
 				IDPType:  "kubernetes",
@@ -4480,11 +4275,11 @@ func TestACLEndpoint_Login_k8s(t *testing.T) {
 		require.Equal(t, idp.Name, resp.IDPName)
 		require.Equal(t, `token created via login: {"pod":"pod1"}`, resp.Description)
 		require.True(t, resp.Local)
-		require.Len(t, resp.Roles, 1)
-		role := resp.Roles[0]
-		require.Empty(t, role.ID)
-		require.Empty(t, role.Name)
-		require.Equal(t, "service:demo", role.BoundName)
+		require.Len(t, resp.Roles, 0)
+		require.Len(t, resp.ServiceIdentities, 1)
+		svcid := resp.ServiceIdentities[0]
+		require.Len(t, svcid.Datacenters, 0)
+		require.Equal(t, "demo", svcid.ServiceName)
 	})
 
 	// annotate the account
@@ -4496,7 +4291,7 @@ func TestACLEndpoint_Login_k8s(t *testing.T) {
 		goodJWT_B,
 	)
 
-	t.Run("valid idp token 1 binding", func(t *testing.T) {
+	t.Run("valid idp token 1 service binding - with annotation", func(t *testing.T) {
 		req := structs.ACLLoginRequest{
 			Auth: &structs.ACLLoginParams{
 				IDPType:  "kubernetes",
@@ -4513,11 +4308,11 @@ func TestACLEndpoint_Login_k8s(t *testing.T) {
 		require.Equal(t, idp.Name, resp.IDPName)
 		require.Equal(t, `token created via login: {"pod":"pod1"}`, resp.Description)
 		require.True(t, resp.Local)
-		require.Len(t, resp.Roles, 1)
-		role := resp.Roles[0]
-		require.Empty(t, role.ID)
-		require.Empty(t, role.Name)
-		require.Equal(t, "service:alternate-name", role.BoundName)
+		require.Len(t, resp.Roles, 0)
+		require.Len(t, resp.ServiceIdentities, 1)
+		svcid := resp.ServiceIdentities[0]
+		require.Len(t, svcid.Datacenters, 0)
+		require.Equal(t, "alternate-name", svcid.ServiceName)
 	})
 }
 
@@ -4562,7 +4357,7 @@ func TestACLEndpoint_Logout(t *testing.T) {
 	_, err = upsertTestBindingRule(
 		codec, "root", "dc1", idp.Name,
 		"",
-		structs.BindingRuleRoleBindTypeService,
+		structs.BindingRuleBindTypeService,
 		"k8s-${serviceaccount.name}",
 	)
 	require.NoError(t, err)
@@ -4674,52 +4469,66 @@ func gatherIDs(t *testing.T, v interface{}) []string {
 	return out
 }
 
-func TestIsValidBindingRuleRoleName(t *testing.T) {
+func TestValidateBindingRuleBindName(t *testing.T) {
 	for _, test := range []struct {
-		name  string
-		in    string
-		keys  string
-		valid bool // passes role regexp
-		err   bool // invalid HIL
+		name     string
+		bindType string
+		bindName string
+		fields   string
+		valid    bool // valid HIL, invalid contents
+		err      bool // invalid HIL
 	}{
+		// ------------ misc --------------
+		{"no bind type",
+			"", "", "", false, false},
+		{"bad bind type",
+			"invalid", "blah", "", false, true},
+		// ------------ type:role --------------
 		// valid HIL, invalid role
 		{"empty",
-			"", "", false, false},
+			"role", "", "", false, false},
 		{"just end",
-			"}", "", false, false},
+			"role", "}", "", false, false},
 		{"var without start",
-			" item }", "item", false, false},
+			"role", " item }", "item", false, false},
 		{"two vars missing second start",
-			"before-${ item }after--more }", "item,more", false, false},
+			"role", "before-${ item }after--more }", "item,more", false, false},
 		// valid HIL, valid role
 		{"no vars",
-			"nothing", "", true, false},
+			"role", "nothing", "", true, false},
 		{"just var",
-			"${item}", "item", true, false},
+			"role", "${item}", "item", true, false},
 		{"var in middle",
-			"before-${item}after", "item", true, false},
+			"role", "before-${item}after", "item", true, false},
 		{"two vars",
-			"before-${item}after-${more}", "item,more", true, false},
+			"role", "before-${item}after-${more}", "item,more", true, false},
 		// bad
+		{"no bind name",
+			"role", "", "", false, false},
 		{"just start",
-			"${", "", false, true},
+			"role", "${", "", false, true},
 		{"backwards",
-			"}${", "", false, true},
+			"role", "}${", "", false, true},
 		{"no varname",
-			"${}", "", false, true},
+			"role", "${}", "", false, true},
 		{"missing map key",
-			"${item}", "", false, true},
+			"role", "${item}", "", false, true},
 		{"var without end",
-			"${ item ", "item", false, true},
+			"role", "${ item ", "item", false, true},
 		{"two vars missing first end",
-			"before-${ item after-${ more }", "item,more", false, true},
+			"role", "before-${ item after-${ more }", "item,more", false, true},
+		// ------------ type:service --------------
+		// TODO: test service flavor
 	} {
-		t.Run(test.name, func(t *testing.T) {
-			keys := strings.Split(test.keys, ",")
-			valid, err := isValidBindingRuleRoleName(test.in, keys)
+		t.Run(test.name+"--"+test.bindType, func(t *testing.T) {
+			valid, err := validateBindingRuleBindName(
+				test.bindType,
+				test.bindName,
+				strings.Split(test.fields, ","),
+			)
 			if test.err {
 				require.NotNil(t, err)
-				// valid flag is "undefined"
+				require.False(t, valid)
 			} else {
 				require.NoError(t, err)
 				require.Equal(t, test.valid, valid)
@@ -5051,16 +4860,16 @@ func upsertTestBindingRule(
 	datacenter string,
 	idpName string,
 	selector string,
-	roleBindType string,
-	roleName string,
+	bindType string,
+	bindName string,
 ) (*structs.ACLBindingRule, error) {
 	req := structs.ACLBindingRuleSetRequest{
 		Datacenter: datacenter,
 		BindingRule: structs.ACLBindingRule{
-			IDPName:      idpName,
-			RoleBindType: roleBindType,
-			RoleName:     roleName,
-			Selector:     selector,
+			IDPName:  idpName,
+			BindType: bindType,
+			BindName: bindName,
+			Selector: selector,
 		},
 		WriteRequest: structs.WriteRequest{Token: masterToken},
 	}

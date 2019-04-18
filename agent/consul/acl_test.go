@@ -139,28 +139,6 @@ func testIdentityForToken(token string) (bool, structs.ACLIdentity, error) {
 				},
 			},
 		}, nil
-	case "idp-token-bound-role-synthetic":
-		return true, &structs.ACLToken{
-			AccessorID: "2f77cc72-eb72-4c71-99db-da66e41e747a",
-			SecretID:   "b1705cce-38e6-4c75-a0c5-3978e95acfd4",
-			IDPName:    "k8s",
-			Roles: []structs.ACLTokenRoleLink{
-				structs.ACLTokenRoleLink{
-					BoundName: "service:synthetic",
-				},
-			},
-		}, nil
-	case "idp-token-bound-role-real":
-		return true, &structs.ACLToken{
-			AccessorID: "6ff27c85-5519-4522-8754-98d129dcba32",
-			SecretID:   "5303a1cf-f6a4-42fe-ab81-0a9b88a71e73",
-			IDPName:    "k8s",
-			Roles: []structs.ACLTokenRoleLink{
-				structs.ACLTokenRoleLink{
-					BoundName: "service:acl-ro",
-				},
-			},
-		}, nil
 	case "acl-ro":
 		return true, &structs.ACLToken{
 			AccessorID: "435a75af-1763-4980-89f4-f0951dda53b4",
@@ -529,13 +507,6 @@ func (d *ACLResolverTestDelegate) plainRoleResolveFn(args *structs.ACLRoleBatchG
 			reply.Roles = append(reply.Roles, role)
 		}
 	}
-	for _, roleName := range args.RoleNames {
-		// This is sane because the test role IDs == role Names
-		_, role, _ := testRoleForID(roleName)
-		if role != nil {
-			reply.Roles = append(reply.Roles, role)
-		}
-	}
 
 	return nil
 }
@@ -574,14 +545,6 @@ func (d *ACLResolverTestDelegate) ResolveRoleFromID(roleID string) (bool, *struc
 	}
 
 	return testRoleForID(roleID)
-}
-
-func (d *ACLResolverTestDelegate) ResolveRoleFromName(roleName string) (bool, *structs.ACLRole, error) {
-	if !d.localRoles {
-		return false, nil, nil
-	}
-
-	return testRoleForID(roleName) // this makes sense since all role ID == role Names
 }
 
 func (d *ACLResolverTestDelegate) RPC(method string, args interface{}, reply interface{}) error {
@@ -1645,31 +1608,6 @@ func testACLResolver_variousTokens(t *testing.T, delegate *ACLResolverTestDelega
 		require.False(t, authz.ACLRead())
 		require.True(t, authz.NodeWrite("foo", nil))
 		require.True(t, authz.ServiceRead("bar"))
-	})
-
-	runTwiceAndReset("IDP-linked with synthetic Bound Role", func(t *testing.T) {
-		authz, err := r.ResolveToken("idp-token-bound-role-synthetic")
-		require.NotNil(t, authz)
-		require.NoError(t, err)
-		require.False(t, authz.ACLRead())
-		// service identity privileges unrolled below
-		require.True(t, authz.NodeRead("any"))
-		require.True(t, authz.ServiceRead("any"))
-		require.True(t, authz.ServiceWrite("synthetic", nil))
-		require.True(t, authz.ServiceWrite("synthetic-sidecar-proxy", nil))
-	})
-
-	runTwiceAndReset("IDP-linked with real Bound Role", func(t *testing.T) {
-		authz, err := r.ResolveToken("idp-token-bound-role-real")
-		require.NotNil(t, authz)
-		require.NoError(t, err)
-		// actual privileges on real role are granted
-		require.True(t, authz.ACLRead())
-		// service identity privileges unrolled below and NOT granted
-		require.False(t, authz.NodeRead("any"))
-		require.False(t, authz.ServiceRead("any"))
-		require.False(t, authz.ServiceWrite("synthetic", nil))
-		require.False(t, authz.ServiceWrite("synthetic-sidecar-proxy", nil))
 	})
 
 	runTwiceAndReset("Anonymous", func(t *testing.T) {

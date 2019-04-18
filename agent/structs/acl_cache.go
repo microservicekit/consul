@@ -21,7 +21,6 @@ type ACLCaches struct {
 	policies       *lru.TwoQueueCache // policy ID -> ACLPolicy
 	authorizers    *lru.TwoQueueCache // token secret -> acl.Authorizer
 	roles          *lru.TwoQueueCache // role ID -> ACLRole
-	rolesByName    *lru.TwoQueueCache // role name -> ACLRole
 }
 
 type IdentityCacheEntry struct {
@@ -61,7 +60,6 @@ func (e *AuthorizerCacheEntry) Age() time.Duration {
 	return time.Since(e.CacheTime)
 }
 
-// RoleCacheEntry is the payload for by by-id and by-name caches.
 type RoleCacheEntry struct {
 	Role      *ACLRole
 	CacheTime time.Time
@@ -111,17 +109,12 @@ func NewACLCaches(config *ACLCachesConfig) (*ACLCaches, error) {
 	}
 
 	if config != nil && config.Roles > 0 {
-		var err error
-
-		cache.roles, err = lru.New2Q(config.Roles)
+		roleCache, err := lru.New2Q(config.Roles)
 		if err != nil {
 			return nil, err
 		}
 
-		cache.rolesByName, err = lru.New2Q(config.Roles)
-		if err != nil {
-			return nil, err
-		}
+		cache.roles = roleCache
 	}
 
 	return cache, nil
@@ -179,26 +172,13 @@ func (c *ACLCaches) GetAuthorizer(id string) *AuthorizerCacheEntry {
 	return nil
 }
 
-// GetRoleByID fetches a role from the cache by id and returns it
-func (c *ACLCaches) GetRoleByID(roleID string) *RoleCacheEntry {
+// GetRole fetches a role from the cache by id and returns it
+func (c *ACLCaches) GetRole(roleID string) *RoleCacheEntry {
 	if c == nil || c.roles == nil {
 		return nil
 	}
 
 	if raw, ok := c.roles.Get(roleID); ok {
-		return raw.(*RoleCacheEntry)
-	}
-
-	return nil
-}
-
-// GetRoleByName fetches a role from the cache by name and returns it
-func (c *ACLCaches) GetRoleByName(roleName string) *RoleCacheEntry {
-	if c == nil || c.rolesByName == nil {
-		return nil
-	}
-
-	if raw, ok := c.rolesByName.Get(roleName); ok {
 		return raw.(*RoleCacheEntry)
 	}
 
@@ -246,19 +226,12 @@ func (c *ACLCaches) PutAuthorizerWithTTL(id string, authorizer acl.Authorizer, t
 	c.authorizers.Add(id, &AuthorizerCacheEntry{Authorizer: authorizer, CacheTime: time.Now(), TTL: ttl})
 }
 
-func (c *ACLCaches) PutRole(roleID, roleName string, role *ACLRole) {
-	if c == nil {
+func (c *ACLCaches) PutRole(roleID string, role *ACLRole) {
+	if c == nil || c.roles == nil {
 		return
 	}
-	if role != nil && role.ID == "" {
-		return // safety check to avoid caching synthetic roles
-	}
-	if c.roles != nil && roleID != "" {
-		c.roles.Add(roleID, &RoleCacheEntry{Role: role, CacheTime: time.Now()})
-	}
-	if c.rolesByName != nil && roleName != "" {
-		c.rolesByName.Add(roleName, &RoleCacheEntry{Role: role, CacheTime: time.Now()})
-	}
+
+	c.roles.Add(roleID, &RoleCacheEntry{Role: role, CacheTime: time.Now()})
 }
 
 func (c *ACLCaches) RemoveIdentity(id string) {
@@ -273,15 +246,9 @@ func (c *ACLCaches) RemovePolicy(policyID string) {
 	}
 }
 
-func (c *ACLCaches) RemoveRole(roleID, roleName string) {
-	if c == nil {
-		return
-	}
-	if c.roles != nil && roleID != "" {
+func (c *ACLCaches) RemoveRole(roleID string) {
+	if c != nil && c.roles != nil {
 		c.roles.Remove(roleID)
-	}
-	if c.rolesByName != nil && roleName != "" {
-		c.rolesByName.Remove(roleName)
 	}
 }
 
@@ -301,9 +268,6 @@ func (c *ACLCaches) Purge() {
 		}
 		if c.roles != nil {
 			c.roles.Purge()
-		}
-		if c.rolesByName != nil {
-			c.rolesByName.Purge()
 		}
 	}
 }

@@ -45,7 +45,6 @@ func TestBindingRuleListCommand(t *testing.T) {
 	defer a.Shutdown()
 	testrpc.WaitForLeader(t, a.RPC, "dc1")
 
-	// Create a couple roles to list
 	client := a.Client()
 
 	{
@@ -81,7 +80,8 @@ func TestBindingRuleListCommand(t *testing.T) {
 			&api.ACLBindingRule{
 				IDPName:     idpName,
 				Description: description,
-				RoleName:    "k8s-${serviceaccount.name}",
+				BindType:    api.BindingRuleBindTypeService,
+				BindName:    "k8s-${serviceaccount.name}",
 				Selector:    "serviceaccount.namespace==default",
 			},
 			&api.WriteOptions{Token: "root"},

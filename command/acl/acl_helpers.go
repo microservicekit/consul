@@ -29,11 +29,7 @@ func PrintToken(token *api.ACLToken, ui cli.Ui, showMeta bool) {
 	}
 	ui.Info(fmt.Sprintf("Roles:"))
 	for _, role := range token.Roles {
-		if role.BoundName == "" {
-			ui.Info(fmt.Sprintf("   %s - %s", role.ID, role.Name))
-		} else {
-			ui.Info(fmt.Sprintf("   %s", role.BoundName))
-		}
+		ui.Info(fmt.Sprintf("   %s - %s", role.ID, role.Name))
 	}
 	ui.Info(fmt.Sprintf("Service Identities:"))
 	for _, svcid := range token.ServiceIdentities {
@@ -69,11 +65,7 @@ func PrintTokenListEntry(token *api.ACLTokenListEntry, ui cli.Ui, showMeta bool)
 	}
 	ui.Info(fmt.Sprintf("Roles:"))
 	for _, role := range token.Roles {
-		if role.BoundName == "" {
-			ui.Info(fmt.Sprintf("   %s - %s", role.ID, role.Name))
-		} else {
-			ui.Info(fmt.Sprintf("   %s", role.BoundName))
-		}
+		ui.Info(fmt.Sprintf("   %s - %s", role.ID, role.Name))
 	}
 	ui.Info(fmt.Sprintf("Service Identities:"))
 	for _, svcid := range token.ServiceIdentities {
@@ -197,8 +189,8 @@ func PrintBindingRule(rule *api.ACLBindingRule, ui cli.Ui, showMeta bool) {
 	ui.Info(fmt.Sprintf("ID:           %s", rule.ID))
 	ui.Info(fmt.Sprintf("IDPName:      %s", rule.IDPName))
 	ui.Info(fmt.Sprintf("Description:  %s", rule.Description))
-	ui.Info(fmt.Sprintf("RoleBindType: %s", rule.RoleBindType))
-	ui.Info(fmt.Sprintf("RoleName:     %s", rule.RoleName))
+	ui.Info(fmt.Sprintf("BindType:     %s", rule.BindType))
+	ui.Info(fmt.Sprintf("BindName:     %s", rule.BindName))
 	ui.Info(fmt.Sprintf("Selector:     %s", rule.Selector))
 	if showMeta {
 		ui.Info(fmt.Sprintf("Create Index: %d", rule.CreateIndex))
@@ -210,8 +202,8 @@ func PrintBindingRuleListEntry(rule *api.ACLBindingRule, ui cli.Ui, showMeta boo
 	ui.Info(fmt.Sprintf("%s:", rule.ID))
 	ui.Info(fmt.Sprintf("   IDPName:      %s", rule.IDPName))
 	ui.Info(fmt.Sprintf("   Description:  %s", rule.Description))
-	ui.Info(fmt.Sprintf("   RoleBindType: %s", rule.RoleBindType))
-	ui.Info(fmt.Sprintf("   RoleName:     %s", rule.RoleName))
+	ui.Info(fmt.Sprintf("   BindType:     %s", rule.BindType))
+	ui.Info(fmt.Sprintf("   BindName:     %s", rule.BindName))
 	ui.Info(fmt.Sprintf("   Selector:     %s", rule.Selector))
 	if showMeta {
 		ui.Info(fmt.Sprintf("   Create Index: %d", rule.CreateIndex))
