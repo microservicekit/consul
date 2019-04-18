@@ -75,7 +75,7 @@ func (c *cmd) init() {
 		&c.roleName,
 		"role-name",
 		"",
-		"Name of role to bind on match. Can use {{var}} interpolation. "+
+		"Name of role to bind on match. Can use ${var} interpolation. "+
 			"This flag is required.",
 	)
 
@@ -203,6 +203,6 @@ Usage: consul acl binding-rule update -id ID [options]
             -id=43cb72df-9c6f-4315-ac8a-01a9d98155ef \
             -description="new description" \
             -role-bind-type=existing \
-            -role-name="k8s-{{serviceaccount.name}}" \
+            -role-name='k8s-${serviceaccount.name}' \
             -selector='serviceaccount.namespace==default and serviceaccount.name==web'
 `

@@ -72,7 +72,7 @@ func (c *cmd) init() {
 		&c.roleName,
 		"role-name",
 		"",
-		"Name of role to bind on match. Can use {{var}} interpolation. "+
+		"Name of role to bind on match. Can use ${var} interpolation. "+
 			"This flag is required.",
 	)
 
@@ -138,6 +138,6 @@ Usage: consul acl binding-rule create [options]
 
      $ consul acl binding-rule create \
             -idp-name=minikube \
-            -role-name="k8s-{{serviceaccount.name}}" \
+            -role-name='k8s-${serviceaccount.name}' \
             -selector='serviceaccount.namespace==default and serviceaccount.name==web'
 `

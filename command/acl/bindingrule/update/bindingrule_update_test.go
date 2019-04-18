@@ -136,7 +136,7 @@ func TestBindingRuleUpdateCommand(t *testing.T) {
 				IDPName:      "k8s",
 				Description:  "test rule",
 				RoleBindType: api.BindingRuleRoleBindTypeService,
-				RoleName:     "k8s-{{serviceaccount.name}}",
+				RoleName:     "k8s-${serviceaccount.name}",
 				Selector:     "serviceaccount.namespace==default",
 			},
 			&api.WriteOptions{Token: "root"},
@@ -330,7 +330,7 @@ func TestBindingRuleUpdateCommand(t *testing.T) {
 		require.NotNil(t, rule)
 
 		require.Equal(t, "test rule edited", rule.Description)
-		require.Equal(t, "k8s-{{serviceaccount.name}}", rule.RoleName)
+		require.Equal(t, "k8s-${serviceaccount.name}", rule.RoleName)
 		require.Equal(t, api.BindingRuleRoleBindTypeExisting, rule.RoleBindType)
 		require.Equal(t, "serviceaccount.namespace==alt and serviceaccount.name==demo", rule.Selector)
 	})
@@ -546,7 +546,7 @@ func TestBindingRuleUpdateCommand_noMerge(t *testing.T) {
 				IDPName:      "k8s",
 				Description:  "test rule",
 				RoleBindType: api.BindingRuleRoleBindTypeExisting,
-				RoleName:     "k8s-{{serviceaccount.name}}",
+				RoleName:     "k8s-${serviceaccount.name}",
 				Selector:     "serviceaccount.namespace==default",
 			},
 			&api.WriteOptions{Token: "root"},

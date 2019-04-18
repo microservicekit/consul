@@ -130,7 +130,7 @@ func TestLogoutCommand(t *testing.T) {
 	{
 		_, _, err := client.ACL().BindingRuleCreate(&api.ACLBindingRule{
 			IDPName:  "k8s",
-			RoleName: "{{serviceaccount.name}}",
+			RoleName: "${serviceaccount.name}",
 		},
 			&api.WriteOptions{Token: "root"},
 		)

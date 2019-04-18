@@ -3847,7 +3847,7 @@ func TestACLEndpoint_BindingRuleSet(t *testing.T) {
 
 	t.Run("Create fails; role name with unknown vars", func(t *testing.T) {
 		reqRule := newRule()
-		reqRule.RoleName = "k8s-{{ serviceaccount.bizarroname }}"
+		reqRule.RoleName = "k8s-${serviceaccount.bizarroname}"
 		requireSetErrors(t, reqRule)
 	})
 
@@ -3859,12 +3859,12 @@ func TestACLEndpoint_BindingRuleSet(t *testing.T) {
 
 	t.Run("Create fails; invalid role name with template", func(t *testing.T) {
 		reqRule := newRule()
-		reqRule.RoleName = "k8s-{{ serviceaccount.name"
+		reqRule.RoleName = "k8s-${serviceaccount.name"
 		requireSetErrors(t, reqRule)
 	})
 	t.Run("Create fails; invalid role name after template computed", func(t *testing.T) {
 		reqRule := newRule()
-		reqRule.RoleName = "k8s-{{ serviceaccount.name }}:blah-"
+		reqRule.RoleName = "k8s-${serviceaccount.name}:blah-"
 		requireSetErrors(t, reqRule)
 	})
 }
@@ -4136,13 +4136,13 @@ func TestACLEndpoint_Login(t *testing.T) {
 		codec, "root", "dc1", idp.Name,
 		"serviceaccount.namespace==default and serviceaccount.name==db",
 		structs.BindingRuleRoleBindTypeService,
-		"k8s-{{serviceaccount.name}}",
+		"k8s-${serviceaccount.name}",
 	)
 	_, err = upsertTestBindingRule(
 		codec, "root", "dc1", idp.Name,
 		"serviceaccount.namespace==default and serviceaccount.name==monolith",
 		structs.BindingRuleRoleBindTypeExisting,
-		"k8s-{{serviceaccount.name}}",
+		"k8s-${serviceaccount.name}",
 	)
 	require.NoError(t, err)
 
@@ -4459,7 +4459,7 @@ func TestACLEndpoint_Login_k8s(t *testing.T) {
 		codec, "root", "dc1", idp.Name,
 		"serviceaccount.namespace==default",
 		structs.BindingRuleRoleBindTypeService,
-		"{{serviceaccount.name}}",
+		"${serviceaccount.name}",
 	)
 	require.NoError(t, err)
 
@@ -4563,7 +4563,7 @@ func TestACLEndpoint_Logout(t *testing.T) {
 		codec, "root", "dc1", idp.Name,
 		"",
 		structs.BindingRuleRoleBindTypeService,
-		"k8s-{{serviceaccount.name}}",
+		"k8s-${serviceaccount.name}",
 	)
 	require.NoError(t, err)
 
@@ -4672,6 +4672,60 @@ func gatherIDs(t *testing.T, v interface{}) []string {
 		t.Fatalf("unknown type: %T", x)
 	}
 	return out
+}
+
+func TestIsValidBindingRuleRoleName(t *testing.T) {
+	for _, test := range []struct {
+		name  string
+		in    string
+		keys  string
+		valid bool // passes role regexp
+		err   bool // invalid HIL
+	}{
+		// valid HIL, invalid role
+		{"empty",
+			"", "", false, false},
+		{"just end",
+			"}", "", false, false},
+		{"var without start",
+			" item }", "item", false, false},
+		{"two vars missing second start",
+			"before-${ item }after--more }", "item,more", false, false},
+		// valid HIL, valid role
+		{"no vars",
+			"nothing", "", true, false},
+		{"just var",
+			"${item}", "item", true, false},
+		{"var in middle",
+			"before-${item}after", "item", true, false},
+		{"two vars",
+			"before-${item}after-${more}", "item,more", true, false},
+		// bad
+		{"just start",
+			"${", "", false, true},
+		{"backwards",
+			"}${", "", false, true},
+		{"no varname",
+			"${}", "", false, true},
+		{"missing map key",
+			"${item}", "", false, true},
+		{"var without end",
+			"${ item ", "item", false, true},
+		{"two vars missing first end",
+			"before-${ item after-${ more }", "item,more", false, true},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			keys := strings.Split(test.keys, ",")
+			valid, err := isValidBindingRuleRoleName(test.in, keys)
+			if test.err {
+				require.NotNil(t, err)
+				// valid flag is "undefined"
+			} else {
+				require.NoError(t, err)
+				require.Equal(t, test.valid, valid)
+			}
+		})
+	}
 }
 
 // upsertTestToken creates a token for testing purposes

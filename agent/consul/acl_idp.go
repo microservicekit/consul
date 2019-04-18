@@ -155,9 +155,11 @@ func (s *Server) evaluateRoleBindings(validator IdentityProviderValidator, verif
 	// For all matching rules compute the role links.
 	var roleLinks []structs.ACLTokenRoleLink
 	for _, rule := range matchingRules {
-		roleName, err := simpleInterpolateVars(rule.RoleName, verifiedFields)
+		roleName, valid, err := computeBindingRuleRoleName(rule.RoleName, verifiedFields)
 		if err != nil {
 			return nil, fmt.Errorf("cannot compute role name for bind target: %v", err)
+		} else if !valid {
+			return nil, fmt.Errorf("computed role name for bind target is invalid: %q", roleName)
 		}
 
 		switch rule.RoleBindType {

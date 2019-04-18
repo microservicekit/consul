@@ -592,6 +592,40 @@ func (a *ACL) tokenSetInternal(args *structs.ACLTokenSetRequest, reply *structs.
 	return nil
 }
 
+// computeBindingRuleRoleName processes the HIL for the provided role name
+// using the verified fields.
+//
+// - If the HIL is invalid ("", false, AN_ERROR) is returned.
+// - If the computed role name is not valid ("INVALID_ROLE_NAME", false, nil) is returned.
+// - If the computed role name is valid ("ROLE_NAME", true, nil) is returned.
+func computeBindingRuleRoleName(roleName string, verifiedFields map[string]string) (string, bool, error) {
+	roleName, err := InterpolateHIL(roleName, verifiedFields)
+	if err != nil {
+		return "", false, err
+	}
+	if !validRoleName.MatchString(roleName) {
+		return "", false, nil
+	}
+	return roleName, true, nil
+}
+
+func isValidBindingRuleRoleName(roleName string, availableFields []string) (bool, error) {
+	if roleName == "" {
+		return false, nil
+	}
+
+	fakeVarMap := make(map[string]string)
+	for _, v := range availableFields {
+		fakeVarMap[v] = "fake"
+	}
+
+	_, valid, err := computeBindingRuleRoleName(roleName, fakeVarMap)
+	if err != nil {
+		return false, err
+	}
+	return valid, nil
+}
+
 // isValidServiceIdentityName returns true if the provided name can be used as
 // an ACLServiceIdentity ServiceName. This is more restrictive than standard
 // catalog registration, which basically takes the view that "everything is
@@ -1627,7 +1661,8 @@ func (a *ACL) BindingRuleSet(args *structs.ACLBindingRuleSetRequest, reply *stru
 	if rule.RoleName == "" {
 		return fmt.Errorf("Invalid Binding Rule: no RoleName is set")
 	}
-	if valid, err := isValidBindingRuleRoleName(validator, idp.Type, rule.RoleName); err != nil {
+
+	if valid, err := isValidBindingRuleRoleName(rule.RoleName, validator.AvailableFields()); err != nil {
 		return fmt.Errorf("binding rule role name is invalid: %v", err)
 	} else if !valid {
 		return fmt.Errorf("binding rule role name is invalid")
@@ -1651,67 +1686,6 @@ func (a *ACL) BindingRuleSet(args *structs.ACLBindingRuleSetRequest, reply *stru
 	}
 
 	return nil
-}
-
-func isValidBindingRuleRoleName(validator IdentityProviderValidator, idpType, roleName string) (bool, error) {
-	if idpType == "" || roleName == "" {
-		return false, nil
-	}
-
-	vars, err := simpleCollectVars(roleName)
-	if err != nil {
-		return false, err
-	}
-
-	if len(vars) == 0 {
-		return validRoleName.MatchString(roleName), nil
-	}
-
-	allowed := validator.AvailableFields()
-	unknown := setDiff(vars, allowed)
-	if len(unknown) > 0 {
-		return false, fmt.Errorf("contains unknown variables: %v", unknown)
-	}
-
-	// Convert the template into a real name to verify the overall template
-	// structure.
-	fakeVars := make(map[string]string)
-	for _, v := range vars {
-		fakeVars[v] = "fake"
-	}
-
-	generatedName, err := simpleInterpolateVars(roleName, fakeVars)
-	if err != nil {
-		return false, err
-	}
-
-	return validRoleName.MatchString(generatedName), nil
-}
-
-// setDiff(A, B) removes the elements in B from A and returns the result.
-//
-// This should only be used on slices that are VERY short.
-func setDiff(a, b []string) []string {
-	if len(b) == 0 {
-		return nil
-	}
-
-	var retained []string
-
-	for _, av := range a {
-		found := false
-		for _, bv := range b {
-			if av == bv {
-				found = true
-				break
-			}
-		}
-		if !found {
-			retained = append(retained, av)
-		}
-	}
-
-	return retained
 }
 
 func (a *ACL) BindingRuleDelete(args *structs.ACLBindingRuleDeleteRequest, reply *bool) error {

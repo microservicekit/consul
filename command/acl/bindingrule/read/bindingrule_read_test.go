@@ -69,7 +69,7 @@ func TestBindingRuleReadCommand(t *testing.T) {
 			&api.ACLBindingRule{
 				IDPName:     "k8s",
 				Description: "test rule",
-				RoleName:    "k8s-{{serviceaccount.name}}",
+				RoleName:    "k8s-${serviceaccount.name}",
 				Selector:    "serviceaccount.namespace==default",
 			},
 			&api.WriteOptions{Token: "root"},

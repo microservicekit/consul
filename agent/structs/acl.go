@@ -909,7 +909,7 @@ type ACLBindingRule struct {
 	RoleBindType string
 
 	// RoleName is the named ACL Role to bind to. Can be lightly templated
-	// using {{ foo }} syntax from available field names.
+	// using HIL ${foo} syntax from available field names.
 	RoleName string
 
 	// Embedded Raft Metadata
