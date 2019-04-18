@@ -1167,7 +1167,7 @@ func TestACLEndpoint_TokenSet(t *testing.T) {
 		}
 
 		ca := connect.TestCA(t, nil)
-		idp, err := upsertTestIDP(codec, "root", "dc1", ca.RootCert)
+		idp, err := upsertTestIDP(codec, "root", "dc1", ca.RootCert, "", "")
 
 		req := structs.ACLTokenSetRequest{
 			Datacenter: "dc1",
@@ -1211,7 +1211,7 @@ func TestACLEndpoint_TokenSet(t *testing.T) {
 		acl := ACL{srv: s1}
 
 		ca := connect.TestCA(t, nil)
-		idp, err := upsertTestIDP(codec, "root", "dc1", ca.RootCert)
+		idp, err := upsertTestIDP(codec, "root", "dc1", ca.RootCert, "", "")
 
 		req := structs.ACLTokenSetRequest{
 			Datacenter: "dc1",
@@ -3013,7 +3013,7 @@ func TestACLEndpoint_RoleResolve(t *testing.T) {
 
 	ca := connect.TestCA(t, nil)
 
-	existingIDP, err := upsertTestIDP(codec, "root", "dc1", ca.RootCert)
+	existingIDP, err := upsertTestIDP(codec, "root", "dc1", ca.RootCert, "", "")
 	require.NoError(t, err)
 
 	t.Run("Normal", func(t *testing.T) {
@@ -3451,7 +3451,7 @@ func TestACLEndpoint_IdentityProviderDelete(t *testing.T) {
 
 	ca := connect.TestCA(t, nil)
 
-	existingIDP, err := upsertTestIDP(codec, "root", "dc1", ca.RootCert)
+	existingIDP, err := upsertTestIDP(codec, "root", "dc1", ca.RootCert, "", "")
 	require.NoError(t, err)
 
 	acl := ACL{srv: s1}
@@ -3526,7 +3526,7 @@ func TestACLEndpoint_IdentityProviderDelete_RuleAndTokenCascade(t *testing.T) {
 		return &resp
 	}
 
-	idp1, err := upsertTestIDP(codec, "root", "dc1", ca.RootCert)
+	idp1, err := upsertTestIDP(codec, "root", "dc1", ca.RootCert, "", "")
 	require.NoError(t, err)
 	i1_r1, err := upsertTestBindingRule(
 		codec, "root", "dc1",
@@ -3547,7 +3547,7 @@ func TestACLEndpoint_IdentityProviderDelete_RuleAndTokenCascade(t *testing.T) {
 	i1_t1 := createToken(idp1.Name)
 	i1_t2 := createToken(idp1.Name)
 
-	idp2, err := upsertTestIDP(codec, "root", "dc1", ca.RootCert)
+	idp2, err := upsertTestIDP(codec, "root", "dc1", ca.RootCert, "", "")
 	require.NoError(t, err)
 	i2_r1, err := upsertTestBindingRule(
 		codec, "root", "dc1",
@@ -3627,10 +3627,10 @@ func TestACLEndpoint_IdentityProviderList(t *testing.T) {
 
 	ca := connect.TestCA(t, nil)
 
-	i1, err := upsertTestIDP(codec, "root", "dc1", ca.RootCert)
+	i1, err := upsertTestIDP(codec, "root", "dc1", ca.RootCert, "", "")
 	require.NoError(t, err)
 
-	i2, err := upsertTestIDP(codec, "root", "dc1", ca.RootCert)
+	i2, err := upsertTestIDP(codec, "root", "dc1", ca.RootCert, "", "")
 	require.NoError(t, err)
 
 	acl := ACL{srv: s1}
@@ -3666,9 +3666,9 @@ func TestACLEndpoint_BindingRuleSet(t *testing.T) {
 	var ruleID string
 
 	ca := connect.TestCA(t, nil)
-	testIDP, err := upsertTestIDP(codec, "root", "dc1", ca.RootCert)
+	testIDP, err := upsertTestIDP(codec, "root", "dc1", ca.RootCert, "", "")
 	require.NoError(t, err)
-	otherTestIDP, err := upsertTestIDP(codec, "root", "dc1", ca.RootCert)
+	otherTestIDP, err := upsertTestIDP(codec, "root", "dc1", ca.RootCert, "", "")
 	require.NoError(t, err)
 
 	newRule := func() structs.ACLBindingRule {
@@ -3885,7 +3885,7 @@ func TestACLEndpoint_BindingRuleDelete(t *testing.T) {
 	testrpc.WaitForLeader(t, s1.RPC, "dc1")
 
 	ca := connect.TestCA(t, nil)
-	testIDP, err := upsertTestIDP(codec, "root", "dc1", ca.RootCert)
+	testIDP, err := upsertTestIDP(codec, "root", "dc1", ca.RootCert, "", "")
 	require.NoError(t, err)
 
 	existingRule, err := upsertTestBindingRule(
@@ -3948,7 +3948,7 @@ func TestACLEndpoint_BindingRuleList(t *testing.T) {
 	testrpc.WaitForLeader(t, s1.RPC, "dc1")
 
 	ca := connect.TestCA(t, nil)
-	testIDP, err := upsertTestIDP(codec, "root", "dc1", ca.RootCert)
+	testIDP, err := upsertTestIDP(codec, "root", "dc1", ca.RootCert, "", "")
 	require.NoError(t, err)
 
 	r1, err := upsertTestBindingRule(
@@ -4096,7 +4096,7 @@ func TestACLEndpoint_Login(t *testing.T) {
 
 	ca := connect.TestCA(t, nil)
 
-	idp, err := upsertTestIDP(codec, "root", "dc1", ca.RootCert)
+	idp, err := upsertTestIDP(codec, "root", "dc1", ca.RootCert, "", "")
 	require.NoError(t, err)
 
 	makeFields := func(namespace, name, uid string) map[string]string {
@@ -4417,10 +4417,10 @@ func TestACLEndpoint_Login_k8s(t *testing.T) {
 		goodJWT_B,
 	)
 
-	idp, err := upsertTestIDP_NEW(
+	idp, err := upsertTestIDP(
 		codec, "root", "dc1",
-		testSrv.Addr(),
 		testSrv.CACert(),
+		testSrv.Addr(),
 		goodJWT_A,
 	)
 	require.NoError(t, err)
@@ -4551,10 +4551,10 @@ func TestACLEndpoint_Logout(t *testing.T) {
 		goodJWT_B,
 	)
 
-	idp, err := upsertTestIDP_NEW(
+	idp, err := upsertTestIDP(
 		codec, "root", "dc1",
-		testSrv.Addr(),
 		testSrv.CACert(),
+		testSrv.Addr(),
 		goodJWT_A,
 	)
 	require.NoError(t, err)
@@ -4977,16 +4977,21 @@ func deleteTestIDP(codec rpc.ClientCodec, masterToken string, datacenter string,
 	return err
 }
 
-func upsertTestIDP(codec rpc.ClientCodec, masterToken string, datacenter string, caCert string) (*structs.ACLIdentityProvider, error) {
-	return upsertTestIDP_NEW(codec, masterToken, datacenter, "https://abc:8443", caCert, goodJWT_A)
-}
-func upsertTestIDP_NEW(
+// KEEP THIS
+func upsertTestIDP(
 	codec rpc.ClientCodec, masterToken string, datacenter string,
-	kubeHost, caCert, kubeJWT string,
+	caCert, kubeHost, kubeJWT string,
 ) (*structs.ACLIdentityProvider, error) {
 	name, err := uuid.GenerateUUID()
 	if err != nil {
 		return nil, err
+	}
+
+	if kubeHost == "" {
+		kubeHost = "https://abc:8443"
+	}
+	if kubeJWT == "" {
+		kubeJWT = goodJWT_A
 	}
 
 	req := structs.ACLIdentityProviderSetRequest{
