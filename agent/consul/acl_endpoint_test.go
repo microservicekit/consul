@@ -1157,6 +1157,7 @@ func TestACLEndpoint_TokenSet(t *testing.T) {
 		requireErrorContains(t, err, "Cannot create Global token via Login")
 	})
 
+	var idpLinkedToken *structs.ACLToken
 	t.Run("Create it using bound Roles by faking login", func(t *testing.T) {
 		// This allows for testing things that are only possible via Login, but
 		// just cumbersome to wire up (multiple binding rules, etc)
@@ -1202,6 +1203,64 @@ func TestACLEndpoint_TokenSet(t *testing.T) {
 		require.Len(t, token.Roles, 2)
 		require.Equal(t, "service:web", token.Roles[0].BoundName)
 		require.Equal(t, "service:db", token.Roles[1].BoundName)
+
+		idpLinkedToken = token
+	})
+
+	t.Run("Update IDP linked token and try to change IDP", func(t *testing.T) {
+		acl := ACL{srv: s1}
+
+		ca := connect.TestCA(t, nil)
+		idp, err := upsertTestIDP(codec, "root", "dc1", ca.RootCert)
+
+		req := structs.ACLTokenSetRequest{
+			Datacenter: "dc1",
+			ACLToken: structs.ACLToken{
+				AccessorID:  idpLinkedToken.AccessorID,
+				SecretID:    idpLinkedToken.SecretID,
+				IDPName:     idp.Name,
+				Description: "updated token",
+				Local:       true,
+			},
+			WriteRequest: structs.WriteRequest{Token: "root"},
+		}
+
+		resp := structs.ACLToken{}
+
+		err = acl.TokenSet(&req, &resp)
+		requireErrorContains(t, err, "Cannot change IDPName")
+	})
+
+	t.Run("Update IDP linked token and let the SecretID and IDPName be defaulted", func(t *testing.T) {
+		acl := ACL{srv: s1}
+
+		req := structs.ACLTokenSetRequest{
+			Datacenter: "dc1",
+			ACLToken: structs.ACLToken{
+				AccessorID: idpLinkedToken.AccessorID,
+				// SecretID:    idpLinkedToken.SecretID,
+				// IDPName:     idp.Name,
+				Description: "updated token",
+				Local:       true,
+			},
+			WriteRequest: structs.WriteRequest{Token: "root"},
+		}
+
+		resp := structs.ACLToken{}
+
+		err := acl.TokenSet(&req, &resp)
+		require.NoError(t, err)
+
+		// Get the token directly to validate that it exists
+		tokenResp, err := retrieveTestToken(codec, "root", "dc1", resp.AccessorID)
+		require.NoError(t, err)
+		token := tokenResp.Token
+
+		require.Len(t, token.Roles, 0)
+		require.Equal(t, "updated token", token.Description)
+		require.True(t, token.Local)
+		require.Equal(t, idpLinkedToken.SecretID, token.SecretID)
+		require.Equal(t, idpLinkedToken.IDPName, token.IDPName)
 	})
 
 	t.Run("Create it with invalid service identity (empty)", func(t *testing.T) {
@@ -1544,11 +1603,37 @@ func TestACLEndpoint_TokenSet(t *testing.T) {
 
 	// do not insert another test at this point: these tests need to be serial
 
+	t.Run("Update anything except expiration time is ok - omit expiration time and let it default", func(t *testing.T) {
+		req := structs.ACLTokenSetRequest{
+			Datacenter: "dc1",
+			ACLToken: structs.ACLToken{
+				Description: "new-description-1",
+				AccessorID:  tokenID,
+			},
+			WriteRequest: structs.WriteRequest{Token: "root"},
+		}
+
+		resp := structs.ACLToken{}
+
+		err := acl.TokenSet(&req, &resp)
+		require.NoError(t, err)
+
+		// Get the token directly to validate that it exists
+		tokenResp, err := retrieveTestToken(codec, "root", "dc1", resp.AccessorID)
+		require.NoError(t, err)
+		token := tokenResp.Token
+
+		require.NotNil(t, token.AccessorID)
+		require.Equal(t, token.Description, "new-description-1")
+		require.Equal(t, token.AccessorID, resp.AccessorID)
+		requireTimeEquals(t, &expTime, resp.ExpirationTime)
+	})
+
 	t.Run("Update anything except expiration time is ok", func(t *testing.T) {
 		req := structs.ACLTokenSetRequest{
 			Datacenter: "dc1",
 			ACLToken: structs.ACLToken{
-				Description:    "new-description",
+				Description:    "new-description-2",
 				AccessorID:     tokenID,
 				ExpirationTime: &expTime,
 			},
@@ -1566,7 +1651,7 @@ func TestACLEndpoint_TokenSet(t *testing.T) {
 		token := tokenResp.Token
 
 		require.NotNil(t, token.AccessorID)
-		require.Equal(t, token.Description, "new-description")
+		require.Equal(t, token.Description, "new-description-2")
 		require.Equal(t, token.AccessorID, resp.AccessorID)
 		requireTimeEquals(t, &expTime, resp.ExpirationTime)
 	})
@@ -3127,9 +3212,40 @@ func TestACLEndpoint_IdentityProviderSet(t *testing.T) {
 		require.Error(t, err)
 	})
 
-	t.Run("Update k8s", func(t *testing.T) {
+	t.Run("Update k8s - allow type to default", func(t *testing.T) {
 		reqIDP := newK8S("k8s")
-		reqIDP.Description = "k8s test modified"
+		reqIDP.Description = "k8s test modified 1"
+		reqIDP.KubernetesHost = "https://def:1111"
+		reqIDP.KubernetesCACert = ca2.RootCert
+		reqIDP.KubernetesServiceAccountJWT = goodJWT_B
+		reqIDP.Type = "" // unset
+
+		req := structs.ACLIdentityProviderSetRequest{
+			Datacenter:       "dc1",
+			IdentityProvider: reqIDP,
+			WriteRequest:     structs.WriteRequest{Token: "root"},
+		}
+		resp := structs.ACLIdentityProvider{}
+
+		err := acl.IdentityProviderSet(&req, &resp)
+		require.NoError(t, err)
+
+		// Get the idp directly to validate that it exists
+		idpResp, err := retrieveTestIDP(codec, "root", "dc1", resp.Name)
+		require.NoError(t, err)
+		idp := idpResp.IdentityProvider
+
+		require.Equal(t, idp.Name, "k8s")
+		require.Equal(t, idp.Description, "k8s test modified 1")
+		require.Equal(t, idp.Type, "kubernetes")
+		require.Equal(t, idp.KubernetesHost, "https://def:1111")
+		require.Equal(t, idp.KubernetesCACert, ca2.RootCert)
+		require.Equal(t, idp.KubernetesServiceAccountJWT, goodJWT_B)
+	})
+
+	t.Run("Update k8s - specify type", func(t *testing.T) {
+		reqIDP := newK8S("k8s")
+		reqIDP.Description = "k8s test modified 2"
 		reqIDP.KubernetesHost = "https://def:1111"
 		reqIDP.KubernetesCACert = ca2.RootCert
 		reqIDP.KubernetesServiceAccountJWT = goodJWT_B
@@ -3150,7 +3266,7 @@ func TestACLEndpoint_IdentityProviderSet(t *testing.T) {
 		idp := idpResp.IdentityProvider
 
 		require.Equal(t, idp.Name, "k8s")
-		require.Equal(t, idp.Description, "k8s test modified")
+		require.Equal(t, idp.Description, "k8s test modified 2")
 		require.Equal(t, idp.Type, "kubernetes")
 		require.Equal(t, idp.KubernetesHost, "https://def:1111")
 		require.Equal(t, idp.KubernetesCACert, ca2.RootCert)
@@ -3626,10 +3742,43 @@ func TestACLEndpoint_BindingRuleSet(t *testing.T) {
 		requireSetErrors(t, reqRule)
 	})
 
-	t.Run("Update it", func(t *testing.T) {
+	t.Run("Update it - omit idp name", func(t *testing.T) {
 		reqRule := newRule()
 		reqRule.ID = ruleID
-		reqRule.Description = "foobar modified"
+		reqRule.Description = "foobar modified 1"
+		reqRule.Selector = "serviceaccount.namespace==def"
+		reqRule.RoleName = "def"
+		reqRule.RoleBindType = structs.BindingRuleRoleBindTypeExisting
+		reqRule.IDPName = "" // clear
+
+		req := structs.ACLBindingRuleSetRequest{
+			Datacenter:   "dc1",
+			BindingRule:  reqRule,
+			WriteRequest: structs.WriteRequest{Token: "root"},
+		}
+		resp := structs.ACLBindingRule{}
+
+		err := acl.BindingRuleSet(&req, &resp)
+		require.NoError(t, err)
+		require.NotNil(t, resp.ID)
+
+		// Get the rule directly to validate that it exists
+		ruleResp, err := retrieveTestBindingRule(codec, "root", "dc1", resp.ID)
+		require.NoError(t, err)
+		rule := ruleResp.BindingRule
+
+		require.NotEmpty(t, rule.ID)
+		require.Equal(t, rule.Description, "foobar modified 1")
+		require.Equal(t, rule.IDPName, testIDP.Name)
+		require.Equal(t, "serviceaccount.namespace==def", rule.Selector)
+		require.Equal(t, "def", rule.RoleName)
+		require.Equal(t, structs.BindingRuleRoleBindTypeExisting, rule.RoleBindType)
+	})
+
+	t.Run("Update it - specify idp name", func(t *testing.T) {
+		reqRule := newRule()
+		reqRule.ID = ruleID
+		reqRule.Description = "foobar modified 2"
 		reqRule.Selector = "serviceaccount.namespace==def"
 		reqRule.RoleName = "def"
 		reqRule.RoleBindType = structs.BindingRuleRoleBindTypeExisting
@@ -3651,7 +3800,7 @@ func TestACLEndpoint_BindingRuleSet(t *testing.T) {
 		rule := ruleResp.BindingRule
 
 		require.NotEmpty(t, rule.ID)
-		require.Equal(t, rule.Description, "foobar modified")
+		require.Equal(t, rule.Description, "foobar modified 2")
 		require.Equal(t, rule.IDPName, testIDP.Name)
 		require.Equal(t, "serviceaccount.namespace==def", rule.Selector)
 		require.Equal(t, "def", rule.RoleName)

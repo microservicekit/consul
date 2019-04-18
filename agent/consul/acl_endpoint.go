@@ -443,7 +443,9 @@ func (a *ACL) tokenSetInternal(args *structs.ACLTokenSetRequest, reply *structs.
 			return fmt.Errorf("cannot toggle local mode of %s", token.AccessorID)
 		}
 
-		if token.IDPName != existing.IDPName {
+		if token.IDPName == "" {
+			token.IDPName = existing.IDPName
+		} else if token.IDPName != existing.IDPName {
 			return fmt.Errorf("Cannot change IDPName of %s", token.AccessorID)
 		}
 
@@ -1561,21 +1563,6 @@ func (a *ACL) BindingRuleSet(args *structs.ACLBindingRuleSetRequest, reply *stru
 	rule := &args.BindingRule
 	state := a.srv.fsm.State()
 
-	if rule.IDPName == "" {
-		return fmt.Errorf("Invalid Binding Rule: no IDPName is set")
-	}
-
-	idpIdx, idp, err := state.ACLIdentityProviderGetByName(nil, rule.IDPName)
-	if err != nil {
-		return fmt.Errorf("acl identity provider lookup failed: %v", err)
-	} else if idp == nil {
-		return fmt.Errorf("cannot find identity provider with name %q", rule.IDPName)
-	}
-	validator, err := a.srv.loadIdentityProviderValidator(idpIdx, idp)
-	if err != nil {
-		return err
-	}
-
 	if rule.RoleBindType == "" {
 		rule.RoleBindType = structs.BindingRuleRoleBindTypeService
 	}
@@ -1607,9 +1594,26 @@ func (a *ACL) BindingRuleSet(args *structs.ACLBindingRuleSetRequest, reply *stru
 			return fmt.Errorf("cannot find binding rule %s", rule.ID)
 		}
 
-		if existing.IDPName != rule.IDPName {
+		if rule.IDPName == "" {
+			rule.IDPName = existing.IDPName
+		} else if existing.IDPName != rule.IDPName {
 			return fmt.Errorf("the IDPName field of an Binding Rule is immutable")
 		}
+	}
+
+	if rule.IDPName == "" {
+		return fmt.Errorf("Invalid Binding Rule: no IDPName is set")
+	}
+
+	idpIdx, idp, err := state.ACLIdentityProviderGetByName(nil, rule.IDPName)
+	if err != nil {
+		return fmt.Errorf("acl identity provider lookup failed: %v", err)
+	} else if idp == nil {
+		return fmt.Errorf("cannot find identity provider with name %q", rule.IDPName)
+	}
+	validator, err := a.srv.loadIdentityProviderValidator(idpIdx, idp)
+	if err != nil {
+		return err
 	}
 
 	if rule.Selector != "" {
@@ -1847,6 +1851,20 @@ func (a *ACL) IdentityProviderSet(args *structs.ACLIdentityProviderSetRequest, r
 		return fmt.Errorf("Invalid Identity provider: invalid Name. Only alphanumeric characters, '-' and '_' are allowed")
 	}
 
+	// Check to see if the idp exists first.
+	_, existing, err := state.ACLIdentityProviderGetByName(nil, idp.Name)
+	if err != nil {
+		return fmt.Errorf("acl identity provider lookup failed: %v", err)
+	}
+
+	if existing != nil {
+		if idp.Type == "" {
+			idp.Type = existing.Type
+		} else if existing.Type != idp.Type {
+			return fmt.Errorf("the Type field of an Identity Provider is immutable")
+		}
+	}
+
 	if idp.Type != "kubernetes" {
 		return fmt.Errorf("Invalid Identity Provider: Type should be one of [kubernetes]")
 	}
@@ -1855,18 +1873,6 @@ func (a *ACL) IdentityProviderSet(args *structs.ACLIdentityProviderSetRequest, r
 	// configuration.
 	if _, err := a.srv.createIdentityProviderValidator(idp); err != nil {
 		return fmt.Errorf("Invalid Identity Provider: %v", err)
-	}
-
-	// Check to see if the idp exists first.
-	_, existing, err := state.ACLIdentityProviderGetByName(nil, idp.Name)
-	if err != nil {
-		return fmt.Errorf("acl identity provider lookup failed: %v", err)
-	}
-
-	if existing != nil {
-		if existing.Type != idp.Type {
-			return fmt.Errorf("the Type field of an Identity Provider is immutable")
-		}
 	}
 
 	req := &structs.ACLIdentityProviderBatchSetRequest{
