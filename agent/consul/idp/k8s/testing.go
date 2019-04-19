@@ -1,4 +1,4 @@
-package kubeidp
+package k8s
 
 import (
 	"bytes"

@@ -12,8 +12,8 @@ import (
 	"time"
 
 	"github.com/hashicorp/consul/acl"
-	"github.com/hashicorp/consul/agent/connect"
-	"github.com/hashicorp/consul/agent/consul/kubeidp"
+	"github.com/hashicorp/consul/agent/consul/idp/k8s"
+	testidp "github.com/hashicorp/consul/agent/consul/idp/testing"
 	"github.com/hashicorp/consul/agent/structs"
 	tokenStore "github.com/hashicorp/consul/agent/token"
 	"github.com/hashicorp/consul/lib"
@@ -971,7 +971,7 @@ func TestACLEndpoint_TokenSet(t *testing.T) {
 			Datacenter: "dc1",
 			ACLToken: structs.ACLToken{
 				Description: "foobar",
-				IDPName:     "k8s",
+				IDPName:     "idp",
 			},
 			WriteRequest: structs.WriteRequest{Token: "root"},
 		}
@@ -982,106 +982,39 @@ func TestACLEndpoint_TokenSet(t *testing.T) {
 		requireErrorContains(t, err, "IDPName field is disallowed outside of Login")
 	})
 
-	t.Run("Create fails with an empty IDPName when faking login", func(t *testing.T) {
-		acl := ACL{
-			srv:                                   s1,
-			disableLoginOnlyRestrictionOnTokenSet: true,
-		}
-
-		req := structs.ACLTokenSetRequest{
-			Datacenter: "dc1",
-			ACLToken: structs.ACLToken{
-				IDPName:     "",
-				Description: "foobar",
-				Local:       true,
-			},
-			WriteRequest: structs.WriteRequest{Token: "root"},
-		}
-
-		resp := structs.ACLToken{}
-
-		err := acl.TokenSet(&req, &resp)
-		requireErrorContains(t, err, "IDPName field is required during Login")
-	})
-
-	t.Run("Create fails to create global token linked to an IDP when faking login", func(t *testing.T) {
-		acl := ACL{
-			srv:                                   s1,
-			disableLoginOnlyRestrictionOnTokenSet: true,
-		}
-
-		req := structs.ACLTokenSetRequest{
-			Datacenter: "dc1",
-			ACLToken: structs.ACLToken{
-				IDPName:     "k8s",
-				Description: "foobar",
-				Local:       false,
-			},
-			WriteRequest: structs.WriteRequest{Token: "root"},
-		}
-
-		resp := structs.ACLToken{}
-
-		err := acl.TokenSet(&req, &resp)
-		requireErrorContains(t, err, "Cannot create Global token via Login")
-	})
-
-	var idpLinkedToken *structs.ACLToken
-	t.Run("Create it with idp set by faking login", func(t *testing.T) {
-		// This allows for testing things that are only possible via Login, but
-		// just cumbersome to wire up (multiple binding rules, etc)
-		acl := ACL{
-			srv:                                   s1,
-			disableLoginOnlyRestrictionOnTokenSet: true,
-		}
-
-		ca := connect.TestCA(t, nil)
-		idp, err := upsertTestIDP(codec, "root", "dc1", ca.RootCert, "", "")
-
-		req := structs.ACLTokenSetRequest{
-			Datacenter: "dc1",
-			ACLToken: structs.ACLToken{
-				IDPName:     idp.Name,
-				Description: "foobar",
-				ServiceIdentities: []*structs.ACLServiceIdentity{
-					&structs.ACLServiceIdentity{
-						ServiceName: "web",
-					},
-				},
-				Local: true,
-			},
-			WriteRequest: structs.WriteRequest{Token: "root"},
-		}
-
-		resp := structs.ACLToken{}
-
-		err = acl.TokenSet(&req, &resp)
-		require.NoError(t, err)
-
-		// Get the token directly to validate that it exists
-		tokenResp, err := retrieveTestToken(codec, "root", "dc1", resp.AccessorID)
-		require.NoError(t, err)
-		token := tokenResp.Token
-
-		require.Len(t, token.Roles, 0)
-		require.Len(t, token.ServiceIdentities, 1)
-		require.Equal(t, "web", token.ServiceIdentities[0].ServiceName)
-
-		idpLinkedToken = token
-	})
-
 	t.Run("Update IDP linked token and try to change IDP", func(t *testing.T) {
 		acl := ACL{srv: s1}
 
-		ca := connect.TestCA(t, nil)
-		idp, err := upsertTestIDP(codec, "root", "dc1", ca.RootCert, "", "")
+		testSessionID := testidp.StartSession()
+		defer testidp.ResetSession(testSessionID)
+		testidp.InstallSessionToken(testSessionID, "fake-token", "default", "demo", "abc123")
 
+		idp1, err := upsertTestIDP(codec, "root", "dc1", testSessionID)
+		require.NoError(t, err)
+
+		_, err = upsertTestBindingRule(codec, "root", "dc1", idp1.Name, "", structs.BindingRuleBindTypeService, "demo")
+		require.NoError(t, err)
+
+		// create a token in one idp
+		idpToken := structs.ACLToken{}
+		require.NoError(t, acl.Login(&structs.ACLLoginRequest{
+			Auth: &structs.ACLLoginParams{
+				IDPName:  idp1.Name,
+				IDPToken: "fake-token",
+			},
+			Datacenter: "dc1",
+		}, &idpToken))
+
+		idp2, err := upsertTestIDP(codec, "root", "dc1", "")
+		require.NoError(t, err)
+
+		// try to update the token and change the idp
 		req := structs.ACLTokenSetRequest{
 			Datacenter: "dc1",
 			ACLToken: structs.ACLToken{
-				AccessorID:  idpLinkedToken.AccessorID,
-				SecretID:    idpLinkedToken.SecretID,
-				IDPName:     idp.Name,
+				AccessorID:  idpToken.AccessorID,
+				SecretID:    idpToken.SecretID,
+				IDPName:     idp2.Name,
 				Description: "updated token",
 				Local:       true,
 			},
@@ -1097,11 +1030,30 @@ func TestACLEndpoint_TokenSet(t *testing.T) {
 	t.Run("Update IDP linked token and let the SecretID and IDPName be defaulted", func(t *testing.T) {
 		acl := ACL{srv: s1}
 
+		testSessionID := testidp.StartSession()
+		defer testidp.ResetSession(testSessionID)
+		testidp.InstallSessionToken(testSessionID, "fake-token", "default", "demo", "abc123")
+
+		idp, err := upsertTestIDP(codec, "root", "dc1", testSessionID)
+		require.NoError(t, err)
+
+		_, err = upsertTestBindingRule(codec, "root", "dc1", idp.Name, "", structs.BindingRuleBindTypeService, "demo")
+		require.NoError(t, err)
+
+		idpToken := structs.ACLToken{}
+		require.NoError(t, acl.Login(&structs.ACLLoginRequest{
+			Auth: &structs.ACLLoginParams{
+				IDPName:  idp.Name,
+				IDPToken: "fake-token",
+			},
+			Datacenter: "dc1",
+		}, &idpToken))
+
 		req := structs.ACLTokenSetRequest{
 			Datacenter: "dc1",
 			ACLToken: structs.ACLToken{
-				AccessorID: idpLinkedToken.AccessorID,
-				// SecretID:    idpLinkedToken.SecretID,
+				AccessorID: idpToken.AccessorID,
+				// SecretID:    idpToken.SecretID,
 				// IDPName:     idp.Name,
 				Description: "updated token",
 				Local:       true,
@@ -1111,8 +1063,7 @@ func TestACLEndpoint_TokenSet(t *testing.T) {
 
 		resp := structs.ACLToken{}
 
-		err := acl.TokenSet(&req, &resp)
-		require.NoError(t, err)
+		require.NoError(t, acl.TokenSet(&req, &resp))
 
 		// Get the token directly to validate that it exists
 		tokenResp, err := retrieveTestToken(codec, "root", "dc1", resp.AccessorID)
@@ -1122,8 +1073,8 @@ func TestACLEndpoint_TokenSet(t *testing.T) {
 		require.Len(t, token.Roles, 0)
 		require.Equal(t, "updated token", token.Description)
 		require.True(t, token.Local)
-		require.Equal(t, idpLinkedToken.SecretID, token.SecretID)
-		require.Equal(t, idpLinkedToken.IDPName, token.IDPName)
+		require.Equal(t, idpToken.SecretID, token.SecretID)
+		require.Equal(t, idpToken.IDPName, token.IDPName)
 	})
 
 	t.Run("Create it with invalid service identity (empty)", func(t *testing.T) {
@@ -2936,22 +2887,16 @@ func TestACLEndpoint_IdentityProviderSet(t *testing.T) {
 
 	acl := ACL{srv: s1}
 
-	ca := connect.TestCA(t, nil)
-	ca2 := connect.TestCA(t, nil)
-
-	newK8S := func(name string) structs.ACLIdentityProvider {
+	newIDP := func(name string) structs.ACLIdentityProvider {
 		return structs.ACLIdentityProvider{
-			Name:                        name,
-			Description:                 "k8s test",
-			Type:                        "kubernetes",
-			KubernetesHost:              "https://abc:8443",
-			KubernetesCACert:            ca.RootCert,
-			KubernetesServiceAccountJWT: goodJWT_A,
+			Name:        name,
+			Description: "test",
+			Type:        "testing",
 		}
 	}
 
-	t.Run("Create k8s", func(t *testing.T) {
-		reqIDP := newK8S("k8s")
+	t.Run("Create", func(t *testing.T) {
+		reqIDP := newIDP("test")
 
 		req := structs.ACLIdentityProviderSetRequest{
 			Datacenter:       "dc1",
@@ -2968,20 +2913,14 @@ func TestACLEndpoint_IdentityProviderSet(t *testing.T) {
 		require.NoError(t, err)
 		idp := idpResp.IdentityProvider
 
-		require.Equal(t, idp.Name, "k8s")
-		require.Equal(t, idp.Description, "k8s test")
-		require.Equal(t, idp.Type, "kubernetes")
-		require.Equal(t, idp.KubernetesHost, "https://abc:8443")
-		require.Equal(t, idp.KubernetesCACert, ca.RootCert)
-		require.Equal(t, idp.KubernetesServiceAccountJWT, goodJWT_A)
+		require.Equal(t, idp.Name, "test")
+		require.Equal(t, idp.Description, "test")
+		require.Equal(t, idp.Type, "testing")
 	})
 
-	// Note that this test technically fails right now because the type is
-	// invalid.  When we add another idp type this test will start failing for
-	// a new reason.
-	t.Run("Update k8s fails; not allowed to change types", func(t *testing.T) {
-		reqIDP := newK8S("k8s")
-		reqIDP.Type = "oidc"
+	t.Run("Update fails; not allowed to change types", func(t *testing.T) {
+		reqIDP := newIDP("test")
+		reqIDP.Type = "invalid"
 
 		req := structs.ACLIdentityProviderSetRequest{
 			Datacenter:       "dc1",
@@ -2994,12 +2933,9 @@ func TestACLEndpoint_IdentityProviderSet(t *testing.T) {
 		require.Error(t, err)
 	})
 
-	t.Run("Update k8s - allow type to default", func(t *testing.T) {
-		reqIDP := newK8S("k8s")
-		reqIDP.Description = "k8s test modified 1"
-		reqIDP.KubernetesHost = "https://def:1111"
-		reqIDP.KubernetesCACert = ca2.RootCert
-		reqIDP.KubernetesServiceAccountJWT = goodJWT_B
+	t.Run("Update - allow type to default", func(t *testing.T) {
+		reqIDP := newIDP("test")
+		reqIDP.Description = "test modified 1"
 		reqIDP.Type = "" // unset
 
 		req := structs.ACLIdentityProviderSetRequest{
@@ -3017,20 +2953,14 @@ func TestACLEndpoint_IdentityProviderSet(t *testing.T) {
 		require.NoError(t, err)
 		idp := idpResp.IdentityProvider
 
-		require.Equal(t, idp.Name, "k8s")
-		require.Equal(t, idp.Description, "k8s test modified 1")
-		require.Equal(t, idp.Type, "kubernetes")
-		require.Equal(t, idp.KubernetesHost, "https://def:1111")
-		require.Equal(t, idp.KubernetesCACert, ca2.RootCert)
-		require.Equal(t, idp.KubernetesServiceAccountJWT, goodJWT_B)
+		require.Equal(t, idp.Name, "test")
+		require.Equal(t, idp.Description, "test modified 1")
+		require.Equal(t, idp.Type, "testing")
 	})
 
-	t.Run("Update k8s - specify type", func(t *testing.T) {
-		reqIDP := newK8S("k8s")
-		reqIDP.Description = "k8s test modified 2"
-		reqIDP.KubernetesHost = "https://def:1111"
-		reqIDP.KubernetesCACert = ca2.RootCert
-		reqIDP.KubernetesServiceAccountJWT = goodJWT_B
+	t.Run("Update - specify type", func(t *testing.T) {
+		reqIDP := newIDP("test")
+		reqIDP.Description = "test modified 2"
 
 		req := structs.ACLIdentityProviderSetRequest{
 			Datacenter:       "dc1",
@@ -3047,18 +2977,15 @@ func TestACLEndpoint_IdentityProviderSet(t *testing.T) {
 		require.NoError(t, err)
 		idp := idpResp.IdentityProvider
 
-		require.Equal(t, idp.Name, "k8s")
-		require.Equal(t, idp.Description, "k8s test modified 2")
-		require.Equal(t, idp.Type, "kubernetes")
-		require.Equal(t, idp.KubernetesHost, "https://def:1111")
-		require.Equal(t, idp.KubernetesCACert, ca2.RootCert)
-		require.Equal(t, idp.KubernetesServiceAccountJWT, goodJWT_B)
+		require.Equal(t, idp.Name, "test")
+		require.Equal(t, idp.Description, "test modified 2")
+		require.Equal(t, idp.Type, "testing")
 	})
 
 	t.Run("Create with no name", func(t *testing.T) {
 		req := structs.ACLIdentityProviderSetRequest{
 			Datacenter:       "dc1",
-			IdentityProvider: newK8S(""),
+			IdentityProvider: newIDP(""),
 			WriteRequest:     structs.WriteRequest{Token: "root"},
 		}
 		resp := structs.ACLIdentityProvider{}
@@ -3107,14 +3034,14 @@ func TestACLEndpoint_IdentityProviderSet(t *testing.T) {
 	} {
 		var testName string
 		if test.ok {
-			testName = "Create k8s with valid name (by regex): " + test.name
+			testName = "Create with valid name (by regex): " + test.name
 		} else {
-			testName = "Create k8s with invalid name (by regex): " + test.name
+			testName = "Create with invalid name (by regex): " + test.name
 		}
 		t.Run(testName, func(t *testing.T) {
 			req := structs.ACLIdentityProviderSetRequest{
 				Datacenter:       "dc1",
-				IdentityProvider: newK8S(test.name),
+				IdentityProvider: newIDP(test.name),
 				WriteRequest:     structs.WriteRequest{Token: "root"},
 			}
 			resp := structs.ACLIdentityProvider{}
@@ -3130,90 +3057,12 @@ func TestACLEndpoint_IdentityProviderSet(t *testing.T) {
 				idp := idpResp.IdentityProvider
 
 				require.Equal(t, idp.Name, test.name)
-				require.Equal(t, idp.Type, "kubernetes")
-				require.Equal(t, idp.KubernetesHost, "https://abc:8443")
-				require.Equal(t, idp.KubernetesCACert, ca.RootCert)
-				require.Equal(t, idp.KubernetesServiceAccountJWT, goodJWT_A)
+				require.Equal(t, idp.Type, "testing")
 			} else {
 				require.Error(t, err)
 			}
 		})
 	}
-
-	t.Run("Create k8s with missing k8s host", func(t *testing.T) {
-		reqIDP := newK8S("k8s-2")
-		reqIDP.KubernetesHost = ""
-
-		req := structs.ACLIdentityProviderSetRequest{
-			Datacenter:       "dc1",
-			IdentityProvider: reqIDP,
-			WriteRequest:     structs.WriteRequest{Token: "root"},
-		}
-		resp := structs.ACLIdentityProvider{}
-
-		err := acl.IdentityProviderSet(&req, &resp)
-		require.Error(t, err)
-	})
-
-	t.Run("Create k8s with missing ca cert", func(t *testing.T) {
-		reqIDP := newK8S("k8s-2")
-		reqIDP.KubernetesCACert = ""
-
-		req := structs.ACLIdentityProviderSetRequest{
-			Datacenter:       "dc1",
-			IdentityProvider: reqIDP,
-			WriteRequest:     structs.WriteRequest{Token: "root"},
-		}
-		resp := structs.ACLIdentityProvider{}
-
-		err := acl.IdentityProviderSet(&req, &resp)
-		require.Error(t, err)
-	})
-
-	t.Run("Create k8s with bad ca cert", func(t *testing.T) {
-		reqIDP := newK8S("k8s-2")
-		reqIDP.KubernetesCACert = "garbage"
-
-		req := structs.ACLIdentityProviderSetRequest{
-			Datacenter:       "dc1",
-			IdentityProvider: reqIDP,
-			WriteRequest:     structs.WriteRequest{Token: "root"},
-		}
-		resp := structs.ACLIdentityProvider{}
-
-		err := acl.IdentityProviderSet(&req, &resp)
-		require.Error(t, err)
-	})
-
-	t.Run("Create k8s with missing jwt", func(t *testing.T) {
-		reqIDP := newK8S("k8s-2")
-		reqIDP.KubernetesServiceAccountJWT = ""
-
-		req := structs.ACLIdentityProviderSetRequest{
-			Datacenter:       "dc1",
-			IdentityProvider: reqIDP,
-			WriteRequest:     structs.WriteRequest{Token: "root"},
-		}
-		resp := structs.ACLIdentityProvider{}
-
-		err := acl.IdentityProviderSet(&req, &resp)
-		require.Error(t, err)
-	})
-
-	t.Run("Create k8s with bad jwt", func(t *testing.T) {
-		reqIDP := newK8S("k8s-2")
-		reqIDP.KubernetesServiceAccountJWT = "bad"
-
-		req := structs.ACLIdentityProviderSetRequest{
-			Datacenter:       "dc1",
-			IdentityProvider: reqIDP,
-			WriteRequest:     structs.WriteRequest{Token: "root"},
-		}
-		resp := structs.ACLIdentityProvider{}
-
-		err := acl.IdentityProviderSet(&req, &resp)
-		require.Error(t, err)
-	})
 }
 
 func TestACLEndpoint_IdentityProviderDelete(t *testing.T) {
@@ -3231,9 +3080,10 @@ func TestACLEndpoint_IdentityProviderDelete(t *testing.T) {
 
 	testrpc.WaitForLeader(t, s1.RPC, "dc1")
 
-	ca := connect.TestCA(t, nil)
+	testSessionID := testidp.StartSession()
+	defer testidp.ResetSession(testSessionID)
 
-	existingIDP, err := upsertTestIDP(codec, "root", "dc1", ca.RootCert, "", "")
+	existingIDP, err := upsertTestIDP(codec, "root", "dc1", testSessionID)
 	require.NoError(t, err)
 
 	acl := ACL{srv: s1}
@@ -3284,31 +3134,31 @@ func TestACLEndpoint_IdentityProviderDelete_RuleAndTokenCascade(t *testing.T) {
 
 	testrpc.WaitForLeader(t, s1.RPC, "dc1")
 
-	ca := connect.TestCA(t, nil)
+	testSessionID1 := testidp.StartSession()
+	defer testidp.ResetSession(testSessionID1)
+	testidp.InstallSessionToken(testSessionID1, "fake-token1", "default", "abc", "abc123")
 
-	createToken := func(idpName string) *structs.ACLToken {
-		acl := ACL{
-			srv:                                   s1,
-			disableLoginOnlyRestrictionOnTokenSet: true,
-		}
-		req := structs.ACLTokenSetRequest{
-			Datacenter: "dc1",
-			ACLToken: structs.ACLToken{
-				IDPName: idpName,
-				Local:   true,
-			},
-			WriteRequest: structs.WriteRequest{Token: "root"},
-		}
+	testSessionID2 := testidp.StartSession()
+	defer testidp.ResetSession(testSessionID2)
+	testidp.InstallSessionToken(testSessionID2, "fake-token2", "default", "abc", "abc123")
+
+	createToken := func(idpName, idpToken string) *structs.ACLToken {
+		acl := ACL{srv: s1}
 
 		resp := structs.ACLToken{}
 
-		err := acl.TokenSet(&req, &resp)
-		require.NoError(t, err)
+		require.NoError(t, acl.Login(&structs.ACLLoginRequest{
+			Auth: &structs.ACLLoginParams{
+				IDPName:  idpName,
+				IDPToken: idpToken,
+			},
+			Datacenter: "dc1",
+		}, &resp))
 
 		return &resp
 	}
 
-	idp1, err := upsertTestIDP(codec, "root", "dc1", ca.RootCert, "", "")
+	idp1, err := upsertTestIDP(codec, "root", "dc1", testSessionID1)
 	require.NoError(t, err)
 	i1_r1, err := upsertTestBindingRule(
 		codec, "root", "dc1",
@@ -3326,10 +3176,10 @@ func TestACLEndpoint_IdentityProviderDelete_RuleAndTokenCascade(t *testing.T) {
 		"def",
 	)
 	require.NoError(t, err)
-	i1_t1 := createToken(idp1.Name)
-	i1_t2 := createToken(idp1.Name)
+	i1_t1 := createToken(idp1.Name, "fake-token1")
+	i1_t2 := createToken(idp1.Name, "fake-token1")
 
-	idp2, err := upsertTestIDP(codec, "root", "dc1", ca.RootCert, "", "")
+	idp2, err := upsertTestIDP(codec, "root", "dc1", testSessionID2)
 	require.NoError(t, err)
 	i2_r1, err := upsertTestBindingRule(
 		codec, "root", "dc1",
@@ -3347,8 +3197,8 @@ func TestACLEndpoint_IdentityProviderDelete_RuleAndTokenCascade(t *testing.T) {
 		"def",
 	)
 	require.NoError(t, err)
-	i2_t1 := createToken(idp2.Name)
-	i2_t2 := createToken(idp2.Name)
+	i2_t1 := createToken(idp2.Name, "fake-token2")
+	i2_t2 := createToken(idp2.Name, "fake-token2")
 
 	acl := ACL{srv: s1}
 
@@ -3407,12 +3257,10 @@ func TestACLEndpoint_IdentityProviderList(t *testing.T) {
 
 	testrpc.WaitForLeader(t, s1.RPC, "dc1")
 
-	ca := connect.TestCA(t, nil)
-
-	i1, err := upsertTestIDP(codec, "root", "dc1", ca.RootCert, "", "")
+	i1, err := upsertTestIDP(codec, "root", "dc1", "")
 	require.NoError(t, err)
 
-	i2, err := upsertTestIDP(codec, "root", "dc1", ca.RootCert, "", "")
+	i2, err := upsertTestIDP(codec, "root", "dc1", "")
 	require.NoError(t, err)
 
 	acl := ACL{srv: s1}
@@ -3447,10 +3295,10 @@ func TestACLEndpoint_BindingRuleSet(t *testing.T) {
 	acl := ACL{srv: s1}
 	var ruleID string
 
-	ca := connect.TestCA(t, nil)
-	testIDP, err := upsertTestIDP(codec, "root", "dc1", ca.RootCert, "", "")
+	testIDP, err := upsertTestIDP(codec, "root", "dc1", "")
 	require.NoError(t, err)
-	otherTestIDP, err := upsertTestIDP(codec, "root", "dc1", ca.RootCert, "", "")
+
+	otherTestIDP, err := upsertTestIDP(codec, "root", "dc1", "")
 	require.NoError(t, err)
 
 	newRule := func() structs.ACLBindingRule {
@@ -3642,7 +3490,7 @@ func TestACLEndpoint_BindingRuleSet(t *testing.T) {
 
 	t.Run("Create fails; bind name with unknown vars", func(t *testing.T) {
 		reqRule := newRule()
-		reqRule.BindName = "k8s-${serviceaccount.bizarroname}"
+		reqRule.BindName = "idp-${serviceaccount.bizarroname}"
 		requireSetErrors(t, reqRule)
 	})
 
@@ -3654,12 +3502,12 @@ func TestACLEndpoint_BindingRuleSet(t *testing.T) {
 
 	t.Run("Create fails; invalid bind name with template", func(t *testing.T) {
 		reqRule := newRule()
-		reqRule.BindName = "k8s-${serviceaccount.name"
+		reqRule.BindName = "idp-${serviceaccount.name"
 		requireSetErrors(t, reqRule)
 	})
 	t.Run("Create fails; invalid bind name after template computed", func(t *testing.T) {
 		reqRule := newRule()
-		reqRule.BindName = "k8s-${serviceaccount.name}:blah-"
+		reqRule.BindName = "idp-${serviceaccount.name}:blah-"
 		requireSetErrors(t, reqRule)
 	})
 }
@@ -3679,8 +3527,7 @@ func TestACLEndpoint_BindingRuleDelete(t *testing.T) {
 
 	testrpc.WaitForLeader(t, s1.RPC, "dc1")
 
-	ca := connect.TestCA(t, nil)
-	testIDP, err := upsertTestIDP(codec, "root", "dc1", ca.RootCert, "", "")
+	testIDP, err := upsertTestIDP(codec, "root", "dc1", "")
 	require.NoError(t, err)
 
 	existingRule, err := upsertTestBindingRule(
@@ -3742,8 +3589,7 @@ func TestACLEndpoint_BindingRuleList(t *testing.T) {
 
 	testrpc.WaitForLeader(t, s1.RPC, "dc1")
 
-	ca := connect.TestCA(t, nil)
-	testIDP, err := upsertTestIDP(codec, "root", "dc1", ca.RootCert, "", "")
+	testIDP, err := upsertTestIDP(codec, "root", "dc1", "")
 	require.NoError(t, err)
 
 	r1, err := upsertTestBindingRule(
@@ -3776,40 +3622,6 @@ func TestACLEndpoint_BindingRuleList(t *testing.T) {
 	err = acl.BindingRuleList(&req, &resp)
 	require.NoError(t, err)
 	require.ElementsMatch(t, gatherIDs(t, resp.BindingRules), []string{r1.ID, r2.ID})
-}
-
-type fakeK8SIdentityProviderValidator struct {
-	data map[string]map[string]string
-
-	IdentityProviderValidator
-}
-
-func (p *fakeK8SIdentityProviderValidator) Reset() {
-	p.data = nil
-}
-
-func (p *fakeK8SIdentityProviderValidator) InstallToken(token string, fields map[string]string) {
-	if p.data == nil {
-		p.data = make(map[string]map[string]string)
-	}
-	p.data[token] = fields
-}
-
-func (p *fakeK8SIdentityProviderValidator) ValidateLogin(loginToken string) (map[string]string, error) {
-	if p.data == nil {
-		return nil, acl.ErrNotFound
-	}
-	fields, ok := p.data[loginToken]
-	if !ok {
-		return nil, acl.ErrNotFound
-	}
-
-	fmCopy := make(map[string]string)
-	for k, v := range fields {
-		fmCopy[k] = v
-	}
-
-	return fmCopy, nil
 }
 
 func TestACLEndpoint_Login_LocalTokensDisabled(t *testing.T) {
@@ -3859,8 +3671,7 @@ func TestACLEndpoint_Login_LocalTokensDisabled(t *testing.T) {
 	t.Run("unknown idp", func(t *testing.T) {
 		req := structs.ACLLoginRequest{
 			Auth: &structs.ACLLoginParams{
-				IDPType:  "kubernetes",
-				IDPName:  "k8s",
+				IDPName:  "test",
 				IDPToken: "fake-web",
 				Meta:     map[string]string{"pod": "pod1"},
 			},
@@ -3889,62 +3700,45 @@ func TestACLEndpoint_Login(t *testing.T) {
 
 	acl := ACL{srv: s1}
 
-	ca := connect.TestCA(t, nil)
+	testSessionID := testidp.StartSession()
+	defer testidp.ResetSession(testSessionID)
 
-	idp, err := upsertTestIDP(codec, "root", "dc1", ca.RootCert, "", "")
-	require.NoError(t, err)
-
-	makeFields := func(namespace, name, uid string) map[string]string {
-		return map[string]string{
-			"serviceaccount.namespace": namespace,
-			"serviceaccount.name":      name,
-			"serviceaccount.uid":       uid,
-		}
-	}
-
-	// Swap out the k8s validator with our own test one.
-	validator := &fakeK8SIdentityProviderValidator{}
-	validator.InstallToken(
+	testidp.InstallSessionToken(
+		testSessionID,
 		"fake-web", // no rules
-		makeFields("default", "web", "abc123"),
+		"default", "web", "abc123",
 	)
-	validator.InstallToken(
+	testidp.InstallSessionToken(
+		testSessionID,
 		"fake-db", // 1 rule
-		makeFields("default", "db", "def456"),
+		"default", "db", "def456",
 	)
-	validator.InstallToken(
+	testidp.InstallSessionToken(
+		testSessionID,
 		"fake-monolith", // 1 rule, must exist
-		makeFields("default", "monolith", "ghi789"),
+		"default", "monolith", "ghi789",
 	)
-	s1.aclIDPValidatorCreateTestHook = func(orig IdentityProviderValidator) (IdentityProviderValidator, error) {
-		if orig.Name() == idp.Name {
-			validator.IdentityProviderValidator = orig
-			return validator, nil
-		}
-		return orig, nil
-	}
 
-	// Ensure we create any binding rules AFTER monkeypatching the validator
-	// cache because binding rule validation resolves the idp during mutations.
+	idp, err := upsertTestIDP(codec, "root", "dc1", testSessionID)
+	require.NoError(t, err)
 
 	ruleDB, err := upsertTestBindingRule(
 		codec, "root", "dc1", idp.Name,
 		"serviceaccount.namespace==default and serviceaccount.name==db",
 		structs.BindingRuleBindTypeService,
-		"k8s-${serviceaccount.name}",
+		"idp-${serviceaccount.name}",
 	)
 	_, err = upsertTestBindingRule(
 		codec, "root", "dc1", idp.Name,
 		"serviceaccount.namespace==default and serviceaccount.name==monolith",
 		structs.BindingRuleBindTypeRole,
-		"k8s-${serviceaccount.name}",
+		"idp-${serviceaccount.name}",
 	)
 	require.NoError(t, err)
 
 	t.Run("do not provide a token", func(t *testing.T) {
 		req := structs.ACLLoginRequest{
 			Auth: &structs.ACLLoginParams{
-				IDPType:  "kubernetes",
 				IDPName:  idp.Name,
 				IDPToken: "fake-web",
 				Meta:     map[string]string{"pod": "pod1"},
@@ -3960,7 +3754,6 @@ func TestACLEndpoint_Login(t *testing.T) {
 	t.Run("unknown idp", func(t *testing.T) {
 		req := structs.ACLLoginRequest{
 			Auth: &structs.ACLLoginParams{
-				IDPType:  "kubernetes",
 				IDPName:  idp.Name + "-notexist",
 				IDPToken: "fake-web",
 				Meta:     map[string]string{"pod": "pod1"},
@@ -3972,25 +3765,9 @@ func TestACLEndpoint_Login(t *testing.T) {
 		requireErrorContains(t, acl.Login(&req, &resp), "ACL not found")
 	})
 
-	t.Run("idp is known but type doesn't match", func(t *testing.T) {
-		req := structs.ACLLoginRequest{
-			Auth: &structs.ACLLoginParams{
-				IDPType:  "not-kubernetes",
-				IDPName:  idp.Name,
-				IDPToken: "fake-web",
-				Meta:     map[string]string{"pod": "pod1"},
-			},
-			Datacenter: "dc1",
-		}
-		resp := structs.ACLToken{}
-
-		require.Error(t, acl.Login(&req, &resp))
-	})
-
 	t.Run("invalid idp token", func(t *testing.T) {
 		req := structs.ACLLoginRequest{
 			Auth: &structs.ACLLoginParams{
-				IDPType:  "kubernetes",
 				IDPName:  idp.Name,
 				IDPToken: "invalid",
 				Meta:     map[string]string{"pod": "pod1"},
@@ -4005,7 +3782,6 @@ func TestACLEndpoint_Login(t *testing.T) {
 	t.Run("valid idp token no bindings", func(t *testing.T) {
 		req := structs.ACLLoginRequest{
 			Auth: &structs.ACLLoginParams{
-				IDPType:  "kubernetes",
 				IDPName:  idp.Name,
 				IDPToken: "fake-web",
 				Meta:     map[string]string{"pod": "pod1"},
@@ -4020,7 +3796,6 @@ func TestACLEndpoint_Login(t *testing.T) {
 	t.Run("valid idp token 1 role binding must exist and does not exist", func(t *testing.T) {
 		req := structs.ACLLoginRequest{
 			Auth: &structs.ACLLoginParams{
-				IDPType:  "kubernetes",
 				IDPName:  idp.Name,
 				IDPToken: "fake-monolith",
 				Meta:     map[string]string{"pod": "pod1"},
@@ -4038,7 +3813,7 @@ func TestACLEndpoint_Login(t *testing.T) {
 		arg := structs.ACLRoleSetRequest{
 			Datacenter: "dc1",
 			Role: structs.ACLRole{
-				Name: "k8s-monolith",
+				Name: "idp-monolith",
 			},
 			WriteRequest: structs.WriteRequest{Token: "root"},
 		}
@@ -4053,7 +3828,6 @@ func TestACLEndpoint_Login(t *testing.T) {
 	t.Run("valid idp token 1 role binding must exist and now exists", func(t *testing.T) {
 		req := structs.ACLLoginRequest{
 			Auth: &structs.ACLLoginParams{
-				IDPType:  "kubernetes",
 				IDPName:  idp.Name,
 				IDPToken: "fake-monolith",
 				Meta:     map[string]string{"pod": "pod1"},
@@ -4071,13 +3845,12 @@ func TestACLEndpoint_Login(t *testing.T) {
 		require.Len(t, resp.Roles, 1)
 		role := resp.Roles[0]
 		require.Equal(t, monolithRoleID, role.ID)
-		require.Equal(t, "k8s-monolith", role.Name)
+		require.Equal(t, "idp-monolith", role.Name)
 	})
 
 	t.Run("valid idp token 1 service binding", func(t *testing.T) {
 		req := structs.ACLLoginRequest{
 			Auth: &structs.ACLLoginParams{
-				IDPType:  "kubernetes",
 				IDPName:  idp.Name,
 				IDPToken: "fake-db",
 				Meta:     map[string]string{"pod": "pod1"},
@@ -4095,7 +3868,7 @@ func TestACLEndpoint_Login(t *testing.T) {
 		require.Len(t, resp.ServiceIdentities, 1)
 		svcid := resp.ServiceIdentities[0]
 		require.Len(t, svcid.Datacenters, 0)
-		require.Equal(t, "k8s-db", svcid.ServiceName)
+		require.Equal(t, "idp-db", svcid.ServiceName)
 	})
 
 	{
@@ -4117,7 +3890,6 @@ func TestACLEndpoint_Login(t *testing.T) {
 	t.Run("valid idp token 1 binding (no selectors this time)", func(t *testing.T) {
 		req := structs.ACLLoginRequest{
 			Auth: &structs.ACLLoginParams{
-				IDPType:  "kubernetes",
 				IDPName:  idp.Name,
 				IDPToken: "fake-db",
 				Meta:     map[string]string{"pod": "pod1"},
@@ -4135,14 +3907,19 @@ func TestACLEndpoint_Login(t *testing.T) {
 		require.Len(t, resp.ServiceIdentities, 1)
 		svcid := resp.ServiceIdentities[0]
 		require.Len(t, svcid.Datacenters, 0)
-		require.Equal(t, "k8s-db", svcid.ServiceName)
+		require.Equal(t, "idp-db", svcid.ServiceName)
 	})
 
+	testSessionID_2 := testidp.StartSession()
+	defer testidp.ResetSession(testSessionID_2)
 	{
-		// Update the k8s idp to force the cache to invalidate for the next
+		// Update the idp to force the cache to invalidate for the next
 		// subtest.
 		updated := *idp
 		updated.Description = "updated for the test"
+		updated.Config = map[string]interface{}{
+			"SessionID": testSessionID_2,
+		}
 
 		req := structs.ACLIdentityProviderSetRequest{
 			Datacenter:       "dc1",
@@ -4154,22 +3931,11 @@ func TestACLEndpoint_Login(t *testing.T) {
 		require.NoError(t, acl.IdentityProviderSet(&req, &ignored))
 	}
 
-	// ensure our create hook does something different this time
-	validator2 := &fakeK8SIdentityProviderValidator{}
-	s1.aclIDPValidatorCreateTestHook = func(orig IdentityProviderValidator) (IdentityProviderValidator, error) {
-		if orig.Name() == idp.Name {
-			validator2.IdentityProviderValidator = orig
-			return validator2, nil
-		}
-		return orig, nil
-	}
-
 	t.Run("updating the idp invalidates the cache", func(t *testing.T) {
 		// We'll try to login with the 'fake-db' cred which DOES exist in the
 		// old fake validator, but no longer exists in the new fake validator.
 		req := structs.ACLLoginRequest{
 			Auth: &structs.ACLLoginParams{
-				IDPType:  "kubernetes",
 				IDPName:  idp.Name,
 				IDPToken: "fake-db",
 				Meta:     map[string]string{"pod": "pod1"},
@@ -4200,7 +3966,7 @@ func TestACLEndpoint_Login_k8s(t *testing.T) {
 	acl := ACL{srv: s1}
 
 	// spin up a fake api server
-	testSrv := kubeidp.StartTestAPIServer(t)
+	testSrv := k8s.StartTestAPIServer(t)
 	defer testSrv.Stop()
 
 	testSrv.AuthorizeJWT(goodJWT_A)
@@ -4212,7 +3978,7 @@ func TestACLEndpoint_Login_k8s(t *testing.T) {
 		goodJWT_B,
 	)
 
-	idp, err := upsertTestIDP(
+	idp, err := upsertTestKubernetesIDP(
 		codec, "root", "dc1",
 		testSrv.CACert(),
 		testSrv.Addr(),
@@ -4223,7 +3989,6 @@ func TestACLEndpoint_Login_k8s(t *testing.T) {
 	t.Run("invalid idp token", func(t *testing.T) {
 		req := structs.ACLLoginRequest{
 			Auth: &structs.ACLLoginParams{
-				IDPType:  "kubernetes",
 				IDPName:  idp.Name,
 				IDPToken: "invalid",
 				Meta:     map[string]string{"pod": "pod1"},
@@ -4238,7 +4003,6 @@ func TestACLEndpoint_Login_k8s(t *testing.T) {
 	t.Run("valid idp token no bindings", func(t *testing.T) {
 		req := structs.ACLLoginRequest{
 			Auth: &structs.ACLLoginParams{
-				IDPType:  "kubernetes",
 				IDPName:  idp.Name,
 				IDPToken: goodJWT_B,
 				Meta:     map[string]string{"pod": "pod1"},
@@ -4261,7 +4025,6 @@ func TestACLEndpoint_Login_k8s(t *testing.T) {
 	t.Run("valid idp token 1 service binding", func(t *testing.T) {
 		req := structs.ACLLoginRequest{
 			Auth: &structs.ACLLoginParams{
-				IDPType:  "kubernetes",
 				IDPName:  idp.Name,
 				IDPToken: goodJWT_B,
 				Meta:     map[string]string{"pod": "pod1"},
@@ -4294,7 +4057,6 @@ func TestACLEndpoint_Login_k8s(t *testing.T) {
 	t.Run("valid idp token 1 service binding - with annotation", func(t *testing.T) {
 		req := structs.ACLLoginRequest{
 			Auth: &structs.ACLLoginParams{
-				IDPType:  "kubernetes",
 				IDPName:  idp.Name,
 				IDPToken: goodJWT_B,
 				Meta:     map[string]string{"pod": "pod1"},
@@ -4333,32 +4095,22 @@ func TestACLEndpoint_Logout(t *testing.T) {
 
 	acl := ACL{srv: s1}
 
-	// spin up a fake api server
-	testSrv := kubeidp.StartTestAPIServer(t)
-	defer testSrv.Stop()
-
-	testSrv.AuthorizeJWT(goodJWT_A)
-	testSrv.SetAllowedServiceAccount(
-		"default",
-		"demo",
-		"76091af4-4b56-11e9-ac4b-708b11801cbe",
-		"",
-		goodJWT_B,
+	testSessionID := testidp.StartSession()
+	defer testidp.ResetSession(testSessionID)
+	testidp.InstallSessionToken(
+		testSessionID,
+		"fake-db", // 1 rule
+		"default", "db", "def456",
 	)
 
-	idp, err := upsertTestIDP(
-		codec, "root", "dc1",
-		testSrv.CACert(),
-		testSrv.Addr(),
-		goodJWT_A,
-	)
+	idp, err := upsertTestIDP(codec, "root", "dc1", testSessionID)
 	require.NoError(t, err)
 
 	_, err = upsertTestBindingRule(
 		codec, "root", "dc1", idp.Name,
 		"",
 		structs.BindingRuleBindTypeService,
-		"k8s-${serviceaccount.name}",
+		"idp-${serviceaccount.name}",
 	)
 	require.NoError(t, err)
 
@@ -4395,10 +4147,8 @@ func TestACLEndpoint_Logout(t *testing.T) {
 		// Create a totally legit Login token.
 		loginReq := structs.ACLLoginRequest{
 			Auth: &structs.ACLLoginParams{
-				IDPType:  "kubernetes",
 				IDPName:  idp.Name,
-				IDPToken: goodJWT_B,
-				Meta:     map[string]string{"pod": "pod1"},
+				IDPToken: "fake-db",
 			},
 			Datacenter: "dc1",
 		}
@@ -4785,8 +4535,38 @@ func deleteTestIDP(codec rpc.ClientCodec, masterToken string, datacenter string,
 	err := msgpackrpc.CallWithCodec(codec, "ACL.IdentityProviderDelete", &arg, &ignored)
 	return err
 }
-
 func upsertTestIDP(
+	codec rpc.ClientCodec, masterToken string, datacenter string,
+	sessionID string,
+) (*structs.ACLIdentityProvider, error) {
+	name, err := uuid.GenerateUUID()
+	if err != nil {
+		return nil, err
+	}
+
+	req := structs.ACLIdentityProviderSetRequest{
+		Datacenter: datacenter,
+		IdentityProvider: structs.ACLIdentityProvider{
+			Name: "test-idp-" + name,
+			Type: "testing",
+			Config: map[string]interface{}{
+				"SessionID": sessionID,
+			},
+		},
+		WriteRequest: structs.WriteRequest{Token: masterToken},
+	}
+
+	var out structs.ACLIdentityProvider
+
+	err = msgpackrpc.CallWithCodec(codec, "ACL.IdentityProviderSet", &req, &out)
+	if err != nil {
+		return nil, err
+	}
+
+	return &out, nil
+}
+
+func upsertTestKubernetesIDP(
 	codec rpc.ClientCodec, masterToken string, datacenter string,
 	caCert, kubeHost, kubeJWT string,
 ) (*structs.ACLIdentityProvider, error) {
@@ -4805,11 +4585,13 @@ func upsertTestIDP(
 	req := structs.ACLIdentityProviderSetRequest{
 		Datacenter: datacenter,
 		IdentityProvider: structs.ACLIdentityProvider{
-			Name:                        "test-idp-" + name,
-			Type:                        "kubernetes",
-			KubernetesHost:              kubeHost,
-			KubernetesCACert:            caCert,
-			KubernetesServiceAccountJWT: kubeJWT,
+			Name: "test-idp-" + name,
+			Type: "kubernetes",
+			Config: map[string]interface{}{
+				"Host":              kubeHost,
+				"CACert":            caCert,
+				"ServiceAccountJWT": kubeJWT,
+			},
 		},
 		WriteRequest: structs.WriteRequest{Token: masterToken},
 	}

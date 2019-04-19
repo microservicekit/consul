@@ -1,10 +1,11 @@
-package kubeidp
+package k8s
 
 import (
 	"errors"
 	"fmt"
 	"strings"
 
+	idp_pkg "github.com/hashicorp/consul/agent/consul/idp"
 	"github.com/hashicorp/consul/agent/structs"
 	cleanhttp "github.com/hashicorp/go-cleanhttp"
 	"gopkg.in/square/go-jose.v2/jwt"
@@ -17,6 +18,17 @@ import (
 	cert "k8s.io/client-go/util/cert"
 )
 
+func init() {
+	// register this as an available idp type
+	idp_pkg.Register("kubernetes", func(idp *structs.ACLIdentityProvider) (idp_pkg.Validator, error) {
+		v, err := NewValidator(idp)
+		if err != nil {
+			return nil, err
+		}
+		return v, nil
+	})
+}
+
 const (
 	serviceAccountNamespaceField = "serviceaccount.namespace"
 	serviceAccountNameField      = "serviceaccount.name"
@@ -25,47 +37,66 @@ const (
 	serviceAccountServiceNameAnnotation = "consul.hashicorp.com/service-name"
 )
 
+type Config struct {
+	// Host must be a host string, a host:port pair, or a URL to the base of
+	// the Kubernetes API server.
+	Host string `json:",omitempty"`
+
+	// PEM encoded CA cert for use by the TLS client used to talk with the
+	// Kubernetes API. Every line must end with a newline: \n
+	CACert string `json:",omitempty"`
+
+	// A service account JWT used to access the TokenReview API to validate
+	// other JWTs during login. It also must be able to read ServiceAccount
+	// annotations.
+	ServiceAccountJWT string `json:",omitempty"`
+}
+
 // Validator is the wrapper around the relevant portions of the Kubernetes API
 // that also conforms to the IdentityProviderValidator interface.
 type Validator struct {
-	idp      *structs.ACLIdentityProvider
+	name     string
+	config   *Config
 	saGetter client_corev1.ServiceAccountsGetter
 	trGetter client_authv1.TokenReviewsGetter
 }
 
 func NewValidator(idp *structs.ACLIdentityProvider) (*Validator, error) {
-	idp = idp.Clone() // avoid monkeying with memdb copy
-
 	if idp.Type != "kubernetes" {
 		return nil, fmt.Errorf("%q is not a kubernetes identity provider", idp.Name)
 	}
 
-	if idp.KubernetesHost == "" {
-		return nil, fmt.Errorf("KubernetesHost is required")
+	var config Config
+	if err := idp_pkg.ParseConfig(idp.Config, &config); err != nil {
+		return nil, err
 	}
 
-	if idp.KubernetesCACert == "" {
-		return nil, fmt.Errorf("KubernetesCACert is required")
+	if config.Host == "" {
+		return nil, fmt.Errorf("Config.Host is required")
 	}
-	if _, err := cert.ParseCertsPEM([]byte(idp.KubernetesCACert)); err != nil {
+
+	if config.CACert == "" {
+		return nil, fmt.Errorf("Config.CACert is required")
+	}
+	if _, err := cert.ParseCertsPEM([]byte(config.CACert)); err != nil {
 		return nil, fmt.Errorf("error parsing kubernetes ca cert: %v", err)
 	}
 
 	// This is the bearer token we give the apiserver to use the API.
-	if idp.KubernetesServiceAccountJWT == "" {
-		return nil, fmt.Errorf("KubernetesServiceAccountJWT is required")
+	if config.ServiceAccountJWT == "" {
+		return nil, fmt.Errorf("Config.ServiceAccountJWT is required")
 	}
-	if _, err := jwt.ParseSigned(idp.KubernetesServiceAccountJWT); err != nil {
-		return nil, fmt.Errorf("KubernetesServiceAccountJWT is not a valid JWT: %v", err)
+	if _, err := jwt.ParseSigned(config.ServiceAccountJWT); err != nil {
+		return nil, fmt.Errorf("Config.ServiceAccountJWT is not a valid JWT: %v", err)
 	}
 
 	transport := cleanhttp.DefaultTransport()
 	client, err := k8s.NewForConfig(&client_rest.Config{
-		Host:        idp.KubernetesHost,
-		BearerToken: idp.KubernetesServiceAccountJWT,
+		Host:        config.Host,
+		BearerToken: config.ServiceAccountJWT,
 		Dial:        transport.DialContext,
 		TLSClientConfig: client_rest.TLSClientConfig{
-			CAData: []byte(idp.KubernetesCACert),
+			CAData: []byte(config.CACert),
 		},
 		ContentConfig: client_rest.ContentConfig{
 			ContentType: "application/json",
@@ -76,15 +107,14 @@ func NewValidator(idp *structs.ACLIdentityProvider) (*Validator, error) {
 	}
 
 	return &Validator{
-		idp:      idp,
+		name:     idp.Name,
+		config:   &config,
 		saGetter: client.CoreV1(),
 		trGetter: client.AuthenticationV1(),
 	}, nil
 }
 
-func (v *Validator) Name() string {
-	return v.idp.Name
-}
+func (v *Validator) Name() string { return v.name }
 
 func (v *Validator) ValidateLogin(loginToken string) (map[string]string, error) {
 	if _, err := jwt.ParseSigned(loginToken); err != nil {

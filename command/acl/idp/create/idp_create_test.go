@@ -15,6 +15,9 @@ import (
 	"github.com/hashicorp/consul/testrpc"
 	"github.com/mitchellh/cli"
 	"github.com/stretchr/testify/require"
+
+	// activate testing idp
+	_ "github.com/hashicorp/consul/agent/consul/idp/testing"
 )
 
 func TestIDPCreateCommand_noTabs(t *testing.T) {
@@ -63,7 +66,7 @@ func TestIDPCreateCommand(t *testing.T) {
 		args := []string{
 			"-http-addr=" + a.HTTPAddr(),
 			"-token=root",
-			"-type=kubernetes",
+			"-type=testing",
 		}
 
 		ui := cli.NewMockUi()
@@ -74,11 +77,11 @@ func TestIDPCreateCommand(t *testing.T) {
 		require.Contains(t, ui.ErrorWriter.String(), "Missing required '-name' flag")
 	})
 
-	t.Run("type can only be kubernetes", func(t *testing.T) {
+	t.Run("invalid type", func(t *testing.T) {
 		args := []string{
 			"-http-addr=" + a.HTTPAddr(),
 			"-token=root",
-			"-type=fake",
+			"-type=invalid",
 			"-name=my-idp",
 		}
 
@@ -87,8 +90,45 @@ func TestIDPCreateCommand(t *testing.T) {
 
 		code := cmd.Run(args)
 		require.Equal(t, code, 1)
-		require.Contains(t, ui.ErrorWriter.String(), "This tool can only create identity providers of type=kubernetes at this time.")
+		require.Contains(t, ui.ErrorWriter.String(), "Invalid Identity Provider: Type should be one of")
 	})
+
+	t.Run("create testing", func(t *testing.T) {
+		args := []string{
+			"-http-addr=" + a.HTTPAddr(),
+			"-token=root",
+			"-type=testing",
+			"-name=test",
+		}
+
+		ui := cli.NewMockUi()
+		cmd := New(ui)
+
+		code := cmd.Run(args)
+		require.Equal(t, code, 0)
+		require.Empty(t, ui.ErrorWriter.String())
+	})
+}
+
+func TestIDPCreateCommand_k8s(t *testing.T) {
+	t.Parallel()
+
+	testDir := testutil.TempDir(t, "acl")
+	defer os.RemoveAll(testDir)
+
+	a := agent.NewTestAgent(t, t.Name(), `
+	primary_datacenter = "dc1"
+	acl {
+		enabled = true
+		tokens {
+			master = "root"
+		}
+	}`)
+
+	a.Agent.LogWriter = logger.NewLogWriter(512)
+
+	defer a.Shutdown()
+	testrpc.WaitForLeader(t, a.RPC, "dc1")
 
 	t.Run("k8s host required", func(t *testing.T) {
 		args := []string{

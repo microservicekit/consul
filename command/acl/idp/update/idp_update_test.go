@@ -17,6 +17,9 @@ import (
 	"github.com/hashicorp/go-uuid"
 	"github.com/mitchellh/cli"
 	"github.com/stretchr/testify/require"
+
+	// activate testing idp
+	_ "github.com/hashicorp/consul/agent/consul/idp/testing"
 )
 
 func TestIDPUpdateCommand_noTabs(t *testing.T) {
@@ -49,16 +52,10 @@ func TestIDPUpdateCommand(t *testing.T) {
 
 	client := a.Client()
 
-	ca := connect.TestCA(t, nil)
-	ca2 := connect.TestCA(t, nil)
-
 	t.Run("update without name", func(t *testing.T) {
 		args := []string{
 			"-http-addr=" + a.HTTPAddr(),
 			"-token=root",
-			"-kubernetes-host", "https://foo.internal:8443",
-			"-kubernetes-ca-cert", ca.RootCert,
-			"-kubernetes-service-account-jwt", acl.TestKubernetesJWT_A,
 		}
 
 		ui := cli.NewMockUi()
@@ -73,10 +70,7 @@ func TestIDPUpdateCommand(t *testing.T) {
 		args := []string{
 			"-http-addr=" + a.HTTPAddr(),
 			"-token=root",
-			"-name=k8s",
-			"-kubernetes-host", "https://foo.internal:8443",
-			"-kubernetes-ca-cert", ca.RootCert,
-			"-kubernetes-service-account-jwt", acl.TestKubernetesJWT_A,
+			"-name=test",
 		}
 
 		ui := cli.NewMockUi()
@@ -91,16 +85,189 @@ func TestIDPUpdateCommand(t *testing.T) {
 		id, err := uuid.GenerateUUID()
 		require.NoError(t, err)
 
+		idpName := "test-" + id
+
+		_, _, err = client.ACL().IdentityProviderCreate(
+			&api.ACLIdentityProvider{
+				Name:        idpName,
+				Type:        "testing",
+				Description: "test idp",
+			},
+			&api.WriteOptions{Token: "root"},
+		)
+		require.NoError(t, err)
+
+		return idpName
+	}
+
+	t.Run("update all fields", func(t *testing.T) {
+		name := createIDP(t)
+
+		args := []string{
+			"-http-addr=" + a.HTTPAddr(),
+			"-token=root",
+			"-name=" + name,
+			"-description", "updated description",
+		}
+
+		ui := cli.NewMockUi()
+		cmd := New(ui)
+
+		code := cmd.Run(args)
+		require.Equal(t, code, 0)
+		require.Empty(t, ui.ErrorWriter.String())
+
+		idp, _, err := client.ACL().IdentityProviderRead(
+			name,
+			&api.QueryOptions{Token: "root"},
+		)
+		require.NoError(t, err)
+		require.NotNil(t, idp)
+		require.Equal(t, "updated description", idp.Description)
+	})
+}
+
+func TestIDPUpdateCommand_noMerge(t *testing.T) {
+	t.Parallel()
+
+	testDir := testutil.TempDir(t, "acl")
+	defer os.RemoveAll(testDir)
+
+	a := agent.NewTestAgent(t, t.Name(), `
+	primary_datacenter = "dc1"
+	acl {
+		enabled = true
+		tokens {
+			master = "root"
+		}
+	}`)
+
+	a.Agent.LogWriter = logger.NewLogWriter(512)
+
+	defer a.Shutdown()
+	testrpc.WaitForLeader(t, a.RPC, "dc1")
+
+	client := a.Client()
+
+	t.Run("update without name", func(t *testing.T) {
+		args := []string{
+			"-http-addr=" + a.HTTPAddr(),
+			"-token=root",
+			"-no-merge",
+		}
+
+		ui := cli.NewMockUi()
+		cmd := New(ui)
+
+		code := cmd.Run(args)
+		require.Equal(t, code, 1)
+		require.Contains(t, ui.ErrorWriter.String(), "Cannot update an identity provider without specifying the -name parameter")
+	})
+
+	t.Run("update nonexistent idp", func(t *testing.T) {
+		args := []string{
+			"-http-addr=" + a.HTTPAddr(),
+			"-token=root",
+			"-no-merge",
+			"-name=test",
+		}
+
+		ui := cli.NewMockUi()
+		cmd := New(ui)
+
+		code := cmd.Run(args)
+		require.Equal(t, code, 1)
+		require.Contains(t, ui.ErrorWriter.String(), "Identity Provider not found with name")
+	})
+
+	createIDP := func(t *testing.T) string {
+		id, err := uuid.GenerateUUID()
+		require.NoError(t, err)
+
+		idpName := "test-" + id
+
+		_, _, err = client.ACL().IdentityProviderCreate(
+			&api.ACLIdentityProvider{
+				Name:        idpName,
+				Type:        "testing",
+				Description: "test idp",
+			},
+			&api.WriteOptions{Token: "root"},
+		)
+		require.NoError(t, err)
+
+		return idpName
+	}
+
+	t.Run("update all fields", func(t *testing.T) {
+		name := createIDP(t)
+
+		args := []string{
+			"-http-addr=" + a.HTTPAddr(),
+			"-token=root",
+			"-no-merge",
+			"-name=" + name,
+			"-description", "updated description",
+		}
+
+		ui := cli.NewMockUi()
+		cmd := New(ui)
+
+		code := cmd.Run(args)
+		require.Equal(t, code, 0, "err: %s", ui.ErrorWriter.String())
+		require.Empty(t, ui.ErrorWriter.String())
+
+		idp, _, err := client.ACL().IdentityProviderRead(
+			name,
+			&api.QueryOptions{Token: "root"},
+		)
+		require.NoError(t, err)
+		require.NotNil(t, idp)
+		require.Equal(t, "updated description", idp.Description)
+	})
+}
+
+func TestIDPUpdateCommand_k8s(t *testing.T) {
+	t.Parallel()
+
+	testDir := testutil.TempDir(t, "acl")
+	defer os.RemoveAll(testDir)
+
+	a := agent.NewTestAgent(t, t.Name(), `
+	primary_datacenter = "dc1"
+	acl {
+		enabled = true
+		tokens {
+			master = "root"
+		}
+	}`)
+
+	a.Agent.LogWriter = logger.NewLogWriter(512)
+
+	defer a.Shutdown()
+	testrpc.WaitForLeader(t, a.RPC, "dc1")
+
+	client := a.Client()
+
+	ca := connect.TestCA(t, nil)
+	ca2 := connect.TestCA(t, nil)
+
+	createIDP := func(t *testing.T) string {
+		id, err := uuid.GenerateUUID()
+		require.NoError(t, err)
+
 		idpName := "k8s-" + id
 
 		_, _, err = client.ACL().IdentityProviderCreate(
 			&api.ACLIdentityProvider{
-				Name:                        idpName,
-				Type:                        "kubernetes",
-				Description:                 "test idp",
-				KubernetesHost:              "https://foo.internal:8443",
-				KubernetesCACert:            ca.RootCert,
-				KubernetesServiceAccountJWT: acl.TestKubernetesJWT_A,
+				Name:        idpName,
+				Type:        "kubernetes",
+				Description: "test idp",
+				Config: map[string]interface{}{
+					"Host":              "https://foo.internal:8443",
+					"CACert":            ca.RootCert,
+					"ServiceAccountJWT": acl.TestKubernetesJWT_A,
+				},
 			},
 			&api.WriteOptions{Token: "root"},
 		)
@@ -136,9 +303,12 @@ func TestIDPUpdateCommand(t *testing.T) {
 		require.NoError(t, err)
 		require.NotNil(t, idp)
 		require.Equal(t, "updated description", idp.Description)
-		require.Equal(t, "https://foo-new.internal:8443", idp.KubernetesHost)
-		require.Equal(t, ca2.RootCert, idp.KubernetesCACert)
-		require.Equal(t, acl.TestKubernetesJWT_B, idp.KubernetesServiceAccountJWT)
+
+		config, err := api.ParseKubernetesIdentityProviderConfig(idp.Config)
+		require.NoError(t, err)
+		require.Equal(t, "https://foo-new.internal:8443", config.Host)
+		require.Equal(t, ca2.RootCert, config.CACert)
+		require.Equal(t, acl.TestKubernetesJWT_B, config.ServiceAccountJWT)
 	})
 
 	ca2File := filepath.Join(testDir, "ca2.crt")
@@ -171,9 +341,13 @@ func TestIDPUpdateCommand(t *testing.T) {
 		require.NoError(t, err)
 		require.NotNil(t, idp)
 		require.Equal(t, "updated description", idp.Description)
-		require.Equal(t, "https://foo-new.internal:8443", idp.KubernetesHost)
-		require.Equal(t, ca2.RootCert, idp.KubernetesCACert)
-		require.Equal(t, acl.TestKubernetesJWT_B, idp.KubernetesServiceAccountJWT)
+
+		config, err := api.ParseKubernetesIdentityProviderConfig(idp.Config)
+		require.NoError(t, err)
+
+		require.Equal(t, "https://foo-new.internal:8443", config.Host)
+		require.Equal(t, ca2.RootCert, config.CACert)
+		require.Equal(t, acl.TestKubernetesJWT_B, config.ServiceAccountJWT)
 	})
 
 	t.Run("update all fields but k8s host", func(t *testing.T) {
@@ -202,9 +376,13 @@ func TestIDPUpdateCommand(t *testing.T) {
 		require.NoError(t, err)
 		require.NotNil(t, idp)
 		require.Equal(t, "updated description", idp.Description)
-		require.Equal(t, "https://foo.internal:8443", idp.KubernetesHost)
-		require.Equal(t, ca2.RootCert, idp.KubernetesCACert)
-		require.Equal(t, acl.TestKubernetesJWT_B, idp.KubernetesServiceAccountJWT)
+
+		config, err := api.ParseKubernetesIdentityProviderConfig(idp.Config)
+		require.NoError(t, err)
+
+		require.Equal(t, "https://foo.internal:8443", config.Host)
+		require.Equal(t, ca2.RootCert, config.CACert)
+		require.Equal(t, acl.TestKubernetesJWT_B, config.ServiceAccountJWT)
 	})
 
 	t.Run("update all fields but k8s ca cert", func(t *testing.T) {
@@ -233,9 +411,13 @@ func TestIDPUpdateCommand(t *testing.T) {
 		require.NoError(t, err)
 		require.NotNil(t, idp)
 		require.Equal(t, "updated description", idp.Description)
-		require.Equal(t, "https://foo-new.internal:8443", idp.KubernetesHost)
-		require.Equal(t, ca.RootCert, idp.KubernetesCACert)
-		require.Equal(t, acl.TestKubernetesJWT_B, idp.KubernetesServiceAccountJWT)
+
+		config, err := api.ParseKubernetesIdentityProviderConfig(idp.Config)
+		require.NoError(t, err)
+
+		require.Equal(t, "https://foo-new.internal:8443", config.Host)
+		require.Equal(t, ca.RootCert, config.CACert)
+		require.Equal(t, acl.TestKubernetesJWT_B, config.ServiceAccountJWT)
 	})
 
 	t.Run("update all fields but k8s jwt", func(t *testing.T) {
@@ -264,13 +446,17 @@ func TestIDPUpdateCommand(t *testing.T) {
 		require.NoError(t, err)
 		require.NotNil(t, idp)
 		require.Equal(t, "updated description", idp.Description)
-		require.Equal(t, "https://foo-new.internal:8443", idp.KubernetesHost)
-		require.Equal(t, ca2.RootCert, idp.KubernetesCACert)
-		require.Equal(t, acl.TestKubernetesJWT_A, idp.KubernetesServiceAccountJWT)
+
+		config, err := api.ParseKubernetesIdentityProviderConfig(idp.Config)
+		require.NoError(t, err)
+
+		require.Equal(t, "https://foo-new.internal:8443", config.Host)
+		require.Equal(t, ca2.RootCert, config.CACert)
+		require.Equal(t, acl.TestKubernetesJWT_A, config.ServiceAccountJWT)
 	})
 }
 
-func TestIDPUpdateCommand_noMerge(t *testing.T) {
+func TestIDPUpdateCommand_k8s_noMerge(t *testing.T) {
 	t.Parallel()
 
 	testDir := testutil.TempDir(t, "acl")
@@ -295,43 +481,6 @@ func TestIDPUpdateCommand_noMerge(t *testing.T) {
 	ca := connect.TestCA(t, nil)
 	ca2 := connect.TestCA(t, nil)
 
-	t.Run("update without name", func(t *testing.T) {
-		args := []string{
-			"-http-addr=" + a.HTTPAddr(),
-			"-token=root",
-			"-no-merge",
-			"-kubernetes-host", "https://foo.internal:8443",
-			"-kubernetes-ca-cert", ca.RootCert,
-			"-kubernetes-service-account-jwt", acl.TestKubernetesJWT_A,
-		}
-
-		ui := cli.NewMockUi()
-		cmd := New(ui)
-
-		code := cmd.Run(args)
-		require.Equal(t, code, 1)
-		require.Contains(t, ui.ErrorWriter.String(), "Cannot update an identity provider without specifying the -name parameter")
-	})
-
-	t.Run("update nonexistent idp", func(t *testing.T) {
-		args := []string{
-			"-http-addr=" + a.HTTPAddr(),
-			"-token=root",
-			"-no-merge",
-			"-name=k8s",
-			"-kubernetes-host", "https://foo.internal:8443",
-			"-kubernetes-ca-cert", ca.RootCert,
-			"-kubernetes-service-account-jwt", acl.TestKubernetesJWT_A,
-		}
-
-		ui := cli.NewMockUi()
-		cmd := New(ui)
-
-		code := cmd.Run(args)
-		require.Equal(t, code, 1)
-		require.Contains(t, ui.ErrorWriter.String(), "Identity Provider not found with name")
-	})
-
 	createIDP := func(t *testing.T) string {
 		id, err := uuid.GenerateUUID()
 		require.NoError(t, err)
@@ -340,12 +489,14 @@ func TestIDPUpdateCommand_noMerge(t *testing.T) {
 
 		_, _, err = client.ACL().IdentityProviderCreate(
 			&api.ACLIdentityProvider{
-				Name:                        idpName,
-				Type:                        "kubernetes",
-				Description:                 "test idp",
-				KubernetesHost:              "https://foo.internal:8443",
-				KubernetesCACert:            ca.RootCert,
-				KubernetesServiceAccountJWT: acl.TestKubernetesJWT_A,
+				Name:        idpName,
+				Type:        "kubernetes",
+				Description: "test idp",
+				Config: map[string]interface{}{
+					"Host":              "https://foo.internal:8443",
+					"CACert":            ca.RootCert,
+					"ServiceAccountJWT": acl.TestKubernetesJWT_A,
+				},
 			},
 			&api.WriteOptions{Token: "root"},
 		)
@@ -445,9 +596,13 @@ func TestIDPUpdateCommand_noMerge(t *testing.T) {
 		require.NoError(t, err)
 		require.NotNil(t, idp)
 		require.Equal(t, "updated description", idp.Description)
-		require.Equal(t, "https://foo-new.internal:8443", idp.KubernetesHost)
-		require.Equal(t, ca2.RootCert, idp.KubernetesCACert)
-		require.Equal(t, acl.TestKubernetesJWT_B, idp.KubernetesServiceAccountJWT)
+
+		config, err := api.ParseKubernetesIdentityProviderConfig(idp.Config)
+		require.NoError(t, err)
+
+		require.Equal(t, "https://foo-new.internal:8443", config.Host)
+		require.Equal(t, ca2.RootCert, config.CACert)
+		require.Equal(t, acl.TestKubernetesJWT_B, config.ServiceAccountJWT)
 	})
 
 	ca2File := filepath.Join(testDir, "ca2.crt")
@@ -481,8 +636,12 @@ func TestIDPUpdateCommand_noMerge(t *testing.T) {
 		require.NoError(t, err)
 		require.NotNil(t, idp)
 		require.Equal(t, "updated description", idp.Description)
-		require.Equal(t, "https://foo-new.internal:8443", idp.KubernetesHost)
-		require.Equal(t, ca2.RootCert, idp.KubernetesCACert)
-		require.Equal(t, acl.TestKubernetesJWT_B, idp.KubernetesServiceAccountJWT)
+
+		config, err := api.ParseKubernetesIdentityProviderConfig(idp.Config)
+		require.NoError(t, err)
+
+		require.Equal(t, "https://foo-new.internal:8443", config.Host)
+		require.Equal(t, ca2.RootCert, config.CACert)
+		require.Equal(t, acl.TestKubernetesJWT_B, config.ServiceAccountJWT)
 	})
 }

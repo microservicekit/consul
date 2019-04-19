@@ -7,14 +7,15 @@ import (
 	"testing"
 
 	"github.com/hashicorp/consul/agent"
-	"github.com/hashicorp/consul/agent/connect"
 	"github.com/hashicorp/consul/api"
-	"github.com/hashicorp/consul/command/acl"
 	"github.com/hashicorp/consul/logger"
 	"github.com/hashicorp/consul/sdk/testutil"
 	"github.com/hashicorp/consul/testrpc"
 	"github.com/mitchellh/cli"
 	"github.com/stretchr/testify/require"
+
+	// activate testing idp
+	_ "github.com/hashicorp/consul/agent/consul/idp/testing"
 )
 
 func TestBindingRuleListCommand_noTabs(t *testing.T) {
@@ -48,15 +49,10 @@ func TestBindingRuleListCommand(t *testing.T) {
 	client := a.Client()
 
 	{
-		ca := connect.TestCA(t, nil)
-		ca2 := connect.TestCA(t, nil)
 		_, _, err := client.ACL().IdentityProviderCreate(
 			&api.ACLIdentityProvider{
-				Name:                        "k8s-1",
-				Type:                        "kubernetes",
-				KubernetesHost:              "https://foo.internal:8443",
-				KubernetesCACert:            ca.RootCert,
-				KubernetesServiceAccountJWT: acl.TestKubernetesJWT_A,
+				Name: "test-1",
+				Type: "testing",
 			},
 			&api.WriteOptions{Token: "root"},
 		)
@@ -64,11 +60,8 @@ func TestBindingRuleListCommand(t *testing.T) {
 
 		_, _, err = client.ACL().IdentityProviderCreate(
 			&api.ACLIdentityProvider{
-				Name:                        "k8s-2",
-				Type:                        "kubernetes",
-				KubernetesHost:              "https://foo.internal:8443",
-				KubernetesCACert:            ca2.RootCert,
-				KubernetesServiceAccountJWT: acl.TestKubernetesJWT_A,
+				Name: "test-2",
+				Type: "testing",
 			},
 			&api.WriteOptions{Token: "root"},
 		)
@@ -81,7 +74,7 @@ func TestBindingRuleListCommand(t *testing.T) {
 				IDPName:     idpName,
 				Description: description,
 				BindType:    api.BindingRuleBindTypeService,
-				BindName:    "k8s-${serviceaccount.name}",
+				BindName:    "test-${serviceaccount.name}",
 				Selector:    "serviceaccount.namespace==default",
 			},
 			&api.WriteOptions{Token: "root"},
@@ -96,9 +89,9 @@ func TestBindingRuleListCommand(t *testing.T) {
 
 		var idpName string
 		if i%2 == 0 {
-			idpName = "k8s-1"
+			idpName = "test-1"
 		} else {
-			idpName = "k8s-2"
+			idpName = "test-2"
 		}
 
 		id := createRule(t, idpName, name)
@@ -130,7 +123,7 @@ func TestBindingRuleListCommand(t *testing.T) {
 		args := []string{
 			"-http-addr=" + a.HTTPAddr(),
 			"-token=root",
-			"-idp-name=k8s-1",
+			"-idp-name=test-1",
 		}
 
 		ui := cli.NewMockUi()
@@ -153,7 +146,7 @@ func TestBindingRuleListCommand(t *testing.T) {
 		args := []string{
 			"-http-addr=" + a.HTTPAddr(),
 			"-token=root",
-			"-idp-name=k8s-2",
+			"-idp-name=test-2",
 		}
 
 		ui := cli.NewMockUi()

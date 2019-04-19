@@ -3,68 +3,29 @@ package consul
 import (
 	"fmt"
 
-	"github.com/hashicorp/consul/agent/consul/kubeidp"
+	idp_pkg "github.com/hashicorp/consul/agent/consul/idp"
 	"github.com/hashicorp/consul/agent/structs"
 	"github.com/hashicorp/go-bexpr"
+
+	// register this as a builtin idp
+	_ "github.com/hashicorp/consul/agent/consul/idp/k8s"
 )
 
-type IdentityProviderValidator interface {
-	// Name returns the name of the identity provider backing this validator.
-	Name() string
-
-	// ValidateLogin takes raw user-provided IdP metadata and ensures it is
-	// sane, provably correct, and currently valid. Relevant identifying data
-	// is extracted and returned for immediate use by the role binding process.
-	//
-	// Depending upon the provider, it may make sense to use these calls to
-	// continue to extend the life of the underlying token.
-	//
-	// Returns IdP specific metadata suitable for the Role Binding process.
-	ValidateLogin(loginToken string) (map[string]string, error)
-
-	// AvailableFields returns a slice of all fields that are returned as a
-	// result of ValidateLogin. These are valid fields for use in any
-	// BindingRule tied to this identity provider.
-	AvailableFields() []string
-
-	// MakeFieldMapSelectable converts a field map as returned by ValidateLogin
-	// into a structure suitable for selection with a binding rule.
-	MakeFieldMapSelectable(fieldMap map[string]string) interface{}
-}
-
-// createIdentityProviderValidator returns an IdentityProviderValidator for the
-// given idp configuration.
-//
-// No caches are updated.
-func (s *Server) createIdentityProviderValidator(idp *structs.ACLIdentityProvider) (IdentityProviderValidator, error) {
-	switch idp.Type {
-	case "kubernetes":
-		return kubeidp.NewValidator(idp)
-	default:
-		return nil, fmt.Errorf("identity provider with name %q found with unknown type %q", idp.Name, idp.Type)
-	}
-}
-
 type idpValidatorEntry struct {
-	Validator   IdentityProviderValidator
+	Validator   idp_pkg.Validator
 	ModifyIndex uint64 // the raft index when this last changed
 }
 
-// loadIdentityProviderValidator returns an IdentityProviderValidator for the
+// loadIdentityProviderValidator returns an idp_pkg.Validator for the
 // given idp configuration. If the cache is up to date as-of the provided index
 // then the cached version is returned, otherwise a new validator is created
 // and cached.
-func (s *Server) loadIdentityProviderValidator(idx uint64, idp *structs.ACLIdentityProvider) (IdentityProviderValidator, error) {
+func (s *Server) loadIdentityProviderValidator(idx uint64, idp *structs.ACLIdentityProvider) (idp_pkg.Validator, error) {
 	if prevIdx, v, ok := s.getCachedIdentityProviderValidator(idp.Name); ok && idx <= prevIdx {
 		return v, nil
 	}
 
-	v, err := s.createIdentityProviderValidator(idp)
-
-	if err == nil && s.aclIDPValidatorCreateTestHook != nil {
-		v, err = s.aclIDPValidatorCreateTestHook(v)
-	}
-
+	v, err := idp_pkg.Create(idp)
 	if err != nil {
 		return nil, fmt.Errorf("identity provider validator for %q could not be initialized: %v", idp.Name, err)
 	}
@@ -77,7 +38,7 @@ func (s *Server) loadIdentityProviderValidator(idx uint64, idp *structs.ACLIdent
 // getCachedIdentityProviderValidator returns an IdentityProviderValidator for
 // the given name exclusively from the cache. If one is not found in the cache
 // nil is returned.
-func (s *Server) getCachedIdentityProviderValidator(name string) (uint64, IdentityProviderValidator, bool) {
+func (s *Server) getCachedIdentityProviderValidator(name string) (uint64, idp_pkg.Validator, bool) {
 	s.aclIDPValidatorLock.RLock()
 	defer s.aclIDPValidatorLock.RUnlock()
 
@@ -93,7 +54,7 @@ func (s *Server) getCachedIdentityProviderValidator(name string) (uint64, Identi
 // getOrReplaceIdentityProviderValidator updates the cached validator with the
 // provided one UNLESS it has been updated by another goroutine in which case
 // the updated one is returned.
-func (s *Server) getOrReplaceIdentityProviderValidator(name string, idx uint64, v IdentityProviderValidator) IdentityProviderValidator {
+func (s *Server) getOrReplaceIdentityProviderValidator(name string, idx uint64, v idp_pkg.Validator) idp_pkg.Validator {
 	s.aclIDPValidatorLock.Lock()
 	defer s.aclIDPValidatorLock.Unlock()
 
@@ -130,7 +91,7 @@ func (s *Server) purgeIdentityProviderValidators() {
 //
 // A list of role links and service identities are returned.
 func (s *Server) evaluateRoleBindings(
-	validator IdentityProviderValidator,
+	validator idp_pkg.Validator,
 	verifiedFields map[string]string,
 ) ([]*structs.ACLServiceIdentity, []structs.ACLTokenRoleLink, error) {
 	// Only fetch rules that are relevant for this idp.

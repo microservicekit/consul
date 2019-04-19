@@ -120,12 +120,6 @@ func (c *cmd) Run(args []string) int {
 		return 1
 	}
 
-	if currentIDP.Type != "kubernetes" {
-		c.UI.Error(fmt.Sprintf("This tool can only update identity providers of type=kubernetes at this time."))
-		c.UI.Error(c.Help())
-		return 1
-	}
-
 	if c.k8sCACert != "" && c.k8sCACert[0] == '@' {
 		data, err := ioutil.ReadFile(c.k8sCACert[1:])
 		if err != nil {
@@ -141,24 +135,29 @@ func (c *cmd) Run(args []string) int {
 
 	var idp *api.ACLIdentityProvider
 	if c.noMerge {
-		if c.k8sHost == "" {
-			c.UI.Error(fmt.Sprintf("Missing required '-kubernetes-host' flag"))
-			return 1
-		} else if c.k8sCACert == "" {
-			c.UI.Error(fmt.Sprintf("Missing required '-kubernetes-ca-cert' flag"))
-			return 1
-		} else if c.k8sServiceAccountJWT == "" {
-			c.UI.Error(fmt.Sprintf("Missing required '-kubernetes-service-account-jwt' flag"))
-			return 1
+		idp = &api.ACLIdentityProvider{
+			Name:        currentIDP.Name,
+			Type:        currentIDP.Type,
+			Description: c.description,
 		}
 
-		idp = &api.ACLIdentityProvider{
-			Name:                        currentIDP.Name,
-			Type:                        currentIDP.Type,
-			Description:                 c.description,
-			KubernetesHost:              c.k8sHost,
-			KubernetesCACert:            c.k8sCACert,
-			KubernetesServiceAccountJWT: c.k8sServiceAccountJWT,
+		if currentIDP.Type == "kubernetes" {
+			if c.k8sHost == "" {
+				c.UI.Error(fmt.Sprintf("Missing required '-kubernetes-host' flag"))
+				return 1
+			} else if c.k8sCACert == "" {
+				c.UI.Error(fmt.Sprintf("Missing required '-kubernetes-ca-cert' flag"))
+				return 1
+			} else if c.k8sServiceAccountJWT == "" {
+				c.UI.Error(fmt.Sprintf("Missing required '-kubernetes-service-account-jwt' flag"))
+				return 1
+			}
+
+			idp.Config = map[string]interface{}{
+				"Host":              c.k8sHost,
+				"CACert":            c.k8sCACert,
+				"ServiceAccountJWT": c.k8sServiceAccountJWT,
+			}
 		}
 	} else {
 		idpCopy := *currentIDP
@@ -167,14 +166,19 @@ func (c *cmd) Run(args []string) int {
 		if c.description != "" {
 			idp.Description = c.description
 		}
-		if c.k8sHost != "" {
-			idp.KubernetesHost = c.k8sHost
+		if idp.Config == nil {
+			idp.Config = make(map[string]interface{})
 		}
-		if c.k8sCACert != "" {
-			idp.KubernetesCACert = c.k8sCACert
-		}
-		if c.k8sServiceAccountJWT != "" {
-			idp.KubernetesServiceAccountJWT = c.k8sServiceAccountJWT
+		if currentIDP.Type == "kubernetes" {
+			if c.k8sHost != "" {
+				idp.Config["Host"] = c.k8sHost
+			}
+			if c.k8sCACert != "" {
+				idp.Config["CACert"] = c.k8sCACert
+			}
+			if c.k8sServiceAccountJWT != "" {
+				idp.Config["ServiceAccountJWT"] = c.k8sServiceAccountJWT
+			}
 		}
 	}
 

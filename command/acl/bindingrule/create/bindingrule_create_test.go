@@ -6,14 +6,15 @@ import (
 	"testing"
 
 	"github.com/hashicorp/consul/agent"
-	"github.com/hashicorp/consul/agent/connect"
 	"github.com/hashicorp/consul/api"
-	"github.com/hashicorp/consul/command/acl"
 	"github.com/hashicorp/consul/logger"
 	"github.com/hashicorp/consul/sdk/testutil"
 	"github.com/hashicorp/consul/testrpc"
 	"github.com/mitchellh/cli"
 	"github.com/stretchr/testify/require"
+
+	// activate testing idp
+	_ "github.com/hashicorp/consul/agent/consul/idp/testing"
 )
 
 func TestBindingRuleCreateCommand_noTabs(t *testing.T) {
@@ -48,14 +49,10 @@ func TestBindingRuleCreateCommand(t *testing.T) {
 
 	// create an idp in advance
 	{
-		ca := connect.TestCA(t, nil)
 		_, _, err := client.ACL().IdentityProviderCreate(
 			&api.ACLIdentityProvider{
-				Name:                        "k8s",
-				Type:                        "kubernetes",
-				KubernetesHost:              "https://foo.internal:8443",
-				KubernetesCACert:            ca.RootCert,
-				KubernetesServiceAccountJWT: acl.TestKubernetesJWT_A,
+				Name: "test",
+				Type: "testing",
 			},
 			&api.WriteOptions{Token: "root"},
 		)
@@ -80,7 +77,7 @@ func TestBindingRuleCreateCommand(t *testing.T) {
 		args := []string{
 			"-http-addr=" + a.HTTPAddr(),
 			"-token=root",
-			"-idp-name=k8s",
+			"-idp-name=test",
 			"-bind-type=",
 		}
 
@@ -96,7 +93,7 @@ func TestBindingRuleCreateCommand(t *testing.T) {
 		args := []string{
 			"-http-addr=" + a.HTTPAddr(),
 			"-token=root",
-			"-idp-name=k8s",
+			"-idp-name=test",
 			"-bind-type=service",
 		}
 
@@ -112,7 +109,7 @@ func TestBindingRuleCreateCommand(t *testing.T) {
 		args := []string{
 			"-http-addr=" + a.HTTPAddr(),
 			"-token=root",
-			"-idp-name=k8s",
+			"-idp-name=test",
 			"-bind-type=service",
 			"-bind-name=demo",
 			"-selector", "foo",
@@ -130,7 +127,7 @@ func TestBindingRuleCreateCommand(t *testing.T) {
 		args := []string{
 			"-http-addr=" + a.HTTPAddr(),
 			"-token=root",
-			"-idp-name=k8s",
+			"-idp-name=test",
 			"-bind-type=service",
 			"-bind-name=demo",
 		}
@@ -147,7 +144,7 @@ func TestBindingRuleCreateCommand(t *testing.T) {
 		args := []string{
 			"-http-addr=" + a.HTTPAddr(),
 			"-token=root",
-			"-idp-name=k8s",
+			"-idp-name=test",
 			"-bind-type=service",
 			"-bind-name=demo",
 			"-selector", "serviceaccount.namespace==default and serviceaccount.name==vault",
@@ -165,7 +162,7 @@ func TestBindingRuleCreateCommand(t *testing.T) {
 		args := []string{
 			"-http-addr=" + a.HTTPAddr(),
 			"-token=root",
-			"-idp-name=k8s",
+			"-idp-name=test",
 			"-bind-type=role",
 			"-bind-name=demo",
 			"-selector", "serviceaccount.namespace==default and serviceaccount.name==vault",

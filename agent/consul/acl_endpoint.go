@@ -12,6 +12,7 @@ import (
 
 	metrics "github.com/armon/go-metrics"
 	"github.com/hashicorp/consul/acl"
+	idp_pkg "github.com/hashicorp/consul/agent/consul/idp"
 	"github.com/hashicorp/consul/agent/consul/state"
 	"github.com/hashicorp/consul/agent/structs"
 	"github.com/hashicorp/consul/lib"
@@ -38,9 +39,6 @@ var (
 // ACL endpoint is used to manipulate ACLs
 type ACL struct {
 	srv *Server
-
-	// disableLoginOnlyRestrictionOnTokenSet is only to be used in tests
-	disableLoginOnlyRestrictionOnTokenSet bool
 }
 
 // fileBootstrapResetIndex retrieves the reset index specified by the administrator from
@@ -332,7 +330,7 @@ func (a *ACL) TokenSet(args *structs.ACLTokenSetRequest, reply *structs.ACLToken
 		return acl.ErrPermissionDenied
 	}
 
-	return a.tokenSetInternal(args, reply, a.disableLoginOnlyRestrictionOnTokenSet)
+	return a.tokenSetInternal(args, reply, false)
 }
 
 func (a *ACL) tokenSetInternal(args *structs.ACLTokenSetRequest, reply *structs.ACLToken, fromLogin bool) error {
@@ -1777,13 +1775,13 @@ func (a *ACL) IdentityProviderSet(args *structs.ACLIdentityProviderSetRequest, r
 		}
 	}
 
-	if idp.Type != "kubernetes" {
-		return fmt.Errorf("Invalid Identity Provider: Type should be one of [kubernetes]")
+	if !idp_pkg.IsRegisteredType(idp.Type) {
+		return fmt.Errorf("Invalid Identity Provider: Type should be one of: %v", idp_pkg.Types())
 	}
 
 	// Instantiate a validator but do not cache it yet. This will validate the
 	// configuration.
-	if _, err := a.srv.createIdentityProviderValidator(idp); err != nil {
+	if _, err := idp_pkg.Create(idp); err != nil {
 		return fmt.Errorf("Invalid Identity Provider: %v", err)
 	}
 
@@ -1915,10 +1913,6 @@ func (a *ACL) Login(args *structs.ACLLoginRequest, reply *structs.ACLToken) erro
 		return err
 	} else if idp == nil {
 		return acl.ErrNotFound
-	}
-
-	if idp.Type != auth.IDPType {
-		return fmt.Errorf("identity provider with name %q is of type %q not %q", idp.Name, idp.Type, auth.IDPType)
 	}
 
 	validator, err := a.srv.loadIdentityProviderValidator(idx, idp)

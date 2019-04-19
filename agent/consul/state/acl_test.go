@@ -57,8 +57,8 @@ func testACLStateStore(t *testing.T) *Store {
 func setupExtraIDPs(t *testing.T, s *Store) {
 	idps := structs.ACLIdentityProviders{
 		&structs.ACLIdentityProvider{
-			Name:        "k8s",
-			Type:        "kubernetes",
+			Name:        "test",
+			Type:        "testing",
 			Description: "test",
 		},
 	}
@@ -465,7 +465,7 @@ func TestStateStore_ACLToken_SetGet(t *testing.T) {
 		token := &structs.ACLToken{
 			AccessorID: "daf37c07-d04d-4fd5-9678-a8206a57d61a",
 			SecretID:   "39171632-6f34-4411-827f-9416403687f4",
-			IDPName:    "k8s",
+			IDPName:    "test",
 		}
 
 		err := s.ACLTokenSet(2, token, false)
@@ -577,7 +577,7 @@ func TestStateStore_ACLToken_SetGet(t *testing.T) {
 		token := &structs.ACLToken{
 			AccessorID: "daf37c07-d04d-4fd5-9678-a8206a57d61a",
 			SecretID:   "39171632-6f34-4411-827f-9416403687f4",
-			IDPName:    "k8s",
+			IDPName:    "test",
 			Roles: []structs.ACLTokenRoleLink{
 				structs.ACLTokenRoleLink{
 					ID: testRoleID_A,
@@ -593,7 +593,7 @@ func TestStateStore_ACLToken_SetGet(t *testing.T) {
 		compareTokens(t, token, rtoken)
 		require.Equal(t, uint64(2), rtoken.CreateIndex)
 		require.Equal(t, uint64(2), rtoken.ModifyIndex)
-		require.Equal(t, "k8s", rtoken.IDPName)
+		require.Equal(t, "test", rtoken.IDPName)
 		require.Len(t, rtoken.Policies, 0)
 		require.Len(t, rtoken.ServiceIdentities, 0)
 		require.Len(t, rtoken.Roles, 1)
@@ -954,13 +954,13 @@ func TestStateStore_ACLToken_List(t *testing.T) {
 		&structs.ACLToken{
 			AccessorID: "74277ae1-6a9b-4035-b444-2370fe6a2cb5",
 			SecretID:   "ab8ac834-0d35-4cb7-83c3-168203f986cd",
-			IDPName:    "k8s",
+			IDPName:    "test",
 		},
 		// the idp specific token and local
 		&structs.ACLToken{
 			AccessorID: "211f0360-ef53-41d3-9d4d-db84396eb6c0",
 			SecretID:   "087a0eb4-366f-4190-ab4c-a4aa3d2562aa",
-			IDPName:    "k8s",
+			IDPName:    "test",
 			Local:      true,
 		},
 	}
@@ -1081,7 +1081,7 @@ func TestStateStore_ACLToken_List(t *testing.T) {
 			global:  false,
 			policy:  "",
 			role:    "",
-			idpName: "k8s",
+			idpName: "test",
 			accessors: []string{
 				"211f0360-ef53-41d3-9d4d-db84396eb6c0", // idp + local
 			},
@@ -1092,7 +1092,7 @@ func TestStateStore_ACLToken_List(t *testing.T) {
 			global:  true,
 			policy:  "",
 			role:    "",
-			idpName: "k8s",
+			idpName: "test",
 			accessors: []string{
 				"74277ae1-6a9b-4035-b444-2370fe6a2cb5", // idp + global
 			},
@@ -1119,9 +1119,9 @@ func TestStateStore_ACLToken_List(t *testing.T) {
 	}
 
 	for _, tc := range []struct{ policy, role, idpName string }{
-		{testPolicyID_A, testRoleID_A, "k8s"},
-		{"", testRoleID_A, "k8s"},
-		{testPolicyID_A, "", "k8s"},
+		{testPolicyID_A, testRoleID_A, "test"},
+		{"", testRoleID_A, "test"},
+		{testPolicyID_A, "", "test"},
 		{testPolicyID_A, testRoleID_A, ""},
 	} {
 		t.Run(fmt.Sprintf("can't filter on more than one: %s/%s/%s", tc.policy, tc.role, tc.idpName), func(t *testing.T) {
@@ -2629,7 +2629,7 @@ func TestStateStore_ACLIdentityProvider_SetGet(t *testing.T) {
 
 		idp := structs.ACLIdentityProvider{
 			Name:        "",
-			Type:        "kubernetes",
+			Type:        "testing",
 			Description: "test",
 		}
 
@@ -2641,7 +2641,7 @@ func TestStateStore_ACLIdentityProvider_SetGet(t *testing.T) {
 		s := testACLStateStore(t)
 
 		idp := structs.ACLIdentityProvider{
-			Name:        "k8s",
+			Name:        "test",
 			Type:        "",
 			Description: "test",
 		}
@@ -2654,19 +2654,19 @@ func TestStateStore_ACLIdentityProvider_SetGet(t *testing.T) {
 		s := testACLStateStore(t)
 
 		idp := structs.ACLIdentityProvider{
-			Name:        "k8s",
-			Type:        "kubernetes",
+			Name:        "test",
+			Type:        "testing",
 			Description: "test",
 		}
 
 		require.NoError(t, s.ACLIdentityProviderSet(3, &idp))
 
-		idx, ridp, err := s.ACLIdentityProviderGetByName(nil, "k8s")
+		idx, ridp, err := s.ACLIdentityProviderGetByName(nil, "test")
 		require.NoError(t, err)
 		require.Equal(t, uint64(3), idx)
 		require.NotNil(t, ridp)
-		require.Equal(t, "k8s", ridp.Name)
-		require.Equal(t, "kubernetes", ridp.Type)
+		require.Equal(t, "test", ridp.Name)
+		require.Equal(t, "testing", ridp.Type)
 		require.Equal(t, "test", ridp.Description)
 		require.Equal(t, uint64(3), ridp.CreateIndex)
 		require.Equal(t, uint64(3), ridp.ModifyIndex)
@@ -2678,8 +2678,8 @@ func TestStateStore_ACLIdentityProvider_SetGet(t *testing.T) {
 
 		// Create the initial idp
 		idp := structs.ACLIdentityProvider{
-			Name:        "k8s",
-			Type:        "kubernetes",
+			Name:        "test",
+			Type:        "testing",
 			Description: "test",
 		}
 
@@ -2687,22 +2687,24 @@ func TestStateStore_ACLIdentityProvider_SetGet(t *testing.T) {
 
 		// Now make sure we can update it
 		update := structs.ACLIdentityProvider{
-			Name:           "k8s",
-			Type:           "kubernetes",
-			Description:    "modified",
-			KubernetesHost: "https://localhost:8443",
+			Name:        "test",
+			Type:        "testing",
+			Description: "modified",
+			Config: map[string]interface{}{
+				"Host": "https://localhost:8443",
+			},
 		}
 
 		require.NoError(t, s.ACLIdentityProviderSet(3, &update))
 
-		idx, ridp, err := s.ACLIdentityProviderGetByName(nil, "k8s")
+		idx, ridp, err := s.ACLIdentityProviderGetByName(nil, "test")
 		require.NoError(t, err)
 		require.Equal(t, uint64(3), idx)
 		require.NotNil(t, ridp)
-		require.Equal(t, "k8s", ridp.Name)
-		require.Equal(t, "kubernetes", ridp.Type)
+		require.Equal(t, "test", ridp.Name)
+		require.Equal(t, "testing", ridp.Type)
 		require.Equal(t, "modified", ridp.Description)
-		require.Equal(t, "https://localhost:8443", ridp.KubernetesHost)
+		require.Equal(t, update.Config, ridp.Config)
 		require.Equal(t, uint64(2), ridp.CreateIndex)
 		require.Equal(t, uint64(3), ridp.ModifyIndex)
 	})
@@ -2717,13 +2719,13 @@ func TestStateStore_ACLIdentityProviders_UpsertBatchRead(t *testing.T) {
 
 		idps := structs.ACLIdentityProviders{
 			&structs.ACLIdentityProvider{
-				Name:        "k8s-1",
-				Type:        "kubernetes",
+				Name:        "test-1",
+				Type:        "testing",
 				Description: "test-1",
 			},
 			&structs.ACLIdentityProvider{
-				Name:        "k8s-2",
-				Type:        "kubernetes",
+				Name:        "test-2",
+				Type:        "testing",
 				Description: "test-1",
 			},
 		}
@@ -2749,13 +2751,13 @@ func TestStateStore_ACLIdentityProviders_UpsertBatchRead(t *testing.T) {
 		// Seed initial data.
 		idps := structs.ACLIdentityProviders{
 			&structs.ACLIdentityProvider{
-				Name:        "k8s-1",
-				Type:        "kubernetes",
+				Name:        "test-1",
+				Type:        "testing",
 				Description: "test-1",
 			},
 			&structs.ACLIdentityProvider{
-				Name:        "k8s-2",
-				Type:        "kubernetes",
+				Name:        "test-2",
+				Type:        "testing",
 				Description: "test-2",
 			},
 		}
@@ -2765,16 +2767,20 @@ func TestStateStore_ACLIdentityProviders_UpsertBatchRead(t *testing.T) {
 		// Update two idps at the same time.
 		updates := structs.ACLIdentityProviders{
 			&structs.ACLIdentityProvider{
-				Name:           "k8s-1",
-				Type:           "kubernetes",
-				Description:    "test-1 modified",
-				KubernetesHost: "https://localhost:8443",
+				Name:        "test-1",
+				Type:        "testing",
+				Description: "test-1 modified",
+				Config: map[string]interface{}{
+					"Host": "https://localhost:8443",
+				},
 			},
 			&structs.ACLIdentityProvider{
-				Name:           "k8s-2",
-				Type:           "kubernetes",
-				Description:    "test-2 modified",
-				KubernetesHost: "https://localhost:8444",
+				Name:        "test-2",
+				Type:        "testing",
+				Description: "test-2 modified",
+				Config: map[string]interface{}{
+					"Host": "https://localhost:8444",
+				},
 			},
 		}
 
@@ -2799,13 +2805,13 @@ func TestStateStore_ACLIdentityProvider_List(t *testing.T) {
 
 	idps := structs.ACLIdentityProviders{
 		&structs.ACLIdentityProvider{
-			Name:        "k8s-1",
-			Type:        "kubernetes",
+			Name:        "test-1",
+			Type:        "testing",
 			Description: "test-1",
 		},
 		&structs.ACLIdentityProvider{
-			Name:        "k8s-2",
-			Type:        "kubernetes",
+			Name:        "test-2",
+			Type:        "testing",
 			Description: "test-2",
 		},
 	}
@@ -2818,14 +2824,14 @@ func TestStateStore_ACLIdentityProvider_List(t *testing.T) {
 	require.Len(t, ridps, 2)
 	ridps.Sort()
 
-	require.Equal(t, "k8s-1", ridps[0].Name)
-	require.Equal(t, "kubernetes", ridps[0].Type)
+	require.Equal(t, "test-1", ridps[0].Name)
+	require.Equal(t, "testing", ridps[0].Type)
 	require.Equal(t, "test-1", ridps[0].Description)
 	require.Equal(t, uint64(2), ridps[0].CreateIndex)
 	require.Equal(t, uint64(2), ridps[0].ModifyIndex)
 
-	require.Equal(t, "k8s-2", ridps[1].Name)
-	require.Equal(t, "kubernetes", ridps[1].Type)
+	require.Equal(t, "test-2", ridps[1].Name)
+	require.Equal(t, "testing", ridps[1].Type)
 	require.Equal(t, "test-2", ridps[1].Description)
 	require.Equal(t, uint64(2), ridps[1].CreateIndex)
 	require.Equal(t, uint64(2), ridps[1].ModifyIndex)
@@ -2839,21 +2845,21 @@ func TestStateStore_ACLIdentityProvider_Delete(t *testing.T) {
 		s := testACLStateStore(t)
 
 		idp := structs.ACLIdentityProvider{
-			Name:        "k8s",
-			Type:        "kubernetes",
+			Name:        "test",
+			Type:        "testing",
 			Description: "test",
 		}
 
 		require.NoError(t, s.ACLIdentityProviderSet(2, &idp))
 
-		_, ridp, err := s.ACLIdentityProviderGetByName(nil, "k8s")
+		_, ridp, err := s.ACLIdentityProviderGetByName(nil, "test")
 		require.NoError(t, err)
 		require.NotNil(t, ridp)
 
-		require.NoError(t, s.ACLIdentityProviderDeleteByName(3, "k8s"))
+		require.NoError(t, s.ACLIdentityProviderDeleteByName(3, "test"))
 		require.NoError(t, err)
 
-		_, ridp, err = s.ACLIdentityProviderGetByName(nil, "k8s")
+		_, ridp, err = s.ACLIdentityProviderGetByName(nil, "test")
 		require.NoError(t, err)
 		require.Nil(t, ridp)
 	})
@@ -2864,32 +2870,32 @@ func TestStateStore_ACLIdentityProvider_Delete(t *testing.T) {
 
 		idps := structs.ACLIdentityProviders{
 			&structs.ACLIdentityProvider{
-				Name:        "k8s-1",
-				Type:        "kubernetes",
+				Name:        "test-1",
+				Type:        "testing",
 				Description: "test-1",
 			},
 			&structs.ACLIdentityProvider{
-				Name:        "k8s-2",
-				Type:        "kubernetes",
+				Name:        "test-2",
+				Type:        "testing",
 				Description: "test-2",
 			},
 		}
 
 		require.NoError(t, s.ACLIdentityProviderBatchSet(2, idps))
 
-		_, ridp, err := s.ACLIdentityProviderGetByName(nil, "k8s-1")
+		_, ridp, err := s.ACLIdentityProviderGetByName(nil, "test-1")
 		require.NoError(t, err)
 		require.NotNil(t, ridp)
-		_, ridp, err = s.ACLIdentityProviderGetByName(nil, "k8s-2")
+		_, ridp, err = s.ACLIdentityProviderGetByName(nil, "test-2")
 		require.NoError(t, err)
 		require.NotNil(t, ridp)
 
-		require.NoError(t, s.ACLIdentityProviderBatchDelete(3, []string{"k8s-1", "k8s-2"}))
+		require.NoError(t, s.ACLIdentityProviderBatchDelete(3, []string{"test-1", "test-2"}))
 
-		_, ridp, err = s.ACLIdentityProviderGetByName(nil, "k8s-1")
+		_, ridp, err = s.ACLIdentityProviderGetByName(nil, "test-1")
 		require.NoError(t, err)
 		require.Nil(t, ridp)
-		_, ridp, err = s.ACLIdentityProviderGetByName(nil, "k8s-2")
+		_, ridp, err = s.ACLIdentityProviderGetByName(nil, "test-2")
 		require.NoError(t, err)
 		require.Nil(t, ridp)
 	})
@@ -2911,13 +2917,13 @@ func TestStateStore_ACLIdentityProvider_Delete_RuleAndTokenCascade(t *testing.T)
 
 	idps := structs.ACLIdentityProviders{
 		&structs.ACLIdentityProvider{
-			Name:        "k8s-1",
-			Type:        "kubernetes",
+			Name:        "test-1",
+			Type:        "testing",
 			Description: "test-1",
 		},
 		&structs.ACLIdentityProvider{
-			Name:        "k8s-2",
-			Type:        "kubernetes",
+			Name:        "test-2",
+			Type:        "testing",
 			Description: "test-2",
 		},
 	}
@@ -2933,22 +2939,22 @@ func TestStateStore_ACLIdentityProvider_Delete_RuleAndTokenCascade(t *testing.T)
 	rules := structs.ACLBindingRules{
 		&structs.ACLBindingRule{
 			ID:          idp1_rule1,
-			IDPName:     "k8s-1",
+			IDPName:     "test-1",
 			Description: "test-i1-r1",
 		},
 		&structs.ACLBindingRule{
 			ID:          idp1_rule2,
-			IDPName:     "k8s-1",
+			IDPName:     "test-1",
 			Description: "test-i1-r2",
 		},
 		&structs.ACLBindingRule{
 			ID:          idp2_rule1,
-			IDPName:     "k8s-2",
+			IDPName:     "test-2",
 			Description: "test-i2-r1",
 		},
 		&structs.ACLBindingRule{
 			ID:          idp2_rule2,
-			IDPName:     "k8s-2",
+			IDPName:     "test-2",
 			Description: "test-i2-r2",
 		},
 	}
@@ -2966,34 +2972,34 @@ func TestStateStore_ACLIdentityProvider_Delete_RuleAndTokenCascade(t *testing.T)
 			AccessorID:  idp1_tok1,
 			SecretID:    "7a1950c6-79dc-441c-acd2-e22cd3db0240",
 			Description: "test-i1-t1",
-			IDPName:     "k8s-1",
+			IDPName:     "test-1",
 		},
 		&structs.ACLToken{
 			AccessorID:  idp1_tok2,
 			SecretID:    "442cee4c-353f-4957-adbb-33db2f9e267f",
 			Description: "test-i1-t2",
-			IDPName:     "k8s-1",
+			IDPName:     "test-1",
 		},
 		&structs.ACLToken{
 			AccessorID:  idp2_tok1,
 			SecretID:    "d9399b7d-6c34-46bd-a675-c1352fadb6fd",
 			Description: "test-i2-t1",
-			IDPName:     "k8s-2",
+			IDPName:     "test-2",
 		},
 		&structs.ACLToken{
 			AccessorID:  idp2_tok2,
 			SecretID:    "3b72fc27-9230-42ab-a1e8-02cb489ab177",
 			Description: "test-i2-t2",
-			IDPName:     "k8s-2",
+			IDPName:     "test-2",
 		},
 	}
 	require.NoError(t, s.ACLTokenBatchSet(4, tokens, false))
 
 	// Delete one idp.
-	require.NoError(t, s.ACLIdentityProviderDeleteByName(4, "k8s-1"))
+	require.NoError(t, s.ACLIdentityProviderDeleteByName(4, "test-1"))
 
 	// Make sure the idp is gone.
-	_, ridp, err := s.ACLIdentityProviderGetByName(nil, "k8s-1")
+	_, ridp, err := s.ACLIdentityProviderGetByName(nil, "test-1")
 	require.NoError(t, err)
 	require.Nil(t, ridp)
 
@@ -3035,7 +3041,7 @@ func TestStateStore_ACLBindingRule_SetGet(t *testing.T) {
 
 		rule := structs.ACLBindingRule{
 			ID:          "",
-			IDPName:     "k8s",
+			IDPName:     "test",
 			Description: "test",
 		}
 
@@ -3077,7 +3083,7 @@ func TestStateStore_ACLBindingRule_SetGet(t *testing.T) {
 
 		rule := structs.ACLBindingRule{
 			ID:          "9669b2d7-455c-4d70-b0ac-457fd7969a2e",
-			IDPName:     "k8s",
+			IDPName:     "test",
 			Description: "test",
 		}
 
@@ -3088,7 +3094,7 @@ func TestStateStore_ACLBindingRule_SetGet(t *testing.T) {
 		require.Equal(t, uint64(3), idx)
 		require.NotNil(t, rrule)
 		require.Equal(t, rule.ID, rrule.ID)
-		require.Equal(t, "k8s", rrule.IDPName)
+		require.Equal(t, "test", rrule.IDPName)
 		require.Equal(t, "test", rrule.Description)
 		require.Equal(t, uint64(3), rrule.CreateIndex)
 		require.Equal(t, uint64(3), rrule.ModifyIndex)
@@ -3102,7 +3108,7 @@ func TestStateStore_ACLBindingRule_SetGet(t *testing.T) {
 		// Create the initial rule
 		rule := structs.ACLBindingRule{
 			ID:          "9669b2d7-455c-4d70-b0ac-457fd7969a2e",
-			IDPName:     "k8s",
+			IDPName:     "test",
 			Description: "test",
 		}
 
@@ -3111,7 +3117,7 @@ func TestStateStore_ACLBindingRule_SetGet(t *testing.T) {
 		// Now make sure we can update it
 		update := structs.ACLBindingRule{
 			ID:          "9669b2d7-455c-4d70-b0ac-457fd7969a2e",
-			IDPName:     "k8s",
+			IDPName:     "test",
 			Description: "modified",
 			BindType:    structs.BindingRuleBindTypeService,
 			BindName:    "web",
@@ -3124,7 +3130,7 @@ func TestStateStore_ACLBindingRule_SetGet(t *testing.T) {
 		require.Equal(t, uint64(3), idx)
 		require.NotNil(t, rrule)
 		require.Equal(t, rule.ID, rrule.ID)
-		require.Equal(t, "k8s", rrule.IDPName)
+		require.Equal(t, "test", rrule.IDPName)
 		require.Equal(t, "modified", rrule.Description)
 		require.Equal(t, structs.BindingRuleBindTypeService, rrule.BindType)
 		require.Equal(t, "web", rrule.BindName)
@@ -3144,19 +3150,19 @@ func TestStateStore_ACLBindingRules_UpsertBatchRead(t *testing.T) {
 		rules := structs.ACLBindingRules{
 			&structs.ACLBindingRule{
 				ID:          "9669b2d7-455c-4d70-b0ac-457fd7969a2e",
-				IDPName:     "k8s",
+				IDPName:     "test",
 				Description: "test-1",
 			},
 			&structs.ACLBindingRule{
 				ID:          "3ebcc27b-f8ba-4611-b385-79a065dfb983",
-				IDPName:     "k8s",
+				IDPName:     "test",
 				Description: "test-2",
 			},
 		}
 
 		require.NoError(t, s.ACLBindingRuleBatchSet(2, rules))
 
-		idx, rrules, err := s.ACLBindingRuleList(nil, "k8s")
+		idx, rrules, err := s.ACLBindingRuleList(nil, "test")
 		require.NoError(t, err)
 		require.Equal(t, uint64(2), idx)
 		require.Len(t, rrules, 2)
@@ -3177,12 +3183,12 @@ func TestStateStore_ACLBindingRules_UpsertBatchRead(t *testing.T) {
 		rules := structs.ACLBindingRules{
 			&structs.ACLBindingRule{
 				ID:          "9669b2d7-455c-4d70-b0ac-457fd7969a2e",
-				IDPName:     "k8s",
+				IDPName:     "test",
 				Description: "test-1",
 			},
 			&structs.ACLBindingRule{
 				ID:          "3ebcc27b-f8ba-4611-b385-79a065dfb983",
-				IDPName:     "k8s",
+				IDPName:     "test",
 				Description: "test-2",
 			},
 		}
@@ -3193,14 +3199,14 @@ func TestStateStore_ACLBindingRules_UpsertBatchRead(t *testing.T) {
 		updates := structs.ACLBindingRules{
 			&structs.ACLBindingRule{
 				ID:          "9669b2d7-455c-4d70-b0ac-457fd7969a2e",
-				IDPName:     "k8s",
+				IDPName:     "test",
 				Description: "test-1 modified",
 				BindType:    structs.BindingRuleBindTypeService,
 				BindName:    "web-1",
 			},
 			&structs.ACLBindingRule{
 				ID:          "3ebcc27b-f8ba-4611-b385-79a065dfb983",
-				IDPName:     "k8s",
+				IDPName:     "test",
 				Description: "test-2 modified",
 				BindType:    structs.BindingRuleBindTypeService,
 				BindName:    "web-2",
@@ -3209,7 +3215,7 @@ func TestStateStore_ACLBindingRules_UpsertBatchRead(t *testing.T) {
 
 		require.NoError(t, s.ACLBindingRuleBatchSet(3, updates))
 
-		idx, rrules, err := s.ACLBindingRuleList(nil, "k8s")
+		idx, rrules, err := s.ACLBindingRuleList(nil, "test")
 		require.NoError(t, err)
 		require.Equal(t, uint64(3), idx)
 		require.Len(t, rrules, 2)
@@ -3230,12 +3236,12 @@ func TestStateStore_ACLBindingRule_List(t *testing.T) {
 	rules := structs.ACLBindingRules{
 		&structs.ACLBindingRule{
 			ID:          "3ebcc27b-f8ba-4611-b385-79a065dfb983",
-			IDPName:     "k8s",
+			IDPName:     "test",
 			Description: "test-1",
 		},
 		&structs.ACLBindingRule{
 			ID:          "9669b2d7-455c-4d70-b0ac-457fd7969a2e",
-			IDPName:     "k8s",
+			IDPName:     "test",
 			Description: "test-2",
 		},
 	}
@@ -3249,13 +3255,13 @@ func TestStateStore_ACLBindingRule_List(t *testing.T) {
 	rrules.Sort()
 
 	require.Equal(t, "3ebcc27b-f8ba-4611-b385-79a065dfb983", rrules[0].ID)
-	require.Equal(t, "k8s", rrules[0].IDPName)
+	require.Equal(t, "test", rrules[0].IDPName)
 	require.Equal(t, "test-1", rrules[0].Description)
 	require.Equal(t, uint64(2), rrules[0].CreateIndex)
 	require.Equal(t, uint64(2), rrules[0].ModifyIndex)
 
 	require.Equal(t, "9669b2d7-455c-4d70-b0ac-457fd7969a2e", rrules[1].ID)
-	require.Equal(t, "k8s", rrules[1].IDPName)
+	require.Equal(t, "test", rrules[1].IDPName)
 	require.Equal(t, "test-2", rrules[1].Description)
 	require.Equal(t, uint64(2), rrules[1].CreateIndex)
 	require.Equal(t, uint64(2), rrules[1].ModifyIndex)
@@ -3271,7 +3277,7 @@ func TestStateStore_ACLBindingRule_Delete(t *testing.T) {
 
 		rule := structs.ACLBindingRule{
 			ID:          "9669b2d7-455c-4d70-b0ac-457fd7969a2e",
-			IDPName:     "k8s",
+			IDPName:     "test",
 			Description: "test",
 		}
 
@@ -3297,12 +3303,12 @@ func TestStateStore_ACLBindingRule_Delete(t *testing.T) {
 		rules := structs.ACLBindingRules{
 			&structs.ACLBindingRule{
 				ID:          "3ebcc27b-f8ba-4611-b385-79a065dfb983",
-				IDPName:     "k8s",
+				IDPName:     "test",
 				Description: "test-1",
 			},
 			&structs.ACLBindingRule{
 				ID:          "9669b2d7-455c-4d70-b0ac-457fd7969a2e",
-				IDPName:     "k8s",
+				IDPName:     "test",
 				Description: "test-2",
 			},
 		}
@@ -3828,14 +3834,14 @@ func TestStateStore_ACLIdentityProviders_Snapshot_Restore(t *testing.T) {
 
 	idps := structs.ACLIdentityProviders{
 		&structs.ACLIdentityProvider{
-			Name:        "k8s-1",
-			Type:        "kubernetes",
+			Name:        "test-1",
+			Type:        "testing",
 			Description: "test-1",
 			RaftIndex:   structs.RaftIndex{CreateIndex: 1, ModifyIndex: 2},
 		},
 		&structs.ACLIdentityProvider{
-			Name:        "k8s-2",
-			Type:        "kubernetes",
+			Name:        "test-2",
+			Type:        "testing",
 			Description: "test-2",
 			RaftIndex:   structs.RaftIndex{CreateIndex: 1, ModifyIndex: 2},
 		},
@@ -3848,7 +3854,7 @@ func TestStateStore_ACLIdentityProviders_Snapshot_Restore(t *testing.T) {
 	defer snap.Close()
 
 	// Alter the real state store.
-	require.NoError(t, s.ACLIdentityProviderDeleteByName(3, "k8s-1"))
+	require.NoError(t, s.ACLIdentityProviderDeleteByName(3, "test-1"))
 
 	// Verify the snapshot.
 	require.Equal(t, uint64(2), snap.LastIndex())
@@ -3887,13 +3893,13 @@ func TestStateStore_ACLBindingRules_Snapshot_Restore(t *testing.T) {
 	rules := structs.ACLBindingRules{
 		&structs.ACLBindingRule{
 			ID:          "9669b2d7-455c-4d70-b0ac-457fd7969a2e",
-			IDPName:     "k8s",
+			IDPName:     "test",
 			Description: "test-1",
 			RaftIndex:   structs.RaftIndex{CreateIndex: 1, ModifyIndex: 2},
 		},
 		&structs.ACLBindingRule{
 			ID:          "3ebcc27b-f8ba-4611-b385-79a065dfb983",
-			IDPName:     "k8s",
+			IDPName:     "test",
 			Description: "test-2",
 			RaftIndex:   structs.RaftIndex{CreateIndex: 1, ModifyIndex: 2},
 		},

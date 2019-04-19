@@ -6,16 +6,16 @@ import (
 	"testing"
 
 	"github.com/hashicorp/consul/agent"
-	"github.com/hashicorp/consul/agent/connect"
 	"github.com/hashicorp/consul/api"
-	"github.com/hashicorp/consul/command/acl"
 	"github.com/hashicorp/consul/logger"
 	"github.com/hashicorp/consul/sdk/testutil"
 	"github.com/hashicorp/consul/testrpc"
+	uuid "github.com/hashicorp/go-uuid"
 	"github.com/mitchellh/cli"
 	"github.com/stretchr/testify/require"
 
-	uuid "github.com/hashicorp/go-uuid"
+	// activate testing idp
+	_ "github.com/hashicorp/consul/agent/consul/idp/testing"
 )
 
 func TestBindingRuleUpdateCommand_noTabs(t *testing.T) {
@@ -50,14 +50,10 @@ func TestBindingRuleUpdateCommand(t *testing.T) {
 
 	// create an idp in advance
 	{
-		ca := connect.TestCA(t, nil)
 		_, _, err := client.ACL().IdentityProviderCreate(
 			&api.ACLIdentityProvider{
-				Name:                        "k8s",
-				Type:                        "kubernetes",
-				KubernetesHost:              "https://foo.internal:8443",
-				KubernetesCACert:            ca.RootCert,
-				KubernetesServiceAccountJWT: acl.TestKubernetesJWT_A,
+				Name: "test",
+				Type: "testing",
 			},
 			&api.WriteOptions{Token: "root"},
 		)
@@ -66,7 +62,7 @@ func TestBindingRuleUpdateCommand(t *testing.T) {
 
 	deleteRules := func(t *testing.T) {
 		rules, _, err := client.ACL().BindingRuleList(
-			"k8s",
+			"test",
 			&api.QueryOptions{Token: "root"},
 		)
 		require.NoError(t, err)
@@ -133,10 +129,10 @@ func TestBindingRuleUpdateCommand(t *testing.T) {
 	createRule := func(t *testing.T) string {
 		rule, _, err := client.ACL().BindingRuleCreate(
 			&api.ACLBindingRule{
-				IDPName:     "k8s",
+				IDPName:     "test",
 				Description: "test rule",
 				BindType:    api.BindingRuleBindTypeService,
-				BindName:    "k8s-${serviceaccount.name}",
+				BindName:    "test-${serviceaccount.name}",
 				Selector:    "serviceaccount.namespace==default",
 			},
 			&api.WriteOptions{Token: "root"},
@@ -149,7 +145,7 @@ func TestBindingRuleUpdateCommand(t *testing.T) {
 		for {
 			// Check for 1-char duplicates.
 			rules, _, err := client.ACL().BindingRuleList(
-				"k8s",
+				"test",
 				&api.QueryOptions{Token: "root"},
 			)
 			require.NoError(t, err)
@@ -331,7 +327,7 @@ func TestBindingRuleUpdateCommand(t *testing.T) {
 
 		require.Equal(t, "test rule edited", rule.Description)
 		require.Equal(t, api.BindingRuleBindTypeRole, rule.BindType)
-		require.Equal(t, "k8s-${serviceaccount.name}", rule.BindName)
+		require.Equal(t, "test-${serviceaccount.name}", rule.BindName)
 		require.Equal(t, "serviceaccount.namespace==alt and serviceaccount.name==demo", rule.Selector)
 	})
 
@@ -457,14 +453,10 @@ func TestBindingRuleUpdateCommand_noMerge(t *testing.T) {
 
 	// create an idp in advance
 	{
-		ca := connect.TestCA(t, nil)
 		_, _, err := client.ACL().IdentityProviderCreate(
 			&api.ACLIdentityProvider{
-				Name:                        "k8s",
-				Type:                        "kubernetes",
-				KubernetesHost:              "https://foo.internal:8443",
-				KubernetesCACert:            ca.RootCert,
-				KubernetesServiceAccountJWT: acl.TestKubernetesJWT_A,
+				Name: "test",
+				Type: "testing",
 			},
 			&api.WriteOptions{Token: "root"},
 		)
@@ -473,7 +465,7 @@ func TestBindingRuleUpdateCommand_noMerge(t *testing.T) {
 
 	deleteRules := func(t *testing.T) {
 		rules, _, err := client.ACL().BindingRuleList(
-			"k8s",
+			"test",
 			&api.QueryOptions{Token: "root"},
 		)
 		require.NoError(t, err)
@@ -543,10 +535,10 @@ func TestBindingRuleUpdateCommand_noMerge(t *testing.T) {
 	createRule := func(t *testing.T) string {
 		rule, _, err := client.ACL().BindingRuleCreate(
 			&api.ACLBindingRule{
-				IDPName:     "k8s",
+				IDPName:     "test",
 				Description: "test rule",
 				BindType:    api.BindingRuleBindTypeRole,
-				BindName:    "k8s-${serviceaccount.name}",
+				BindName:    "test-${serviceaccount.name}",
 				Selector:    "serviceaccount.namespace==default",
 			},
 			&api.WriteOptions{Token: "root"},
@@ -559,7 +551,7 @@ func TestBindingRuleUpdateCommand_noMerge(t *testing.T) {
 		for {
 			// Check for 1-char duplicates.
 			rules, _, err := client.ACL().BindingRuleList(
-				"k8s",
+				"test",
 				&api.QueryOptions{Token: "root"},
 			)
 			require.NoError(t, err)

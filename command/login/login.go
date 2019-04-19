@@ -29,7 +29,6 @@ type cmd struct {
 	idpToken string
 
 	// flags
-	idpType       string
 	idpName       string
 	idpTokenFile  string
 	tokenSinkFile string
@@ -38,9 +37,6 @@ type cmd struct {
 
 func (c *cmd) init() {
 	c.flags = flag.NewFlagSet("", flag.ContinueOnError)
-
-	c.flags.StringVar(&c.idpType, "idp-type", "",
-		"The type of the identity provider to login to.")
 
 	c.flags.StringVar(&c.idpName, "idp-name", "",
 		"Name of the identity provider to login to.")
@@ -70,10 +66,6 @@ func (c *cmd) Run(args []string) int {
 		return 1
 	}
 
-	if c.idpType == "" {
-		c.UI.Error(fmt.Sprintf("Missing required '-idp-type' flag"))
-		return 1
-	}
 	if c.idpName == "" {
 		c.UI.Error(fmt.Sprintf("Missing required '-idp-name' flag"))
 		return 1
@@ -83,26 +75,20 @@ func (c *cmd) Run(args []string) int {
 		return 1
 	}
 
-	switch c.idpType {
-	case "kubernetes":
-		if c.idpTokenFile == "" {
-			c.UI.Error(fmt.Sprintf("Missing required '-idp-token-file' flag"))
-			return 1
-		}
+	if c.idpTokenFile == "" {
+		c.UI.Error(fmt.Sprintf("Missing required '-idp-token-file' flag"))
+		return 1
+	}
 
-		data, err := ioutil.ReadFile(c.idpTokenFile)
-		if err != nil {
-			c.UI.Error(err.Error())
-			return 1
-		}
-		c.idpToken = strings.TrimSpace(string(data))
+	data, err := ioutil.ReadFile(c.idpTokenFile)
+	if err != nil {
+		c.UI.Error(err.Error())
+		return 1
+	}
+	c.idpToken = strings.TrimSpace(string(data))
 
-		if c.idpToken == "" {
-			c.UI.Error(fmt.Sprintf("No idp token found in %s", c.idpTokenFile))
-			return 1
-		}
-	default:
-		c.UI.Error(fmt.Sprintf("Unknown '-idp-type' value provided."))
+	if c.idpToken == "" {
+		c.UI.Error(fmt.Sprintf("No idp token found in %s", c.idpTokenFile))
 		return 1
 	}
 
@@ -119,7 +105,6 @@ func (c *cmd) Run(args []string) int {
 
 	// Do the login.
 	req := &api.ACLLoginParams{
-		IDPType:  c.idpType,
 		IDPName:  c.idpName,
 		IDPToken: c.idpToken,
 		Meta:     c.meta,

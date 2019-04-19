@@ -907,22 +907,20 @@ func (rules ACLBindingRules) Sort() {
 }
 
 type ACLIdentityProviderListStub struct {
-	Name           string
-	Description    string
-	Type           string
-	KubernetesHost string `json:",omitempty"`
-	CreateIndex    uint64
-	ModifyIndex    uint64
+	Name        string
+	Description string
+	Type        string
+	CreateIndex uint64
+	ModifyIndex uint64
 }
 
 func (p *ACLIdentityProvider) Stub() *ACLIdentityProviderListStub {
 	return &ACLIdentityProviderListStub{
-		Name:           p.Name,
-		Description:    p.Description,
-		Type:           p.Type,
-		KubernetesHost: p.KubernetesHost,
-		CreateIndex:    p.CreateIndex,
-		ModifyIndex:    p.ModifyIndex,
+		Name:        p.Name,
+		Description: p.Description,
+		Type:        p.Type,
+		CreateIndex: p.CreateIndex,
+		ModifyIndex: p.ModifyIndex,
 	}
 }
 
@@ -957,33 +955,12 @@ type ACLIdentityProvider struct {
 	// Immutable once set and only settable during create.
 	Type string
 
-	// KubernetesHost must be a host string, a host:port pair, or a URL to the
-	// base of the Kubernetes API server.
-	//
-	// Required for Type=kubernetes.
-	KubernetesHost string `json:",omitempty"`
-
-	// PEM encoded CA cert for use by the TLS client used to talk with the
-	// Kubernetes API. NOTE: Every line must end with a newline: \n
-	// TODO(rb): enforce the newline thing?
-	//
-	// Required for Type=kubernetes.
-	KubernetesCACert string `json:",omitempty"`
-
-	// A service account JWT used to access the TokenReview API to validate
-	// other JWTs during login. It also must be able to read ServiceAccount
-	// annotations.
-	//
-	// Required for Type=kubernetes.
-	KubernetesServiceAccountJWT string `json:",omitempty"`
+	// Configuration is arbitrary configuration for the provider. This should
+	// only contain primitive values and containers (such as lists and maps).
+	Config map[string]interface{}
 
 	// Embedded Raft Metadata
 	RaftIndex `hash:"ignore"`
-}
-
-func (p *ACLIdentityProvider) Clone() *ACLIdentityProvider {
-	p2 := *p
-	return &p2
 }
 
 type ACLReplicationType string
@@ -1457,8 +1434,6 @@ type ACLIdentityProviderBatchDeleteRequest struct {
 }
 
 type ACLLoginParams struct {
-	// IDPType is the type of the IdP being logged into.
-	IDPType string
 	// IDPName is the name of the IdP being logged into.
 	IDPName string
 	// IDPToken is the bearer token for the given IdP.

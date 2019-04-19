@@ -917,6 +917,7 @@ func (s *HTTPServer) ACLIdentityProviderRead(resp http.ResponseWriter, req *http
 		return nil, nil
 	}
 
+	fixupIdentityProviderConfig(out.IdentityProvider)
 	return out.IdentityProvider, nil
 }
 
@@ -951,6 +952,7 @@ func (s *HTTPServer) ACLIdentityProviderWrite(resp http.ResponseWriter, req *htt
 		return nil, err
 	}
 
+	fixupIdentityProviderConfig(&out)
 	return &out, nil
 }
 
@@ -1012,4 +1014,17 @@ func (s *HTTPServer) ACLLogout(resp http.ResponseWriter, req *http.Request) (int
 	}
 
 	return true, nil
+}
+
+// A hack to fix up the config types inside of the map[string]interface{}
+// so that they get formatted correctly during json.Marshal. Without this,
+// string values that get converted to []uint8 end up getting output back
+// to the user in base64-encoded form.
+func fixupIdentityProviderConfig(idp *structs.ACLIdentityProvider) {
+	for k, v := range idp.Config {
+		if raw, ok := v.([]uint8); ok {
+			strVal := structs.Uint8ToString(raw)
+			idp.Config[k] = strVal
+		}
+	}
 }

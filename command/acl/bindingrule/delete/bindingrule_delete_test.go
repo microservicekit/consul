@@ -7,14 +7,15 @@ import (
 	"testing"
 
 	"github.com/hashicorp/consul/agent"
-	"github.com/hashicorp/consul/agent/connect"
 	"github.com/hashicorp/consul/api"
-	"github.com/hashicorp/consul/command/acl"
 	"github.com/hashicorp/consul/logger"
 	"github.com/hashicorp/consul/sdk/testutil"
 	"github.com/hashicorp/consul/testrpc"
 	"github.com/mitchellh/cli"
 	"github.com/stretchr/testify/require"
+
+	// activate testing idp
+	_ "github.com/hashicorp/consul/agent/consul/idp/testing"
 )
 
 func TestBindingRuleDeleteCommand_noTabs(t *testing.T) {
@@ -49,14 +50,10 @@ func TestBindingRuleDeleteCommand(t *testing.T) {
 
 	// create an idp in advance
 	{
-		ca := connect.TestCA(t, nil)
 		_, _, err := client.ACL().IdentityProviderCreate(
 			&api.ACLIdentityProvider{
-				Name:                        "k8s",
-				Type:                        "kubernetes",
-				KubernetesHost:              "https://foo.internal:8443",
-				KubernetesCACert:            ca.RootCert,
-				KubernetesServiceAccountJWT: acl.TestKubernetesJWT_A,
+				Name: "test",
+				Type: "testing",
 			},
 			&api.WriteOptions{Token: "root"},
 		)
@@ -66,10 +63,10 @@ func TestBindingRuleDeleteCommand(t *testing.T) {
 	createRule := func(t *testing.T) string {
 		rule, _, err := client.ACL().BindingRuleCreate(
 			&api.ACLBindingRule{
-				IDPName:     "k8s",
+				IDPName:     "test",
 				Description: "test rule",
 				BindType:    api.BindingRuleBindTypeService,
-				BindName:    "k8s-${serviceaccount.name}",
+				BindName:    "test-${serviceaccount.name}",
 				Selector:    "serviceaccount.namespace==default",
 			},
 			&api.WriteOptions{Token: "root"},
@@ -82,7 +79,7 @@ func TestBindingRuleDeleteCommand(t *testing.T) {
 		for {
 			// Check for 1-char duplicates.
 			rules, _, err := client.ACL().BindingRuleList(
-				"k8s",
+				"test",
 				&api.QueryOptions{Token: "root"},
 			)
 			require.NoError(t, err)

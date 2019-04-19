@@ -6,6 +6,8 @@ import (
 	"io/ioutil"
 	"net/url"
 	"time"
+
+	"github.com/mitchellh/mapstructure"
 )
 
 const (
@@ -160,9 +162,10 @@ type ACLIdentityProvider struct {
 	Description string
 	Type        string
 
-	KubernetesHost              string `json:",omitempty"`
-	KubernetesCACert            string `json:",omitempty"`
-	KubernetesServiceAccountJWT string `json:",omitempty"`
+	// Configuration is arbitrary configuration for the provider. This
+	// should only contain primitive values and containers (such as lists
+	// and maps).
+	Config map[string]interface{}
 
 	CreateIndex uint64
 	ModifyIndex uint64
@@ -172,15 +175,40 @@ type ACLIdentityProviderListEntry struct {
 	Name        string
 	Description string
 	Type        string
-
-	KubernetesHost string `json:",omitempty"`
-
 	CreateIndex uint64
 	ModifyIndex uint64
 }
 
+// ParseKubernetesIdentityProviderConfig takes a raw config map and returns a
+// parsed KubernetesIdentityProviderConfig.
+func ParseKubernetesIdentityProviderConfig(raw map[string]interface{}) (*KubernetesIdentityProviderConfig, error) {
+	var config KubernetesIdentityProviderConfig
+	decodeConf := &mapstructure.DecoderConfig{
+		Result:           &config,
+		WeaklyTypedInput: true,
+	}
+
+	decoder, err := mapstructure.NewDecoder(decodeConf)
+	if err != nil {
+		return nil, err
+	}
+
+	if err := decoder.Decode(raw); err != nil {
+		return nil, fmt.Errorf("error decoding config: %s", err)
+	}
+
+	return &config, nil
+}
+
+// KubernetesIdentityProviderConfig is the config for the built-in Consul
+// Identity Provider for Kubernetes.
+type KubernetesIdentityProviderConfig struct {
+	Host              string `json:",omitempty"`
+	CACert            string `json:",omitempty"`
+	ServiceAccountJWT string `json:",omitempty"`
+}
+
 type ACLLoginParams struct {
-	IDPType  string
 	IDPName  string
 	IDPToken string
 	Meta     map[string]string `json:",omitempty"`

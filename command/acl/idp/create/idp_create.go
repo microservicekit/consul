@@ -109,36 +109,6 @@ func (c *cmd) Run(args []string) int {
 		return 1
 	}
 
-	if c.idpType != "kubernetes" {
-		c.UI.Error(fmt.Sprintf("This tool can only create identity providers of type=kubernetes at this time."))
-		c.UI.Error(c.Help())
-		return 1
-	}
-
-	if c.k8sHost == "" {
-		c.UI.Error(fmt.Sprintf("Missing required '-kubernetes-host' flag"))
-		return 1
-	} else if c.k8sCACert == "" {
-		c.UI.Error(fmt.Sprintf("Missing required '-kubernetes-ca-cert' flag"))
-		return 1
-	} else if c.k8sServiceAccountJWT == "" {
-		c.UI.Error(fmt.Sprintf("Missing required '-kubernetes-service-account-jwt' flag"))
-		return 1
-	}
-
-	if c.k8sCACert[0] == '@' {
-		data, err := ioutil.ReadFile(c.k8sCACert[1:])
-		if err != nil {
-			c.UI.Error(fmt.Sprintf("Failed to read %s: %s", c.k8sCACert, err))
-		}
-		c.k8sCACert = string(data)
-
-		if c.k8sCACert == "" {
-			c.UI.Error(fmt.Sprintf("Kubernetes CA Cert File is empty"))
-			return 1
-		}
-	}
-
 	client, err := c.http.APIClient()
 	if err != nil {
 		c.UI.Error(fmt.Sprintf("Error connecting to Consul agent: %s", err))
@@ -146,12 +116,41 @@ func (c *cmd) Run(args []string) int {
 	}
 
 	newIDP := &api.ACLIdentityProvider{
-		Type:                        c.idpType,
-		Name:                        c.name,
-		Description:                 c.description,
-		KubernetesHost:              c.k8sHost,
-		KubernetesCACert:            c.k8sCACert,
-		KubernetesServiceAccountJWT: c.k8sServiceAccountJWT,
+		Type:        c.idpType,
+		Name:        c.name,
+		Description: c.description,
+	}
+
+	if c.idpType == "kubernetes" {
+		if c.k8sHost == "" {
+			c.UI.Error(fmt.Sprintf("Missing required '-kubernetes-host' flag"))
+			return 1
+		} else if c.k8sCACert == "" {
+			c.UI.Error(fmt.Sprintf("Missing required '-kubernetes-ca-cert' flag"))
+			return 1
+		} else if c.k8sServiceAccountJWT == "" {
+			c.UI.Error(fmt.Sprintf("Missing required '-kubernetes-service-account-jwt' flag"))
+			return 1
+		}
+
+		if c.k8sCACert[0] == '@' {
+			data, err := ioutil.ReadFile(c.k8sCACert[1:])
+			if err != nil {
+				c.UI.Error(fmt.Sprintf("Failed to read %s: %s", c.k8sCACert, err))
+			}
+			c.k8sCACert = string(data)
+
+			if c.k8sCACert == "" {
+				c.UI.Error(fmt.Sprintf("Kubernetes CA Cert File is empty"))
+				return 1
+			}
+		}
+
+		newIDP.Config = map[string]interface{}{
+			"Host":              c.k8sHost,
+			"CACert":            c.k8sCACert,
+			"ServiceAccountJWT": c.k8sServiceAccountJWT,
+		}
 	}
 
 	idp, _, err := client.ACL().IdentityProviderCreate(newIDP, nil)

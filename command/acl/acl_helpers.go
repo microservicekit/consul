@@ -1,6 +1,7 @@
 package acl
 
 import (
+	"encoding/json"
 	"fmt"
 	"strings"
 
@@ -157,18 +158,12 @@ func PrintIdentityProvider(idp *api.ACLIdentityProvider, ui cli.Ui, showMeta boo
 		ui.Info(fmt.Sprintf("Create Index: %d", idp.CreateIndex))
 		ui.Info(fmt.Sprintf("Modify Index: %d", idp.ModifyIndex))
 	}
-	if idp.Type == "kubernetes" {
-		ui.Info(fmt.Sprintf("Kubernetes:"))
-		ui.Info(fmt.Sprintf("   Host: %s", idp.KubernetesHost))
-		ui.Info(fmt.Sprintf("   CA Cert:"))
-		if idp.KubernetesCACert != "" {
-			ui.Info(fmt.Sprintf("      %s", idp.KubernetesCACert))
-		}
-		ui.Info(fmt.Sprintf("   Service Account JWT:"))
-		if idp.KubernetesServiceAccountJWT != "" {
-			ui.Info(fmt.Sprintf("      %s", idp.KubernetesServiceAccountJWT))
-		}
+	ui.Info(fmt.Sprintf("Config:"))
+	output, err := json.MarshalIndent(idp.Config, "", "  ")
+	if err != nil {
+		ui.Error(fmt.Sprintf("Error formatting identity provider configuration: %s", err))
 	}
+	ui.Output(string(output))
 }
 
 func PrintIdentityProviderListEntry(idp *api.ACLIdentityProviderListEntry, ui cli.Ui, showMeta bool) {
@@ -178,10 +173,6 @@ func PrintIdentityProviderListEntry(idp *api.ACLIdentityProviderListEntry, ui cl
 	if showMeta {
 		ui.Info(fmt.Sprintf("   Create Index: %d", idp.CreateIndex))
 		ui.Info(fmt.Sprintf("   Modify Index: %d", idp.ModifyIndex))
-	}
-	if idp.Type == "kubernetes" {
-		ui.Info(fmt.Sprintf("   Kubernetes:"))
-		ui.Info(fmt.Sprintf("      Host: %s", idp.KubernetesHost))
 	}
 }
 
