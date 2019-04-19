@@ -63,8 +63,8 @@ func (c *cmd) Help() string {
 const synopsis = "Destroy a Consul Token created with Login"
 
 const help = `
-Usage: consul acl logout [options]
+Usage: consul logout [options]
 
   The logout command will destroy the provided token if it was created from
-  'consul acl login'.
+  'consul login'.
 `

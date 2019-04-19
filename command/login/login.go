@@ -154,10 +154,10 @@ func (c *cmd) Help() string {
 const synopsis = "Login to Consul using an Identity Provider"
 
 const help = `
-Usage: consul acl login [options]
+Usage: consul login [options]
 
   The login command will exchange the provided third party credentials with the
   requested identity provider for a newly minted Consul ACL Token. The
-  companion command 'consul acl logout' should be used to destroy any tokens
+  companion command 'consul logout' should be used to destroy any tokens
   created this way to avoid a resource leak.
 `

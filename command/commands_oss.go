@@ -16,8 +16,6 @@ import (
 	aclidplist "github.com/hashicorp/consul/command/acl/idp/list"
 	aclidpread "github.com/hashicorp/consul/command/acl/idp/read"
 	aclidpupdate "github.com/hashicorp/consul/command/acl/idp/update"
-	acllogin "github.com/hashicorp/consul/command/acl/login"
-	acllogout "github.com/hashicorp/consul/command/acl/logout"
 	aclpolicy "github.com/hashicorp/consul/command/acl/policy"
 	aclpcreate "github.com/hashicorp/consul/command/acl/policy/create"
 	aclpdelete "github.com/hashicorp/consul/command/acl/policy/delete"
@@ -71,6 +69,8 @@ import (
 	kvput "github.com/hashicorp/consul/command/kv/put"
 	"github.com/hashicorp/consul/command/leave"
 	"github.com/hashicorp/consul/command/lock"
+	login "github.com/hashicorp/consul/command/login"
+	logout "github.com/hashicorp/consul/command/logout"
 	"github.com/hashicorp/consul/command/maint"
 	"github.com/hashicorp/consul/command/members"
 	"github.com/hashicorp/consul/command/monitor"
@@ -144,8 +144,6 @@ func init() {
 	Register("acl binding-rule read", func(ui cli.Ui) (cli.Command, error) { return aclbrread.New(ui), nil })
 	Register("acl binding-rule update", func(ui cli.Ui) (cli.Command, error) { return aclbrupdate.New(ui), nil })
 	Register("acl binding-rule delete", func(ui cli.Ui) (cli.Command, error) { return aclbrdelete.New(ui), nil })
-	Register("acl login", func(ui cli.Ui) (cli.Command, error) { return acllogin.New(ui), nil })
-	Register("acl logout", func(ui cli.Ui) (cli.Command, error) { return acllogout.New(ui), nil })
 	Register("agent", func(ui cli.Ui) (cli.Command, error) {
 		return agent.New(ui, rev, ver, verPre, verHuman, make(chan struct{})), nil
 	})
@@ -181,6 +179,8 @@ func init() {
 	Register("kv put", func(ui cli.Ui) (cli.Command, error) { return kvput.New(ui), nil })
 	Register("leave", func(ui cli.Ui) (cli.Command, error) { return leave.New(ui), nil })
 	Register("lock", func(ui cli.Ui) (cli.Command, error) { return lock.New(ui), nil })
+	Register("login", func(ui cli.Ui) (cli.Command, error) { return login.New(ui), nil })
+	Register("logout", func(ui cli.Ui) (cli.Command, error) { return logout.New(ui), nil })
 	Register("maint", func(ui cli.Ui) (cli.Command, error) { return maint.New(ui), nil })
 	Register("members", func(ui cli.Ui) (cli.Command, error) { return members.New(ui), nil })
 	Register("monitor", func(ui cli.Ui) (cli.Command, error) { return monitor.New(ui, MakeShutdownCh()), nil })
