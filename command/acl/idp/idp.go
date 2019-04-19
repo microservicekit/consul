@@ -28,31 +28,37 @@ const help = `
 Usage: consul acl idp <subcommand> [options] [args]
 
   This command has subcommands for managing Consul's ACL Identity Providers.
-  Here are some simple examples, and more detailed examples are available
-  in the subcommands or the documentation.
+  Here are some simple examples, and more detailed examples are available in
+  the subcommands or the documentation.
 
-  Create a new ACL Identity Provider:
+  Create a new identity provider:
 
-      $ consul acl idp create -type kubernetes \
-                              -name "kube-1" \
-                              -description "This is an example kube idp"
+    $ consul acl idp create -type "kubernetes" \
+                            -name "my-idp" \
+                            -description "This is an example kube idp" \
+                            -kubernetes-host "https://apiserver.example.com:8443" \
+                            -kubernetes-ca-file /path/to/kube.ca.crt \
+                            -kubernetes-service-account-jwt "JWT_CONTENTS"
 
   List all identity providers:
 
-      $ consul acl idp list
+    $ consul acl idp list
 
-  Update a identity provider:
+  Update all editable fields of the identity provider:
 
-    $ consul acl idp update -name "kube-1" \
-                            -kubernetes-host="https://apiserver.example.com:8443"
+    $ consul acl idp update -name "my-idp" \
+                            -description "new description" \
+                            -kubernetes-host "https://new-apiserver.example.com:8443" \
+                            -kubernetes-ca-file /path/to/new-kube.ca.crt \
+                            -kubernetes-service-account-jwt "NEW_JWT_CONTENTS"
 
-  Read a identity provider:
+  Read an identity provider:
 
-    $ consul acl idp read -name kube-1
+    $ consul acl idp read -name my-idp
 
-  Delete a identity provider:
+  Delete an identity provider:
 
-    $ consul acl idp delete -name "kube-1"
+    $ consul acl idp delete -name "my-idp"
 
   For more examples, ask for subcommand help or view the documentation.
 `

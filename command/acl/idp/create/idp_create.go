@@ -177,12 +177,12 @@ const synopsis = "Create an ACL Identity Provider"
 const help = `
 Usage: consul acl idp create -name NAME -type TYPE [options]
 
-    Create a new identity provider:
+  Create a new identity provider:
 
-        $ consul acl idp create -type "kubernetes" \
-                                -name "new-idp" \
-                                -description "This is an example kube idp" \
-                                -kubernetes-host "https://apiserver.example.com:8443" \
-                                -kubernetes-ca-file /path/to/kube.ca.crt \
-                                -kubernetes-service-account-jwt "JWT_CONTENTS"
+    $ consul acl idp create -type "kubernetes" \
+                            -name "my-idp" \
+                            -description "This is an example kube idp" \
+                            -kubernetes-host "https://apiserver.example.com:8443" \
+                            -kubernetes-ca-file /path/to/kube.ca.crt \
+                            -kubernetes-service-account-jwt "JWT_CONTENTS"
 `

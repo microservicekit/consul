@@ -76,9 +76,7 @@ const synopsis = "Delete an ACL Identity Provider"
 const help = `
 Usage: consul acl idp delete -name NAME [options]
 
-    Deletes an ACL identity provider by name.
+  Delete an identity provider:
 
-    Delete by name:
-
-        $ consul acl idp delete -name "my-idp"
+    $ consul acl idp delete -name "my-idp"
 `

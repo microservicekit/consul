@@ -205,11 +205,11 @@ Usage: consul acl idp update -name NAME [options]
   information with its current state so that you do not have to provide all
   parameters. This behavior can be disabled by passing -no-merge.
 
-    Update all editable fields of the identity provider:
+  Update all editable fields of the identity provider:
 
-        $ consul acl idp update -name "my-idp" \
-                                -description "new description" \
-                                -kubernetes-host "https://new-apiserver.example.com:8443" \
-                                -kubernetes-ca-file /path/to/new-kube.ca.crt \
-                                -kubernetes-service-account-jwt "NEW_JWT_CONTENTS"
+    $ consul acl idp update -name "my-idp" \
+                            -description "new description" \
+                            -kubernetes-host "https://new-apiserver.example.com:8443" \
+                            -kubernetes-ca-file /path/to/new-kube.ca.crt \
+                            -kubernetes-service-account-jwt "NEW_JWT_CONTENTS"
 `

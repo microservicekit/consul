@@ -77,9 +77,7 @@ const synopsis = "Lists ACL Identity Providers"
 const help = `
 Usage: consul acl idp list [options]
 
-  Lists all the ACL roles.
+  List all identity providers:
 
-    Example:
-
-        $ consul acl idp list
+    $ consul acl idp list
 `

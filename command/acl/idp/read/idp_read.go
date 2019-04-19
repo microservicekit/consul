@@ -90,9 +90,7 @@ const synopsis = "Read an ACL Identity Provider"
 const help = `
 Usage: consul acl idp read -name NAME [options]
 
-  This command will retrieve and print out the details of a single identity provider.
+  Read an identity provider:
 
-    Read:
-
-        $ consul acl idp read -name "my-idp"
+    $ consul acl idp read -name my-idp
 `
