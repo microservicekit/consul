@@ -157,7 +157,7 @@ const help = `
 Usage: consul acl login [options]
 
   The login command will exchange the provided third party credentials with the
-  requested identity provider for a newly minted Consul ACL Token. The companion
-  command 'consul acl logout' should be used to destroy any tokens created this
-  way to avoid a resource leak.
+  requested identity provider for a newly minted Consul ACL Token. The
+  companion command 'consul acl logout' should be used to destroy any tokens
+  created this way to avoid a resource leak.
 `

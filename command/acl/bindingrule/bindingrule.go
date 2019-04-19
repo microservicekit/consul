@@ -27,34 +27,34 @@ const synopsis = "Manage Consul's ACL Binding Rules"
 const help = `
 Usage: consul acl binding-rule <subcommand> [options] [args]
 
-  This command has subcommands for managing Consul's ACL Binding Rules.
-  Here are some simple examples, and more detailed examples are available
-  in the subcommands or the documentation.
+  This command has subcommands for managing Consul's ACL Binding Rules. Here
+  are some simple examples, and more detailed examples are available in the
+  subcommands or the documentation.
 
-  Create a new binding rules:
+  Create a new binding rule:
 
-      $ consul acl binding-rule create \
-             -idp-name=minikube \
-             -bind-type=service \
-             -bind-name='k8s-${serviceaccount.name}' \
-             -selector='serviceaccount.namespace==default and serviceaccount.name==web'
+    $ consul acl binding-rule create \
+          -idp-name=minikube \
+          -bind-type=service \
+          -bind-name='k8s-${serviceaccount.name}' \
+          -selector='serviceaccount.namespace==default and serviceaccount.name==web'
 
   List all binding rules:
 
-      $ consul acl binding-rule list
+    $ consul acl binding-rule list
 
   Update a binding rule:
 
-      $ consul acl binding-rule update -id=43cb72df-9c6f-4315-ac8a-01a9d98155ef \
-             -bind-name='k8s-${serviceaccount.name}'
+    $ consul acl binding-rule update -id=43cb72df-9c6f-4315-ac8a-01a9d98155ef \
+          -bind-name='k8s-${serviceaccount.name}'
 
   Read a binding rule:
 
-      $ consul acl binding-rule read -id 0479e93e-091c-4475-9b06-79a004765c24
+    $ consul acl binding-rule read -id fdabbcb5-9de5-4b1a-961f-77214ae88cba
 
   Delete a binding rule:
 
-      $ consul acl binding-rule delete -id 0479e93e-091c-4475-9b06-79a004765c24
+    $ consul acl binding-rule delete -id b6b856da-5193-4e78-845a-7d61ca8371ba
 
   For more examples, ask for subcommand help or view the documentation.
 `

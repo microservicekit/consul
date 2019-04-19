@@ -85,14 +85,13 @@ const synopsis = "Delete an ACL Binding Rule"
 const help = `
 Usage: consul acl binding-rule delete -id ID [options]
 
-    Deletes an ACL binding rule by providing the ID or a unique ID prefix.
+  Deletes an ACL binding rule by providing the ID or a unique ID prefix.
 
-    Delete by prefix:
+  Delete by prefix:
 
-        $ consul acl binding-rule delete -id b6b85
+    $ consul acl binding-rule delete -id b6b85
 
-    Delete by full ID:
+  Delete by full ID:
 
-        $ consul acl binding-rule delete -id b6b856da-5193-4e78-845a-7d61ca8371ba
-
+    $ consul acl binding-rule delete -id b6b856da-5193-4e78-845a-7d61ca8371ba
 `

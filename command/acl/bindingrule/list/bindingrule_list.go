@@ -88,11 +88,11 @@ Usage: consul acl binding-rule list [options]
 
   Lists all the ACL binding rules.
 
-    Show all:
+  Show all:
 
-        $ consul acl binding-rule list
+    $ consul acl binding-rule list
 
-    Show all for a specific identity provider:
+  Show all for a specific identity provider:
 
-        $ consul acl binding-rule list -idp-name="my-idp"
+    $ consul acl binding-rule list -idp-name="my-idp"
 `

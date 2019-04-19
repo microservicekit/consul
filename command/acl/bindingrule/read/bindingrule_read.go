@@ -99,10 +99,10 @@ const synopsis = "Read an ACL Binding Rule"
 const help = `
 Usage: consul acl binding-rule read -id ID [options]
 
-  This command will retrieve and print out the details of a single
-  binding rule.
+  This command will retrieve and print out the details of a single binding
+  rule.
 
-    Read:
+  Read a binding rule:
 
-     $ consul acl binding-rule read -id fdabbcb5-9de5-4b1a-961f-77214ae88cba
+    $ consul acl binding-rule read -id fdabbcb5-9de5-4b1a-961f-77214ae88cba
 `

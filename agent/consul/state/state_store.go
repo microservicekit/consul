@@ -53,12 +53,12 @@ var (
 	// is called on a binding rule with an empty IDPName.
 	ErrMissingACLBindingRuleIDPName = errors.New("Missing ACL Binding Rule IDPName")
 
-	// ErrMissingACLIdentityProviderName is returned when a identity provider
-	// set is called on a identity provider with an empty Name.
+	// ErrMissingACLIdentityProviderName is returned when an identity provider
+	// set is called on an identity provider with an empty Name.
 	ErrMissingACLIdentityProviderName = errors.New("Missing ACL Identity Provider Name")
 
-	// ErrMissingACLIdentityProviderType is returned when a identity provider
-	// set is called on a identity provider with an empty Type.
+	// ErrMissingACLIdentityProviderType is returned when an identity provider
+	// set is called on an identity provider with an empty Type.
 	ErrMissingACLIdentityProviderType = errors.New("Missing ACL Identity Provider Type")
 
 	// ErrMissingQueryID is returned when a Query set is called on

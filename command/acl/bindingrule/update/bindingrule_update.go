@@ -201,12 +201,12 @@ Usage: consul acl binding-rule update -id ID [options]
   information with its current state so that you do not have to provide all
   parameters. This behavior can be disabled by passing -no-merge.
 
-    Update all editable fields of the binding rule:
+  Update all editable fields of the binding rule:
 
-     $ consul acl binding-rule update \
-            -id=43cb72df-9c6f-4315-ac8a-01a9d98155ef \
-            -description="new description" \
-            -bind-type=role \
-            -bind-name='k8s-${serviceaccount.name}' \
-            -selector='serviceaccount.namespace==default and serviceaccount.name==web'
+    $ consul acl binding-rule update \
+          -id=43cb72df-9c6f-4315-ac8a-01a9d98155ef \
+          -description="new description" \
+          -bind-type=role \
+          -bind-name='k8s-${serviceaccount.name}' \
+          -selector='serviceaccount.namespace==default and serviceaccount.name==web'
 `
