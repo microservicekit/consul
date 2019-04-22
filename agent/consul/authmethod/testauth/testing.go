@@ -1,18 +1,17 @@
-package testing
+package testauth
 
 import (
 	"fmt"
 	"sync"
 
 	"github.com/hashicorp/consul/acl"
-	"github.com/hashicorp/consul/agent/consul/idp"
-	idp_pkg "github.com/hashicorp/consul/agent/consul/idp"
+	"github.com/hashicorp/consul/agent/consul/authmethod"
 	"github.com/hashicorp/consul/agent/structs"
 	"github.com/hashicorp/go-uuid"
 )
 
 func init() {
-	idp_pkg.Register("testing", newValidator)
+	authmethod.Register("testing", newValidator)
 }
 
 var (
@@ -83,13 +82,13 @@ type Config struct {
 	SessionID string // unique identifier for this set of tokens in the database
 }
 
-func newValidator(idp *structs.ACLIdentityProvider) (idp.Validator, error) {
-	if idp.Type != "testing" {
-		return nil, fmt.Errorf("%q is not a testing identity provider", idp.Name)
+func newValidator(method *structs.ACLAuthMethod) (authmethod.Validator, error) {
+	if method.Type != "testing" {
+		return nil, fmt.Errorf("%q is not a testing auth method", method.Name)
 	}
 
 	var config Config
-	if err := idp_pkg.ParseConfig(idp.Config, &config); err != nil {
+	if err := authmethod.ParseConfig(method.Config, &config); err != nil {
 		return nil, err
 	}
 
@@ -101,7 +100,7 @@ func newValidator(idp *structs.ACLIdentityProvider) (idp.Validator, error) {
 	}
 
 	return &Validator{
-		name:   idp.Name,
+		name:   method.Name,
 		config: &config,
 	}, nil
 }
@@ -113,14 +112,14 @@ type Validator struct {
 
 func (v *Validator) Name() string { return v.name }
 
-// ValidateLogin takes raw user-provided IdP metadata and ensures it is
-// sane, provably correct, and currently valid. Relevant identifying data
-// is extracted and returned for immediate use by the role binding process.
+// ValidateLogin takes raw user-provided auth method metadata and ensures it is
+// sane, provably correct, and currently valid. Relevant identifying data is
+// extracted and returned for immediate use by the role binding process.
 //
-// Depending upon the provider, it may make sense to use these calls to
-// continue to extend the life of the underlying token.
+// Depending upon the method, it may make sense to use these calls to continue
+// to extend the life of the underlying token.
 //
-// Returns IdP specific metadata suitable for the Role Binding process.
+// Returns auth method specific metadata suitable for the Role Binding process.
 func (v *Validator) ValidateLogin(loginToken string) (map[string]string, error) {
 	fields, valid := GetSessionToken(v.config.SessionID, loginToken)
 	if !valid {

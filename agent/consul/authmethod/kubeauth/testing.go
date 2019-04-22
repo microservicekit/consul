@@ -1,4 +1,4 @@
-package k8s
+package kubeauth
 
 import (
 	"bytes"
@@ -22,7 +22,7 @@ import (
 )
 
 // TestAPIServer is a way to mock the Kubernetes API server as it is used by
-// the consul kubernetes identity provider.
+// the consul kubernetes auth method.
 //
 //   - POST /apis/authentication.k8s.io/v1/tokenreviews
 //   - GET  /api/v1/namespaces/<NAMESPACE>/serviceaccounts/<NAME>
@@ -271,7 +271,7 @@ func createTokenReviewForbidden(namespace, name string) *metav1.Status {
 	     "apiVersion": "v1",
 	     "metadata": {},
 	     "status": "Failure",
-	     "message": "tokenreviews.authentication.k8s.io is forbidden: User \"system:serviceaccount:default:consul-idp-token-review-account\" cannot create resource \"tokenreviews\" in API group \"authentication.k8s.io\" at the cluster scope",
+	     "message": "tokenreviews.authentication.k8s.io is forbidden: User \"system:serviceaccount:default:admin\" cannot create resource \"tokenreviews\" in API group \"authentication.k8s.io\" at the cluster scope",
 	     "reason": "Forbidden",
 	     "details": {
 	       "group": "authentication.k8s.io",
@@ -384,7 +384,7 @@ func createReadServiceAccountForbidden(namespace, name string) *metav1.Status {
 		  "apiVersion": "v1",
 		  "metadata": {},
 		  "status": "Failure",
-		  "message": "serviceaccounts \"demo\" is forbidden: User \"system:serviceaccount:default:consul-idp-token-review-account\" cannot get resource \"serviceaccounts\" in API group \"\" in the namespace \"default\"",
+		  "message": "serviceaccounts \"demo\" is forbidden: User \"system:serviceaccount:default:admin\" cannot get resource \"serviceaccounts\" in API group \"\" in the namespace \"default\"",
 		  "reason": "Forbidden",
 		  "details": {
 		    "name": "demo",

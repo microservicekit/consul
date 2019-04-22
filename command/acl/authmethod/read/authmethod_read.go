@@ -1,9 +1,10 @@
-package idpdelete
+package authmethodread
 
 import (
 	"flag"
 	"fmt"
 
+	"github.com/hashicorp/consul/command/acl"
 	"github.com/hashicorp/consul/command/flags"
 	"github.com/mitchellh/cli"
 )
@@ -21,16 +22,26 @@ type cmd struct {
 	help  string
 
 	name string
+
+	showMeta bool
 }
 
 func (c *cmd) init() {
 	c.flags = flag.NewFlagSet("", flag.ContinueOnError)
 
+	c.flags.BoolVar(
+		&c.showMeta,
+		"meta",
+		false,
+		"Indicates that auth method metadata such "+
+			"as the content hash and raft indices should be shown for each entry.",
+	)
+
 	c.flags.StringVar(
 		&c.name,
 		"name",
 		"",
-		"The name of the identity provider to delete.",
+		"The name of the auth method to read.",
 	)
 
 	c.http = &flags.HTTPFlags{}
@@ -55,12 +66,15 @@ func (c *cmd) Run(args []string) int {
 		return 1
 	}
 
-	if _, err := client.ACL().IdentityProviderDelete(c.name, nil); err != nil {
-		c.UI.Error(fmt.Sprintf("Error deleting identity provider %q: %v", c.name, err))
+	method, _, err := client.ACL().AuthMethodRead(c.name, nil)
+	if err != nil {
+		c.UI.Error(fmt.Sprintf("Error reading auth method %q: %v", c.name, err))
+		return 1
+	} else if method == nil {
+		c.UI.Error(fmt.Sprintf("Auth method not found with name %q", c.name))
 		return 1
 	}
-
-	c.UI.Info(fmt.Sprintf("Identity provider %q deleted successfully", c.name))
+	acl.PrintAuthMethod(method, c.UI, c.showMeta)
 	return 0
 }
 
@@ -72,11 +86,11 @@ func (c *cmd) Help() string {
 	return flags.Usage(c.help, nil)
 }
 
-const synopsis = "Delete an ACL Identity Provider"
+const synopsis = "Read an ACL Auth Method"
 const help = `
-Usage: consul acl idp delete -name NAME [options]
+Usage: consul acl auth-method read -name NAME [options]
 
-  Delete an identity provider:
+  Read an auth method:
 
-    $ consul acl idp delete -name "my-idp"
+    $ consul acl auth-method read -name my-auth-method
 `

@@ -63,7 +63,7 @@ func (c *cmd) init() {
 		"selector",
 		"",
 		"Selector is an expression that matches against verified identity "+
-			"attributes returned from the identity provider during login.",
+			"attributes returned from the auth method during login.",
 	)
 	c.flags.StringVar(
 		&c.bindType,
@@ -140,7 +140,7 @@ func (c *cmd) Run(args []string) int {
 
 		rule = &api.ACLBindingRule{
 			ID:          ruleID,
-			IDPName:     currentRule.IDPName, // immutable
+			AuthMethod:  currentRule.AuthMethod, // immutable
 			Description: c.description,
 			BindType:    api.BindingRuleBindType(c.bindType),
 			BindName:    c.bindName,

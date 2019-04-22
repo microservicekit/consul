@@ -14,8 +14,8 @@ import (
 	"github.com/mitchellh/cli"
 	"github.com/stretchr/testify/require"
 
-	// activate testing idp
-	_ "github.com/hashicorp/consul/agent/consul/idp/testing"
+	// activate testing auth method
+	_ "github.com/hashicorp/consul/agent/consul/authmethod/testauth"
 )
 
 func TestBindingRuleUpdateCommand_noTabs(t *testing.T) {
@@ -48,10 +48,10 @@ func TestBindingRuleUpdateCommand(t *testing.T) {
 
 	client := a.Client()
 
-	// create an idp in advance
+	// create an auth method in advance
 	{
-		_, _, err := client.ACL().IdentityProviderCreate(
-			&api.ACLIdentityProvider{
+		_, _, err := client.ACL().AuthMethodCreate(
+			&api.ACLAuthMethod{
 				Name: "test",
 				Type: "testing",
 			},
@@ -129,7 +129,7 @@ func TestBindingRuleUpdateCommand(t *testing.T) {
 	createRule := func(t *testing.T) string {
 		rule, _, err := client.ACL().BindingRuleCreate(
 			&api.ACLBindingRule{
-				IDPName:     "test",
+				AuthMethod:  "test",
 				Description: "test rule",
 				BindType:    api.BindingRuleBindTypeService,
 				BindName:    "test-${serviceaccount.name}",
@@ -451,10 +451,10 @@ func TestBindingRuleUpdateCommand_noMerge(t *testing.T) {
 
 	client := a.Client()
 
-	// create an idp in advance
+	// create an auth method in advance
 	{
-		_, _, err := client.ACL().IdentityProviderCreate(
-			&api.ACLIdentityProvider{
+		_, _, err := client.ACL().AuthMethodCreate(
+			&api.ACLAuthMethod{
 				Name: "test",
 				Type: "testing",
 			},
@@ -535,7 +535,7 @@ func TestBindingRuleUpdateCommand_noMerge(t *testing.T) {
 	createRule := func(t *testing.T) string {
 		rule, _, err := client.ACL().BindingRuleCreate(
 			&api.ACLBindingRule{
-				IDPName:     "test",
+				AuthMethod:  "test",
 				Description: "test rule",
 				BindType:    api.BindingRuleBindTypeRole,
 				BindName:    "test-${serviceaccount.name}",

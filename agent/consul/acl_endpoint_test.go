@@ -12,8 +12,8 @@ import (
 	"time"
 
 	"github.com/hashicorp/consul/acl"
-	"github.com/hashicorp/consul/agent/consul/idp/k8s"
-	testidp "github.com/hashicorp/consul/agent/consul/idp/testing"
+	"github.com/hashicorp/consul/agent/consul/authmethod/kubeauth"
+	"github.com/hashicorp/consul/agent/consul/authmethod/testauth"
 	"github.com/hashicorp/consul/agent/structs"
 	tokenStore "github.com/hashicorp/consul/agent/token"
 	"github.com/hashicorp/consul/lib"
@@ -966,12 +966,12 @@ func TestACLEndpoint_TokenSet(t *testing.T) {
 		require.Len(t, token.Roles, 0)
 	})
 
-	t.Run("Create it with IDPName set outside of login", func(t *testing.T) {
+	t.Run("Create it with AuthMethod set outside of login", func(t *testing.T) {
 		req := structs.ACLTokenSetRequest{
 			Datacenter: "dc1",
 			ACLToken: structs.ACLToken{
 				Description: "foobar",
-				IDPName:     "idp",
+				AuthMethod:  "fakemethod",
 			},
 			WriteRequest: structs.WriteRequest{Token: "root"},
 		}
@@ -979,42 +979,42 @@ func TestACLEndpoint_TokenSet(t *testing.T) {
 		resp := structs.ACLToken{}
 
 		err := acl.TokenSet(&req, &resp)
-		requireErrorContains(t, err, "IDPName field is disallowed outside of Login")
+		requireErrorContains(t, err, "AuthMethod field is disallowed outside of Login")
 	})
 
-	t.Run("Update IDP linked token and try to change IDP", func(t *testing.T) {
+	t.Run("Update auth method linked token and try to change auth method", func(t *testing.T) {
 		acl := ACL{srv: s1}
 
-		testSessionID := testidp.StartSession()
-		defer testidp.ResetSession(testSessionID)
-		testidp.InstallSessionToken(testSessionID, "fake-token", "default", "demo", "abc123")
+		testSessionID := testauth.StartSession()
+		defer testauth.ResetSession(testSessionID)
+		testauth.InstallSessionToken(testSessionID, "fake-token", "default", "demo", "abc123")
 
-		idp1, err := upsertTestIDP(codec, "root", "dc1", testSessionID)
+		method1, err := upsertTestAuthMethod(codec, "root", "dc1", testSessionID)
 		require.NoError(t, err)
 
-		_, err = upsertTestBindingRule(codec, "root", "dc1", idp1.Name, "", structs.BindingRuleBindTypeService, "demo")
+		_, err = upsertTestBindingRule(codec, "root", "dc1", method1.Name, "", structs.BindingRuleBindTypeService, "demo")
 		require.NoError(t, err)
 
-		// create a token in one idp
-		idpToken := structs.ACLToken{}
+		// create a token in one method
+		methodToken := structs.ACLToken{}
 		require.NoError(t, acl.Login(&structs.ACLLoginRequest{
 			Auth: &structs.ACLLoginParams{
-				IDPName:  idp1.Name,
-				IDPToken: "fake-token",
+				AuthMethod:  method1.Name,
+				BearerToken: "fake-token",
 			},
 			Datacenter: "dc1",
-		}, &idpToken))
+		}, &methodToken))
 
-		idp2, err := upsertTestIDP(codec, "root", "dc1", "")
+		method2, err := upsertTestAuthMethod(codec, "root", "dc1", "")
 		require.NoError(t, err)
 
-		// try to update the token and change the idp
+		// try to update the token and change the method
 		req := structs.ACLTokenSetRequest{
 			Datacenter: "dc1",
 			ACLToken: structs.ACLToken{
-				AccessorID:  idpToken.AccessorID,
-				SecretID:    idpToken.SecretID,
-				IDPName:     idp2.Name,
+				AccessorID:  methodToken.AccessorID,
+				SecretID:    methodToken.SecretID,
+				AuthMethod:  method2.Name,
 				Description: "updated token",
 				Local:       true,
 			},
@@ -1024,37 +1024,37 @@ func TestACLEndpoint_TokenSet(t *testing.T) {
 		resp := structs.ACLToken{}
 
 		err = acl.TokenSet(&req, &resp)
-		requireErrorContains(t, err, "Cannot change IDPName")
+		requireErrorContains(t, err, "Cannot change AuthMethod")
 	})
 
-	t.Run("Update IDP linked token and let the SecretID and IDPName be defaulted", func(t *testing.T) {
+	t.Run("Update auth method linked token and let the SecretID and AuthMethod be defaulted", func(t *testing.T) {
 		acl := ACL{srv: s1}
 
-		testSessionID := testidp.StartSession()
-		defer testidp.ResetSession(testSessionID)
-		testidp.InstallSessionToken(testSessionID, "fake-token", "default", "demo", "abc123")
+		testSessionID := testauth.StartSession()
+		defer testauth.ResetSession(testSessionID)
+		testauth.InstallSessionToken(testSessionID, "fake-token", "default", "demo", "abc123")
 
-		idp, err := upsertTestIDP(codec, "root", "dc1", testSessionID)
+		method, err := upsertTestAuthMethod(codec, "root", "dc1", testSessionID)
 		require.NoError(t, err)
 
-		_, err = upsertTestBindingRule(codec, "root", "dc1", idp.Name, "", structs.BindingRuleBindTypeService, "demo")
+		_, err = upsertTestBindingRule(codec, "root", "dc1", method.Name, "", structs.BindingRuleBindTypeService, "demo")
 		require.NoError(t, err)
 
-		idpToken := structs.ACLToken{}
+		methodToken := structs.ACLToken{}
 		require.NoError(t, acl.Login(&structs.ACLLoginRequest{
 			Auth: &structs.ACLLoginParams{
-				IDPName:  idp.Name,
-				IDPToken: "fake-token",
+				AuthMethod:  method.Name,
+				BearerToken: "fake-token",
 			},
 			Datacenter: "dc1",
-		}, &idpToken))
+		}, &methodToken))
 
 		req := structs.ACLTokenSetRequest{
 			Datacenter: "dc1",
 			ACLToken: structs.ACLToken{
-				AccessorID: idpToken.AccessorID,
-				// SecretID:    idpToken.SecretID,
-				// IDPName:     idp.Name,
+				AccessorID: methodToken.AccessorID,
+				// SecretID:    methodToken.SecretID,
+				// AuthMethod:     method.Name,
 				Description: "updated token",
 				Local:       true,
 			},
@@ -1073,8 +1073,8 @@ func TestACLEndpoint_TokenSet(t *testing.T) {
 		require.Len(t, token.Roles, 0)
 		require.Equal(t, "updated token", token.Description)
 		require.True(t, token.Local)
-		require.Equal(t, idpToken.SecretID, token.SecretID)
-		require.Equal(t, idpToken.IDPName, token.IDPName)
+		require.Equal(t, methodToken.SecretID, token.SecretID)
+		require.Equal(t, methodToken.AuthMethod, token.AuthMethod)
 	})
 
 	t.Run("Create it with invalid service identity (empty)", func(t *testing.T) {
@@ -2866,7 +2866,7 @@ func TestACLEndpoint_RoleResolve(t *testing.T) {
 	})
 }
 
-func TestACLEndpoint_IdentityProviderSet(t *testing.T) {
+func TestACLEndpoint_AuthMethodSet(t *testing.T) {
 	t.Parallel()
 
 	tempDir, err := ioutil.TempDir("", "consul")
@@ -2887,8 +2887,8 @@ func TestACLEndpoint_IdentityProviderSet(t *testing.T) {
 
 	acl := ACL{srv: s1}
 
-	newIDP := func(name string) structs.ACLIdentityProvider {
-		return structs.ACLIdentityProvider{
+	newAuthMethod := func(name string) structs.ACLAuthMethod {
+		return structs.ACLAuthMethod{
 			Name:        name,
 			Description: "test",
 			Type:        "testing",
@@ -2896,117 +2896,117 @@ func TestACLEndpoint_IdentityProviderSet(t *testing.T) {
 	}
 
 	t.Run("Create", func(t *testing.T) {
-		reqIDP := newIDP("test")
+		reqMethod := newAuthMethod("test")
 
-		req := structs.ACLIdentityProviderSetRequest{
-			Datacenter:       "dc1",
-			IdentityProvider: reqIDP,
-			WriteRequest:     structs.WriteRequest{Token: "root"},
+		req := structs.ACLAuthMethodSetRequest{
+			Datacenter:   "dc1",
+			AuthMethod:   reqMethod,
+			WriteRequest: structs.WriteRequest{Token: "root"},
 		}
-		resp := structs.ACLIdentityProvider{}
+		resp := structs.ACLAuthMethod{}
 
-		err := acl.IdentityProviderSet(&req, &resp)
+		err := acl.AuthMethodSet(&req, &resp)
 		require.NoError(t, err)
 
-		// Get the idp directly to validate that it exists
-		idpResp, err := retrieveTestIDP(codec, "root", "dc1", resp.Name)
+		// Get the method directly to validate that it exists
+		methodResp, err := retrieveTestAuthMethod(codec, "root", "dc1", resp.Name)
 		require.NoError(t, err)
-		idp := idpResp.IdentityProvider
+		method := methodResp.AuthMethod
 
-		require.Equal(t, idp.Name, "test")
-		require.Equal(t, idp.Description, "test")
-		require.Equal(t, idp.Type, "testing")
+		require.Equal(t, method.Name, "test")
+		require.Equal(t, method.Description, "test")
+		require.Equal(t, method.Type, "testing")
 	})
 
 	t.Run("Update fails; not allowed to change types", func(t *testing.T) {
-		reqIDP := newIDP("test")
-		reqIDP.Type = "invalid"
+		reqMethod := newAuthMethod("test")
+		reqMethod.Type = "invalid"
 
-		req := structs.ACLIdentityProviderSetRequest{
-			Datacenter:       "dc1",
-			IdentityProvider: reqIDP,
-			WriteRequest:     structs.WriteRequest{Token: "root"},
+		req := structs.ACLAuthMethodSetRequest{
+			Datacenter:   "dc1",
+			AuthMethod:   reqMethod,
+			WriteRequest: structs.WriteRequest{Token: "root"},
 		}
-		resp := structs.ACLIdentityProvider{}
+		resp := structs.ACLAuthMethod{}
 
-		err := acl.IdentityProviderSet(&req, &resp)
+		err := acl.AuthMethodSet(&req, &resp)
 		require.Error(t, err)
 	})
 
 	t.Run("Update - allow type to default", func(t *testing.T) {
-		reqIDP := newIDP("test")
-		reqIDP.Description = "test modified 1"
-		reqIDP.Type = "" // unset
+		reqMethod := newAuthMethod("test")
+		reqMethod.Description = "test modified 1"
+		reqMethod.Type = "" // unset
 
-		req := structs.ACLIdentityProviderSetRequest{
-			Datacenter:       "dc1",
-			IdentityProvider: reqIDP,
-			WriteRequest:     structs.WriteRequest{Token: "root"},
+		req := structs.ACLAuthMethodSetRequest{
+			Datacenter:   "dc1",
+			AuthMethod:   reqMethod,
+			WriteRequest: structs.WriteRequest{Token: "root"},
 		}
-		resp := structs.ACLIdentityProvider{}
+		resp := structs.ACLAuthMethod{}
 
-		err := acl.IdentityProviderSet(&req, &resp)
+		err := acl.AuthMethodSet(&req, &resp)
 		require.NoError(t, err)
 
-		// Get the idp directly to validate that it exists
-		idpResp, err := retrieveTestIDP(codec, "root", "dc1", resp.Name)
+		// Get the method directly to validate that it exists
+		methodResp, err := retrieveTestAuthMethod(codec, "root", "dc1", resp.Name)
 		require.NoError(t, err)
-		idp := idpResp.IdentityProvider
+		method := methodResp.AuthMethod
 
-		require.Equal(t, idp.Name, "test")
-		require.Equal(t, idp.Description, "test modified 1")
-		require.Equal(t, idp.Type, "testing")
+		require.Equal(t, method.Name, "test")
+		require.Equal(t, method.Description, "test modified 1")
+		require.Equal(t, method.Type, "testing")
 	})
 
 	t.Run("Update - specify type", func(t *testing.T) {
-		reqIDP := newIDP("test")
-		reqIDP.Description = "test modified 2"
+		reqMethod := newAuthMethod("test")
+		reqMethod.Description = "test modified 2"
 
-		req := structs.ACLIdentityProviderSetRequest{
-			Datacenter:       "dc1",
-			IdentityProvider: reqIDP,
-			WriteRequest:     structs.WriteRequest{Token: "root"},
+		req := structs.ACLAuthMethodSetRequest{
+			Datacenter:   "dc1",
+			AuthMethod:   reqMethod,
+			WriteRequest: structs.WriteRequest{Token: "root"},
 		}
-		resp := structs.ACLIdentityProvider{}
+		resp := structs.ACLAuthMethod{}
 
-		err := acl.IdentityProviderSet(&req, &resp)
+		err := acl.AuthMethodSet(&req, &resp)
 		require.NoError(t, err)
 
-		// Get the idp directly to validate that it exists
-		idpResp, err := retrieveTestIDP(codec, "root", "dc1", resp.Name)
+		// Get the method directly to validate that it exists
+		methodResp, err := retrieveTestAuthMethod(codec, "root", "dc1", resp.Name)
 		require.NoError(t, err)
-		idp := idpResp.IdentityProvider
+		method := methodResp.AuthMethod
 
-		require.Equal(t, idp.Name, "test")
-		require.Equal(t, idp.Description, "test modified 2")
-		require.Equal(t, idp.Type, "testing")
+		require.Equal(t, method.Name, "test")
+		require.Equal(t, method.Description, "test modified 2")
+		require.Equal(t, method.Type, "testing")
 	})
 
 	t.Run("Create with no name", func(t *testing.T) {
-		req := structs.ACLIdentityProviderSetRequest{
-			Datacenter:       "dc1",
-			IdentityProvider: newIDP(""),
-			WriteRequest:     structs.WriteRequest{Token: "root"},
+		req := structs.ACLAuthMethodSetRequest{
+			Datacenter:   "dc1",
+			AuthMethod:   newAuthMethod(""),
+			WriteRequest: structs.WriteRequest{Token: "root"},
 		}
-		resp := structs.ACLIdentityProvider{}
+		resp := structs.ACLAuthMethod{}
 
-		err := acl.IdentityProviderSet(&req, &resp)
+		err := acl.AuthMethodSet(&req, &resp)
 		require.Error(t, err)
 	})
 
 	t.Run("Create with invalid type", func(t *testing.T) {
-		req := structs.ACLIdentityProviderSetRequest{
+		req := structs.ACLAuthMethodSetRequest{
 			Datacenter: "dc1",
-			IdentityProvider: structs.ACLIdentityProvider{
+			AuthMethod: structs.ACLAuthMethod{
 				Name:        "invalid",
 				Description: "invalid test",
 				Type:        "invalid",
 			},
 			WriteRequest: structs.WriteRequest{Token: "root"},
 		}
-		resp := structs.ACLIdentityProvider{}
+		resp := structs.ACLAuthMethod{}
 
-		err := acl.IdentityProviderSet(&req, &resp)
+		err := acl.AuthMethodSet(&req, &resp)
 		require.Error(t, err)
 	})
 
@@ -3039,25 +3039,25 @@ func TestACLEndpoint_IdentityProviderSet(t *testing.T) {
 			testName = "Create with invalid name (by regex): " + test.name
 		}
 		t.Run(testName, func(t *testing.T) {
-			req := structs.ACLIdentityProviderSetRequest{
-				Datacenter:       "dc1",
-				IdentityProvider: newIDP(test.name),
-				WriteRequest:     structs.WriteRequest{Token: "root"},
+			req := structs.ACLAuthMethodSetRequest{
+				Datacenter:   "dc1",
+				AuthMethod:   newAuthMethod(test.name),
+				WriteRequest: structs.WriteRequest{Token: "root"},
 			}
-			resp := structs.ACLIdentityProvider{}
+			resp := structs.ACLAuthMethod{}
 
-			err := acl.IdentityProviderSet(&req, &resp)
+			err := acl.AuthMethodSet(&req, &resp)
 
 			if test.ok {
 				require.NoError(t, err)
 
-				// Get the idp directly to validate that it exists
-				idpResp, err := retrieveTestIDP(codec, "root", "dc1", resp.Name)
+				// Get the method directly to validate that it exists
+				methodResp, err := retrieveTestAuthMethod(codec, "root", "dc1", resp.Name)
 				require.NoError(t, err)
-				idp := idpResp.IdentityProvider
+				method := methodResp.AuthMethod
 
-				require.Equal(t, idp.Name, test.name)
-				require.Equal(t, idp.Type, "testing")
+				require.Equal(t, method.Name, test.name)
+				require.Equal(t, method.Type, "testing")
 			} else {
 				require.Error(t, err)
 			}
@@ -3065,7 +3065,7 @@ func TestACLEndpoint_IdentityProviderSet(t *testing.T) {
 	}
 }
 
-func TestACLEndpoint_IdentityProviderDelete(t *testing.T) {
+func TestACLEndpoint_AuthMethodDelete(t *testing.T) {
 	t.Parallel()
 
 	dir1, s1 := testServerWithConfig(t, func(c *Config) {
@@ -3080,46 +3080,46 @@ func TestACLEndpoint_IdentityProviderDelete(t *testing.T) {
 
 	testrpc.WaitForLeader(t, s1.RPC, "dc1")
 
-	testSessionID := testidp.StartSession()
-	defer testidp.ResetSession(testSessionID)
+	testSessionID := testauth.StartSession()
+	defer testauth.ResetSession(testSessionID)
 
-	existingIDP, err := upsertTestIDP(codec, "root", "dc1", testSessionID)
+	existingMethod, err := upsertTestAuthMethod(codec, "root", "dc1", testSessionID)
 	require.NoError(t, err)
 
 	acl := ACL{srv: s1}
 
 	t.Run("normal", func(t *testing.T) {
-		req := structs.ACLIdentityProviderDeleteRequest{
-			Datacenter:           "dc1",
-			IdentityProviderName: existingIDP.Name,
-			WriteRequest:         structs.WriteRequest{Token: "root"},
+		req := structs.ACLAuthMethodDeleteRequest{
+			Datacenter:     "dc1",
+			AuthMethodName: existingMethod.Name,
+			WriteRequest:   structs.WriteRequest{Token: "root"},
 		}
 
 		var ignored bool
-		err = acl.IdentityProviderDelete(&req, &ignored)
+		err = acl.AuthMethodDelete(&req, &ignored)
 		require.NoError(t, err)
 
-		// Make sure the idp is gone
-		idpResp, err := retrieveTestIDP(codec, "root", "dc1", existingIDP.Name)
+		// Make sure the method is gone
+		methodResp, err := retrieveTestAuthMethod(codec, "root", "dc1", existingMethod.Name)
 		require.NoError(t, err)
-		require.Nil(t, idpResp.IdentityProvider)
+		require.Nil(t, methodResp.AuthMethod)
 	})
 
 	t.Run("delete something that doesn't exist", func(t *testing.T) {
-		req := structs.ACLIdentityProviderDeleteRequest{
-			Datacenter:           "dc1",
-			IdentityProviderName: "missing",
-			WriteRequest:         structs.WriteRequest{Token: "root"},
+		req := structs.ACLAuthMethodDeleteRequest{
+			Datacenter:     "dc1",
+			AuthMethodName: "missing",
+			WriteRequest:   structs.WriteRequest{Token: "root"},
 		}
 
 		var ignored bool
-		err = acl.IdentityProviderDelete(&req, &ignored)
+		err = acl.AuthMethodDelete(&req, &ignored)
 		require.NoError(t, err)
 	})
 }
 
-// Deleting an identity provider atomically deletes all rules and tokens as well.
-func TestACLEndpoint_IdentityProviderDelete_RuleAndTokenCascade(t *testing.T) {
+// Deleting an auth method atomically deletes all rules and tokens as well.
+func TestACLEndpoint_AuthMethodDelete_RuleAndTokenCascade(t *testing.T) {
 	t.Parallel()
 
 	dir1, s1 := testServerWithConfig(t, func(c *Config) {
@@ -3134,23 +3134,23 @@ func TestACLEndpoint_IdentityProviderDelete_RuleAndTokenCascade(t *testing.T) {
 
 	testrpc.WaitForLeader(t, s1.RPC, "dc1")
 
-	testSessionID1 := testidp.StartSession()
-	defer testidp.ResetSession(testSessionID1)
-	testidp.InstallSessionToken(testSessionID1, "fake-token1", "default", "abc", "abc123")
+	testSessionID1 := testauth.StartSession()
+	defer testauth.ResetSession(testSessionID1)
+	testauth.InstallSessionToken(testSessionID1, "fake-token1", "default", "abc", "abc123")
 
-	testSessionID2 := testidp.StartSession()
-	defer testidp.ResetSession(testSessionID2)
-	testidp.InstallSessionToken(testSessionID2, "fake-token2", "default", "abc", "abc123")
+	testSessionID2 := testauth.StartSession()
+	defer testauth.ResetSession(testSessionID2)
+	testauth.InstallSessionToken(testSessionID2, "fake-token2", "default", "abc", "abc123")
 
-	createToken := func(idpName, idpToken string) *structs.ACLToken {
+	createToken := func(methodName, bearerToken string) *structs.ACLToken {
 		acl := ACL{srv: s1}
 
 		resp := structs.ACLToken{}
 
 		require.NoError(t, acl.Login(&structs.ACLLoginRequest{
 			Auth: &structs.ACLLoginParams{
-				IDPName:  idpName,
-				IDPToken: idpToken,
+				AuthMethod:  methodName,
+				BearerToken: bearerToken,
 			},
 			Datacenter: "dc1",
 		}, &resp))
@@ -3158,11 +3158,11 @@ func TestACLEndpoint_IdentityProviderDelete_RuleAndTokenCascade(t *testing.T) {
 		return &resp
 	}
 
-	idp1, err := upsertTestIDP(codec, "root", "dc1", testSessionID1)
+	method1, err := upsertTestAuthMethod(codec, "root", "dc1", testSessionID1)
 	require.NoError(t, err)
 	i1_r1, err := upsertTestBindingRule(
 		codec, "root", "dc1",
-		idp1.Name,
+		method1.Name,
 		"serviceaccount.name==abc",
 		structs.BindingRuleBindTypeService,
 		"abc",
@@ -3170,20 +3170,20 @@ func TestACLEndpoint_IdentityProviderDelete_RuleAndTokenCascade(t *testing.T) {
 	require.NoError(t, err)
 	i1_r2, err := upsertTestBindingRule(
 		codec, "root", "dc1",
-		idp1.Name,
+		method1.Name,
 		"serviceaccount.name==def",
 		structs.BindingRuleBindTypeService,
 		"def",
 	)
 	require.NoError(t, err)
-	i1_t1 := createToken(idp1.Name, "fake-token1")
-	i1_t2 := createToken(idp1.Name, "fake-token1")
+	i1_t1 := createToken(method1.Name, "fake-token1")
+	i1_t2 := createToken(method1.Name, "fake-token1")
 
-	idp2, err := upsertTestIDP(codec, "root", "dc1", testSessionID2)
+	method2, err := upsertTestAuthMethod(codec, "root", "dc1", testSessionID2)
 	require.NoError(t, err)
 	i2_r1, err := upsertTestBindingRule(
 		codec, "root", "dc1",
-		idp2.Name,
+		method2.Name,
 		"serviceaccount.name==abc",
 		structs.BindingRuleBindTypeService,
 		"abc",
@@ -3191,31 +3191,31 @@ func TestACLEndpoint_IdentityProviderDelete_RuleAndTokenCascade(t *testing.T) {
 	require.NoError(t, err)
 	i2_r2, err := upsertTestBindingRule(
 		codec, "root", "dc1",
-		idp2.Name,
+		method2.Name,
 		"serviceaccount.name==def",
 		structs.BindingRuleBindTypeService,
 		"def",
 	)
 	require.NoError(t, err)
-	i2_t1 := createToken(idp2.Name, "fake-token2")
-	i2_t2 := createToken(idp2.Name, "fake-token2")
+	i2_t1 := createToken(method2.Name, "fake-token2")
+	i2_t2 := createToken(method2.Name, "fake-token2")
 
 	acl := ACL{srv: s1}
 
-	req := structs.ACLIdentityProviderDeleteRequest{
-		Datacenter:           "dc1",
-		IdentityProviderName: idp1.Name,
-		WriteRequest:         structs.WriteRequest{Token: "root"},
+	req := structs.ACLAuthMethodDeleteRequest{
+		Datacenter:     "dc1",
+		AuthMethodName: method1.Name,
+		WriteRequest:   structs.WriteRequest{Token: "root"},
 	}
 
 	var ignored bool
-	err = acl.IdentityProviderDelete(&req, &ignored)
+	err = acl.AuthMethodDelete(&req, &ignored)
 	require.NoError(t, err)
 
-	// Make sure the idp is gone.
-	idpResp, err := retrieveTestIDP(codec, "root", "dc1", idp1.Name)
+	// Make sure the method is gone.
+	methodResp, err := retrieveTestAuthMethod(codec, "root", "dc1", method1.Name)
 	require.NoError(t, err)
-	require.Nil(t, idpResp.IdentityProvider)
+	require.Nil(t, methodResp.AuthMethod)
 
 	// Make sure the rules and tokens are gone.
 	for _, id := range []string{i1_r1.ID, i1_r2.ID} {
@@ -3229,7 +3229,7 @@ func TestACLEndpoint_IdentityProviderDelete_RuleAndTokenCascade(t *testing.T) {
 		require.Nil(t, tokResp.Token)
 	}
 
-	// Make sure the rules and tokens for the untouched IDP are still there.
+	// Make sure the rules and tokens for the untouched auth method are still there.
 	for _, id := range []string{i2_r1.ID, i2_r2.ID} {
 		ruleResp, err := retrieveTestBindingRule(codec, "root", "dc1", id)
 		require.NoError(t, err)
@@ -3242,7 +3242,7 @@ func TestACLEndpoint_IdentityProviderDelete_RuleAndTokenCascade(t *testing.T) {
 	}
 }
 
-func TestACLEndpoint_IdentityProviderList(t *testing.T) {
+func TestACLEndpoint_AuthMethodList(t *testing.T) {
 	t.Parallel()
 
 	dir1, s1 := testServerWithConfig(t, func(c *Config) {
@@ -3257,24 +3257,24 @@ func TestACLEndpoint_IdentityProviderList(t *testing.T) {
 
 	testrpc.WaitForLeader(t, s1.RPC, "dc1")
 
-	i1, err := upsertTestIDP(codec, "root", "dc1", "")
+	i1, err := upsertTestAuthMethod(codec, "root", "dc1", "")
 	require.NoError(t, err)
 
-	i2, err := upsertTestIDP(codec, "root", "dc1", "")
+	i2, err := upsertTestAuthMethod(codec, "root", "dc1", "")
 	require.NoError(t, err)
 
 	acl := ACL{srv: s1}
 
-	req := structs.ACLIdentityProviderListRequest{
+	req := structs.ACLAuthMethodListRequest{
 		Datacenter:   "dc1",
 		QueryOptions: structs.QueryOptions{Token: "root"},
 	}
 
-	resp := structs.ACLIdentityProviderListResponse{}
+	resp := structs.ACLAuthMethodListResponse{}
 
-	err = acl.IdentityProviderList(&req, &resp)
+	err = acl.AuthMethodList(&req, &resp)
 	require.NoError(t, err)
-	require.ElementsMatch(t, gatherIDs(t, resp.IdentityProviders), []string{i1.Name, i2.Name})
+	require.ElementsMatch(t, gatherIDs(t, resp.AuthMethods), []string{i1.Name, i2.Name})
 }
 
 func TestACLEndpoint_BindingRuleSet(t *testing.T) {
@@ -3295,16 +3295,16 @@ func TestACLEndpoint_BindingRuleSet(t *testing.T) {
 	acl := ACL{srv: s1}
 	var ruleID string
 
-	testIDP, err := upsertTestIDP(codec, "root", "dc1", "")
+	testAuthMethod, err := upsertTestAuthMethod(codec, "root", "dc1", "")
 	require.NoError(t, err)
 
-	otherTestIDP, err := upsertTestIDP(codec, "root", "dc1", "")
+	otherTestAuthMethod, err := upsertTestAuthMethod(codec, "root", "dc1", "")
 	require.NoError(t, err)
 
 	newRule := func() structs.ACLBindingRule {
 		return structs.ACLBindingRule{
 			Description: "foobar",
-			IDPName:     testIDP.Name,
+			AuthMethod:  testAuthMethod.Name,
 			Selector:    "serviceaccount.name==abc",
 			BindType:    structs.BindingRuleBindTypeService,
 			BindName:    "abc",
@@ -3358,7 +3358,7 @@ func TestACLEndpoint_BindingRuleSet(t *testing.T) {
 
 		require.NotEmpty(t, rule.ID)
 		require.Equal(t, rule.Description, "foobar")
-		require.Equal(t, rule.IDPName, testIDP.Name)
+		require.Equal(t, rule.AuthMethod, testAuthMethod.Name)
 		require.Equal(t, "serviceaccount.name==abc", rule.Selector)
 		require.Equal(t, structs.BindingRuleBindTypeService, rule.BindType)
 		require.Equal(t, "abc", rule.BindName)
@@ -3366,21 +3366,21 @@ func TestACLEndpoint_BindingRuleSet(t *testing.T) {
 		ruleID = rule.ID
 	})
 
-	t.Run("Update fails; cannot change idp name", func(t *testing.T) {
+	t.Run("Update fails; cannot change method name", func(t *testing.T) {
 		reqRule := newRule()
 		reqRule.ID = ruleID
-		reqRule.IDPName = otherTestIDP.Name
+		reqRule.AuthMethod = otherTestAuthMethod.Name
 		requireSetErrors(t, reqRule)
 	})
 
-	t.Run("Update it - omit idp name", func(t *testing.T) {
+	t.Run("Update it - omit method name", func(t *testing.T) {
 		reqRule := newRule()
 		reqRule.ID = ruleID
 		reqRule.Description = "foobar modified 1"
 		reqRule.Selector = "serviceaccount.namespace==def"
 		reqRule.BindType = structs.BindingRuleBindTypeRole
 		reqRule.BindName = "def"
-		reqRule.IDPName = "" // clear
+		reqRule.AuthMethod = "" // clear
 
 		req := structs.ACLBindingRuleSetRequest{
 			Datacenter:   "dc1",
@@ -3400,13 +3400,13 @@ func TestACLEndpoint_BindingRuleSet(t *testing.T) {
 
 		require.NotEmpty(t, rule.ID)
 		require.Equal(t, rule.Description, "foobar modified 1")
-		require.Equal(t, rule.IDPName, testIDP.Name)
+		require.Equal(t, rule.AuthMethod, testAuthMethod.Name)
 		require.Equal(t, "serviceaccount.namespace==def", rule.Selector)
 		require.Equal(t, structs.BindingRuleBindTypeRole, rule.BindType)
 		require.Equal(t, "def", rule.BindName)
 	})
 
-	t.Run("Update it - specify idp name", func(t *testing.T) {
+	t.Run("Update it - specify method name", func(t *testing.T) {
 		reqRule := newRule()
 		reqRule.ID = ruleID
 		reqRule.Description = "foobar modified 2"
@@ -3432,21 +3432,21 @@ func TestACLEndpoint_BindingRuleSet(t *testing.T) {
 
 		require.NotEmpty(t, rule.ID)
 		require.Equal(t, rule.Description, "foobar modified 2")
-		require.Equal(t, rule.IDPName, testIDP.Name)
+		require.Equal(t, rule.AuthMethod, testAuthMethod.Name)
 		require.Equal(t, "serviceaccount.namespace==def", rule.Selector)
 		require.Equal(t, structs.BindingRuleBindTypeRole, rule.BindType)
 		require.Equal(t, "def", rule.BindName)
 	})
 
-	t.Run("Create fails; empty idp name", func(t *testing.T) {
+	t.Run("Create fails; empty method name", func(t *testing.T) {
 		reqRule := newRule()
-		reqRule.IDPName = ""
+		reqRule.AuthMethod = ""
 		requireSetErrors(t, reqRule)
 	})
 
-	t.Run("Create fails; unknown idp name", func(t *testing.T) {
+	t.Run("Create fails; unknown method name", func(t *testing.T) {
 		reqRule := newRule()
-		reqRule.IDPName = "unknown"
+		reqRule.AuthMethod = "unknown"
 		requireSetErrors(t, reqRule)
 	})
 
@@ -3490,7 +3490,7 @@ func TestACLEndpoint_BindingRuleSet(t *testing.T) {
 
 	t.Run("Create fails; bind name with unknown vars", func(t *testing.T) {
 		reqRule := newRule()
-		reqRule.BindName = "idp-${serviceaccount.bizarroname}"
+		reqRule.BindName = "method-${serviceaccount.bizarroname}"
 		requireSetErrors(t, reqRule)
 	})
 
@@ -3502,12 +3502,12 @@ func TestACLEndpoint_BindingRuleSet(t *testing.T) {
 
 	t.Run("Create fails; invalid bind name with template", func(t *testing.T) {
 		reqRule := newRule()
-		reqRule.BindName = "idp-${serviceaccount.name"
+		reqRule.BindName = "method-${serviceaccount.name"
 		requireSetErrors(t, reqRule)
 	})
 	t.Run("Create fails; invalid bind name after template computed", func(t *testing.T) {
 		reqRule := newRule()
-		reqRule.BindName = "idp-${serviceaccount.name}:blah-"
+		reqRule.BindName = "method-${serviceaccount.name}:blah-"
 		requireSetErrors(t, reqRule)
 	})
 }
@@ -3527,12 +3527,12 @@ func TestACLEndpoint_BindingRuleDelete(t *testing.T) {
 
 	testrpc.WaitForLeader(t, s1.RPC, "dc1")
 
-	testIDP, err := upsertTestIDP(codec, "root", "dc1", "")
+	testAuthMethod, err := upsertTestAuthMethod(codec, "root", "dc1", "")
 	require.NoError(t, err)
 
 	existingRule, err := upsertTestBindingRule(
 		codec, "root", "dc1",
-		testIDP.Name,
+		testAuthMethod.Name,
 		"serviceaccount.name==abc",
 		structs.BindingRuleBindTypeService,
 		"abc",
@@ -3589,12 +3589,12 @@ func TestACLEndpoint_BindingRuleList(t *testing.T) {
 
 	testrpc.WaitForLeader(t, s1.RPC, "dc1")
 
-	testIDP, err := upsertTestIDP(codec, "root", "dc1", "")
+	testAuthMethod, err := upsertTestAuthMethod(codec, "root", "dc1", "")
 	require.NoError(t, err)
 
 	r1, err := upsertTestBindingRule(
 		codec, "root", "dc1",
-		testIDP.Name,
+		testAuthMethod.Name,
 		"serviceaccount.name==abc",
 		structs.BindingRuleBindTypeService,
 		"abc",
@@ -3603,7 +3603,7 @@ func TestACLEndpoint_BindingRuleList(t *testing.T) {
 
 	r2, err := upsertTestBindingRule(
 		codec, "root", "dc1",
-		testIDP.Name,
+		testAuthMethod.Name,
 		"serviceaccount.name==def",
 		structs.BindingRuleBindTypeService,
 		"def",
@@ -3668,12 +3668,12 @@ func TestACLEndpoint_Login_LocalTokensDisabled(t *testing.T) {
 
 	acl2 := ACL{srv: s2}
 
-	t.Run("unknown idp", func(t *testing.T) {
+	t.Run("unknown method", func(t *testing.T) {
 		req := structs.ACLLoginRequest{
 			Auth: &structs.ACLLoginParams{
-				IDPName:  "test",
-				IDPToken: "fake-web",
-				Meta:     map[string]string{"pod": "pod1"},
+				AuthMethod:  "test",
+				BearerToken: "fake-web",
+				Meta:        map[string]string{"pod": "pod1"},
 			},
 			Datacenter: "dc2",
 		}
@@ -3700,48 +3700,48 @@ func TestACLEndpoint_Login(t *testing.T) {
 
 	acl := ACL{srv: s1}
 
-	testSessionID := testidp.StartSession()
-	defer testidp.ResetSession(testSessionID)
+	testSessionID := testauth.StartSession()
+	defer testauth.ResetSession(testSessionID)
 
-	testidp.InstallSessionToken(
+	testauth.InstallSessionToken(
 		testSessionID,
 		"fake-web", // no rules
 		"default", "web", "abc123",
 	)
-	testidp.InstallSessionToken(
+	testauth.InstallSessionToken(
 		testSessionID,
 		"fake-db", // 1 rule
 		"default", "db", "def456",
 	)
-	testidp.InstallSessionToken(
+	testauth.InstallSessionToken(
 		testSessionID,
 		"fake-monolith", // 1 rule, must exist
 		"default", "monolith", "ghi789",
 	)
 
-	idp, err := upsertTestIDP(codec, "root", "dc1", testSessionID)
+	method, err := upsertTestAuthMethod(codec, "root", "dc1", testSessionID)
 	require.NoError(t, err)
 
 	ruleDB, err := upsertTestBindingRule(
-		codec, "root", "dc1", idp.Name,
+		codec, "root", "dc1", method.Name,
 		"serviceaccount.namespace==default and serviceaccount.name==db",
 		structs.BindingRuleBindTypeService,
-		"idp-${serviceaccount.name}",
+		"method-${serviceaccount.name}",
 	)
 	_, err = upsertTestBindingRule(
-		codec, "root", "dc1", idp.Name,
+		codec, "root", "dc1", method.Name,
 		"serviceaccount.namespace==default and serviceaccount.name==monolith",
 		structs.BindingRuleBindTypeRole,
-		"idp-${serviceaccount.name}",
+		"method-${serviceaccount.name}",
 	)
 	require.NoError(t, err)
 
 	t.Run("do not provide a token", func(t *testing.T) {
 		req := structs.ACLLoginRequest{
 			Auth: &structs.ACLLoginParams{
-				IDPName:  idp.Name,
-				IDPToken: "fake-web",
-				Meta:     map[string]string{"pod": "pod1"},
+				AuthMethod:  method.Name,
+				BearerToken: "fake-web",
+				Meta:        map[string]string{"pod": "pod1"},
 			},
 			Datacenter: "dc1",
 		}
@@ -3751,12 +3751,12 @@ func TestACLEndpoint_Login(t *testing.T) {
 		requireErrorContains(t, acl.Login(&req, &resp), "do not provide a token")
 	})
 
-	t.Run("unknown idp", func(t *testing.T) {
+	t.Run("unknown method", func(t *testing.T) {
 		req := structs.ACLLoginRequest{
 			Auth: &structs.ACLLoginParams{
-				IDPName:  idp.Name + "-notexist",
-				IDPToken: "fake-web",
-				Meta:     map[string]string{"pod": "pod1"},
+				AuthMethod:  method.Name + "-notexist",
+				BearerToken: "fake-web",
+				Meta:        map[string]string{"pod": "pod1"},
 			},
 			Datacenter: "dc1",
 		}
@@ -3765,12 +3765,12 @@ func TestACLEndpoint_Login(t *testing.T) {
 		requireErrorContains(t, acl.Login(&req, &resp), "ACL not found")
 	})
 
-	t.Run("invalid idp token", func(t *testing.T) {
+	t.Run("invalid method token", func(t *testing.T) {
 		req := structs.ACLLoginRequest{
 			Auth: &structs.ACLLoginParams{
-				IDPName:  idp.Name,
-				IDPToken: "invalid",
-				Meta:     map[string]string{"pod": "pod1"},
+				AuthMethod:  method.Name,
+				BearerToken: "invalid",
+				Meta:        map[string]string{"pod": "pod1"},
 			},
 			Datacenter: "dc1",
 		}
@@ -3779,12 +3779,12 @@ func TestACLEndpoint_Login(t *testing.T) {
 		require.Error(t, acl.Login(&req, &resp))
 	})
 
-	t.Run("valid idp token no bindings", func(t *testing.T) {
+	t.Run("valid method token no bindings", func(t *testing.T) {
 		req := structs.ACLLoginRequest{
 			Auth: &structs.ACLLoginParams{
-				IDPName:  idp.Name,
-				IDPToken: "fake-web",
-				Meta:     map[string]string{"pod": "pod1"},
+				AuthMethod:  method.Name,
+				BearerToken: "fake-web",
+				Meta:        map[string]string{"pod": "pod1"},
 			},
 			Datacenter: "dc1",
 		}
@@ -3793,12 +3793,12 @@ func TestACLEndpoint_Login(t *testing.T) {
 		requireErrorContains(t, acl.Login(&req, &resp), "Permission denied")
 	})
 
-	t.Run("valid idp token 1 role binding must exist and does not exist", func(t *testing.T) {
+	t.Run("valid method token 1 role binding must exist and does not exist", func(t *testing.T) {
 		req := structs.ACLLoginRequest{
 			Auth: &structs.ACLLoginParams{
-				IDPName:  idp.Name,
-				IDPToken: "fake-monolith",
-				Meta:     map[string]string{"pod": "pod1"},
+				AuthMethod:  method.Name,
+				BearerToken: "fake-monolith",
+				Meta:        map[string]string{"pod": "pod1"},
 			},
 			Datacenter: "dc1",
 		}
@@ -3813,7 +3813,7 @@ func TestACLEndpoint_Login(t *testing.T) {
 		arg := structs.ACLRoleSetRequest{
 			Datacenter: "dc1",
 			Role: structs.ACLRole{
-				Name: "idp-monolith",
+				Name: "method-monolith",
 			},
 			WriteRequest: structs.WriteRequest{Token: "root"},
 		}
@@ -3823,14 +3823,14 @@ func TestACLEndpoint_Login(t *testing.T) {
 
 		monolithRoleID = out.ID
 	}
-	s1.purgeIdentityProviderValidators()
+	s1.purgeAuthMethodValidators()
 
-	t.Run("valid idp token 1 role binding must exist and now exists", func(t *testing.T) {
+	t.Run("valid bearer token 1 role binding must exist and now exists", func(t *testing.T) {
 		req := structs.ACLLoginRequest{
 			Auth: &structs.ACLLoginParams{
-				IDPName:  idp.Name,
-				IDPToken: "fake-monolith",
-				Meta:     map[string]string{"pod": "pod1"},
+				AuthMethod:  method.Name,
+				BearerToken: "fake-monolith",
+				Meta:        map[string]string{"pod": "pod1"},
 			},
 			Datacenter: "dc1",
 		}
@@ -3838,22 +3838,22 @@ func TestACLEndpoint_Login(t *testing.T) {
 
 		require.NoError(t, acl.Login(&req, &resp))
 
-		require.Equal(t, idp.Name, resp.IDPName)
+		require.Equal(t, method.Name, resp.AuthMethod)
 		require.Equal(t, `token created via login: {"pod":"pod1"}`, resp.Description)
 		require.True(t, resp.Local)
 		require.Len(t, resp.ServiceIdentities, 0)
 		require.Len(t, resp.Roles, 1)
 		role := resp.Roles[0]
 		require.Equal(t, monolithRoleID, role.ID)
-		require.Equal(t, "idp-monolith", role.Name)
+		require.Equal(t, "method-monolith", role.Name)
 	})
 
-	t.Run("valid idp token 1 service binding", func(t *testing.T) {
+	t.Run("valid bearer token 1 service binding", func(t *testing.T) {
 		req := structs.ACLLoginRequest{
 			Auth: &structs.ACLLoginParams{
-				IDPName:  idp.Name,
-				IDPToken: "fake-db",
-				Meta:     map[string]string{"pod": "pod1"},
+				AuthMethod:  method.Name,
+				BearerToken: "fake-db",
+				Meta:        map[string]string{"pod": "pod1"},
 			},
 			Datacenter: "dc1",
 		}
@@ -3861,24 +3861,24 @@ func TestACLEndpoint_Login(t *testing.T) {
 
 		require.NoError(t, acl.Login(&req, &resp))
 
-		require.Equal(t, idp.Name, resp.IDPName)
+		require.Equal(t, method.Name, resp.AuthMethod)
 		require.Equal(t, `token created via login: {"pod":"pod1"}`, resp.Description)
 		require.True(t, resp.Local)
 		require.Len(t, resp.Roles, 0)
 		require.Len(t, resp.ServiceIdentities, 1)
 		svcid := resp.ServiceIdentities[0]
 		require.Len(t, svcid.Datacenters, 0)
-		require.Equal(t, "idp-db", svcid.ServiceName)
+		require.Equal(t, "method-db", svcid.ServiceName)
 	})
 
 	{
 		req := structs.ACLBindingRuleSetRequest{
 			Datacenter: "dc1",
 			BindingRule: structs.ACLBindingRule{
-				IDPName:  ruleDB.IDPName,
-				BindType: structs.BindingRuleBindTypeService,
-				BindName: ruleDB.BindName,
-				Selector: "",
+				AuthMethod: ruleDB.AuthMethod,
+				BindType:   structs.BindingRuleBindTypeService,
+				BindName:   ruleDB.BindName,
+				Selector:   "",
 			},
 			WriteRequest: structs.WriteRequest{Token: "root"},
 		}
@@ -3887,12 +3887,12 @@ func TestACLEndpoint_Login(t *testing.T) {
 		require.NoError(t, acl.BindingRuleSet(&req, &out))
 	}
 
-	t.Run("valid idp token 1 binding (no selectors this time)", func(t *testing.T) {
+	t.Run("valid bearer token 1 binding (no selectors this time)", func(t *testing.T) {
 		req := structs.ACLLoginRequest{
 			Auth: &structs.ACLLoginParams{
-				IDPName:  idp.Name,
-				IDPToken: "fake-db",
-				Meta:     map[string]string{"pod": "pod1"},
+				AuthMethod:  method.Name,
+				BearerToken: "fake-db",
+				Meta:        map[string]string{"pod": "pod1"},
 			},
 			Datacenter: "dc1",
 		}
@@ -3900,45 +3900,45 @@ func TestACLEndpoint_Login(t *testing.T) {
 
 		require.NoError(t, acl.Login(&req, &resp))
 
-		require.Equal(t, idp.Name, resp.IDPName)
+		require.Equal(t, method.Name, resp.AuthMethod)
 		require.Equal(t, `token created via login: {"pod":"pod1"}`, resp.Description)
 		require.True(t, resp.Local)
 		require.Len(t, resp.Roles, 0)
 		require.Len(t, resp.ServiceIdentities, 1)
 		svcid := resp.ServiceIdentities[0]
 		require.Len(t, svcid.Datacenters, 0)
-		require.Equal(t, "idp-db", svcid.ServiceName)
+		require.Equal(t, "method-db", svcid.ServiceName)
 	})
 
-	testSessionID_2 := testidp.StartSession()
-	defer testidp.ResetSession(testSessionID_2)
+	testSessionID_2 := testauth.StartSession()
+	defer testauth.ResetSession(testSessionID_2)
 	{
-		// Update the idp to force the cache to invalidate for the next
+		// Update the method to force the cache to invalidate for the next
 		// subtest.
-		updated := *idp
+		updated := *method
 		updated.Description = "updated for the test"
 		updated.Config = map[string]interface{}{
 			"SessionID": testSessionID_2,
 		}
 
-		req := structs.ACLIdentityProviderSetRequest{
-			Datacenter:       "dc1",
-			IdentityProvider: updated,
-			WriteRequest:     structs.WriteRequest{Token: "root"},
+		req := structs.ACLAuthMethodSetRequest{
+			Datacenter:   "dc1",
+			AuthMethod:   updated,
+			WriteRequest: structs.WriteRequest{Token: "root"},
 		}
 
-		var ignored structs.ACLIdentityProvider
-		require.NoError(t, acl.IdentityProviderSet(&req, &ignored))
+		var ignored structs.ACLAuthMethod
+		require.NoError(t, acl.AuthMethodSet(&req, &ignored))
 	}
 
-	t.Run("updating the idp invalidates the cache", func(t *testing.T) {
+	t.Run("updating the method invalidates the cache", func(t *testing.T) {
 		// We'll try to login with the 'fake-db' cred which DOES exist in the
 		// old fake validator, but no longer exists in the new fake validator.
 		req := structs.ACLLoginRequest{
 			Auth: &structs.ACLLoginParams{
-				IDPName:  idp.Name,
-				IDPToken: "fake-db",
-				Meta:     map[string]string{"pod": "pod1"},
+				AuthMethod:  method.Name,
+				BearerToken: "fake-db",
+				Meta:        map[string]string{"pod": "pod1"},
 			},
 			Datacenter: "dc1",
 		}
@@ -3966,7 +3966,7 @@ func TestACLEndpoint_Login_k8s(t *testing.T) {
 	acl := ACL{srv: s1}
 
 	// spin up a fake api server
-	testSrv := k8s.StartTestAPIServer(t)
+	testSrv := kubeauth.StartTestAPIServer(t)
 	defer testSrv.Stop()
 
 	testSrv.AuthorizeJWT(goodJWT_A)
@@ -3978,7 +3978,7 @@ func TestACLEndpoint_Login_k8s(t *testing.T) {
 		goodJWT_B,
 	)
 
-	idp, err := upsertTestKubernetesIDP(
+	method, err := upsertTestKubernetesAuthMethod(
 		codec, "root", "dc1",
 		testSrv.CACert(),
 		testSrv.Addr(),
@@ -3986,12 +3986,12 @@ func TestACLEndpoint_Login_k8s(t *testing.T) {
 	)
 	require.NoError(t, err)
 
-	t.Run("invalid idp token", func(t *testing.T) {
+	t.Run("invalid bearer token", func(t *testing.T) {
 		req := structs.ACLLoginRequest{
 			Auth: &structs.ACLLoginParams{
-				IDPName:  idp.Name,
-				IDPToken: "invalid",
-				Meta:     map[string]string{"pod": "pod1"},
+				AuthMethod:  method.Name,
+				BearerToken: "invalid",
+				Meta:        map[string]string{"pod": "pod1"},
 			},
 			Datacenter: "dc1",
 		}
@@ -4000,12 +4000,12 @@ func TestACLEndpoint_Login_k8s(t *testing.T) {
 		require.Error(t, acl.Login(&req, &resp))
 	})
 
-	t.Run("valid idp token no bindings", func(t *testing.T) {
+	t.Run("valid bearer token no bindings", func(t *testing.T) {
 		req := structs.ACLLoginRequest{
 			Auth: &structs.ACLLoginParams{
-				IDPName:  idp.Name,
-				IDPToken: goodJWT_B,
-				Meta:     map[string]string{"pod": "pod1"},
+				AuthMethod:  method.Name,
+				BearerToken: goodJWT_B,
+				Meta:        map[string]string{"pod": "pod1"},
 			},
 			Datacenter: "dc1",
 		}
@@ -4015,19 +4015,19 @@ func TestACLEndpoint_Login_k8s(t *testing.T) {
 	})
 
 	_, err = upsertTestBindingRule(
-		codec, "root", "dc1", idp.Name,
+		codec, "root", "dc1", method.Name,
 		"serviceaccount.namespace==default",
 		structs.BindingRuleBindTypeService,
 		"${serviceaccount.name}",
 	)
 	require.NoError(t, err)
 
-	t.Run("valid idp token 1 service binding", func(t *testing.T) {
+	t.Run("valid bearer token 1 service binding", func(t *testing.T) {
 		req := structs.ACLLoginRequest{
 			Auth: &structs.ACLLoginParams{
-				IDPName:  idp.Name,
-				IDPToken: goodJWT_B,
-				Meta:     map[string]string{"pod": "pod1"},
+				AuthMethod:  method.Name,
+				BearerToken: goodJWT_B,
+				Meta:        map[string]string{"pod": "pod1"},
 			},
 			Datacenter: "dc1",
 		}
@@ -4035,7 +4035,7 @@ func TestACLEndpoint_Login_k8s(t *testing.T) {
 
 		require.NoError(t, acl.Login(&req, &resp))
 
-		require.Equal(t, idp.Name, resp.IDPName)
+		require.Equal(t, method.Name, resp.AuthMethod)
 		require.Equal(t, `token created via login: {"pod":"pod1"}`, resp.Description)
 		require.True(t, resp.Local)
 		require.Len(t, resp.Roles, 0)
@@ -4054,12 +4054,12 @@ func TestACLEndpoint_Login_k8s(t *testing.T) {
 		goodJWT_B,
 	)
 
-	t.Run("valid idp token 1 service binding - with annotation", func(t *testing.T) {
+	t.Run("valid bearer token 1 service binding - with annotation", func(t *testing.T) {
 		req := structs.ACLLoginRequest{
 			Auth: &structs.ACLLoginParams{
-				IDPName:  idp.Name,
-				IDPToken: goodJWT_B,
-				Meta:     map[string]string{"pod": "pod1"},
+				AuthMethod:  method.Name,
+				BearerToken: goodJWT_B,
+				Meta:        map[string]string{"pod": "pod1"},
 			},
 			Datacenter: "dc1",
 		}
@@ -4067,7 +4067,7 @@ func TestACLEndpoint_Login_k8s(t *testing.T) {
 
 		require.NoError(t, acl.Login(&req, &resp))
 
-		require.Equal(t, idp.Name, resp.IDPName)
+		require.Equal(t, method.Name, resp.AuthMethod)
 		require.Equal(t, `token created via login: {"pod":"pod1"}`, resp.Description)
 		require.True(t, resp.Local)
 		require.Len(t, resp.Roles, 0)
@@ -4095,22 +4095,22 @@ func TestACLEndpoint_Logout(t *testing.T) {
 
 	acl := ACL{srv: s1}
 
-	testSessionID := testidp.StartSession()
-	defer testidp.ResetSession(testSessionID)
-	testidp.InstallSessionToken(
+	testSessionID := testauth.StartSession()
+	defer testauth.ResetSession(testSessionID)
+	testauth.InstallSessionToken(
 		testSessionID,
 		"fake-db", // 1 rule
 		"default", "db", "def456",
 	)
 
-	idp, err := upsertTestIDP(codec, "root", "dc1", testSessionID)
+	method, err := upsertTestAuthMethod(codec, "root", "dc1", testSessionID)
 	require.NoError(t, err)
 
 	_, err = upsertTestBindingRule(
-		codec, "root", "dc1", idp.Name,
+		codec, "root", "dc1", method.Name,
 		"",
 		structs.BindingRuleBindTypeService,
-		"idp-${serviceaccount.name}",
+		"method-${serviceaccount.name}",
 	)
 	require.NoError(t, err)
 
@@ -4134,7 +4134,7 @@ func TestACLEndpoint_Logout(t *testing.T) {
 		requireErrorContains(t, acl.Logout(&req, &ignored), "ACL not found")
 	})
 
-	t.Run("logout from non-IDP-linked token should fail", func(t *testing.T) {
+	t.Run("logout from non-auth method-linked token should fail", func(t *testing.T) {
 		req := structs.ACLLogoutRequest{
 			Datacenter:   "dc1",
 			WriteRequest: structs.WriteRequest{Token: "root"},
@@ -4147,8 +4147,8 @@ func TestACLEndpoint_Logout(t *testing.T) {
 		// Create a totally legit Login token.
 		loginReq := structs.ACLLoginRequest{
 			Auth: &structs.ACLLoginParams{
-				IDPName:  idp.Name,
-				IDPToken: "fake-db",
+				AuthMethod:  method.Name,
+				BearerToken: "fake-db",
 			},
 			Datacenter: "dc1",
 		}
@@ -4197,11 +4197,11 @@ func gatherIDs(t *testing.T, v interface{}) []string {
 		for _, p := range x {
 			out = append(out, p.AccessorID)
 		}
-	case []*structs.ACLIdentityProvider:
+	case []*structs.ACLAuthMethod:
 		for _, p := range x {
 			out = append(out, p.Name)
 		}
-	case structs.ACLIdentityProviderListStubs:
+	case structs.ACLAuthMethodListStubs:
 		for _, p := range x {
 			out = append(out, p.Name)
 		}
@@ -4524,30 +4524,30 @@ func retrieveTestRoleByName(codec rpc.ClientCodec, masterToken string, datacente
 	return &out, nil
 }
 
-func deleteTestIDP(codec rpc.ClientCodec, masterToken string, datacenter string, idpName string) error {
-	arg := structs.ACLIdentityProviderDeleteRequest{
-		Datacenter:           datacenter,
-		IdentityProviderName: idpName,
-		WriteRequest:         structs.WriteRequest{Token: masterToken},
+func deleteTestAuthMethod(codec rpc.ClientCodec, masterToken string, datacenter string, methodName string) error {
+	arg := structs.ACLAuthMethodDeleteRequest{
+		Datacenter:     datacenter,
+		AuthMethodName: methodName,
+		WriteRequest:   structs.WriteRequest{Token: masterToken},
 	}
 
 	var ignored string
-	err := msgpackrpc.CallWithCodec(codec, "ACL.IdentityProviderDelete", &arg, &ignored)
+	err := msgpackrpc.CallWithCodec(codec, "ACL.AuthMethodDelete", &arg, &ignored)
 	return err
 }
-func upsertTestIDP(
+func upsertTestAuthMethod(
 	codec rpc.ClientCodec, masterToken string, datacenter string,
 	sessionID string,
-) (*structs.ACLIdentityProvider, error) {
+) (*structs.ACLAuthMethod, error) {
 	name, err := uuid.GenerateUUID()
 	if err != nil {
 		return nil, err
 	}
 
-	req := structs.ACLIdentityProviderSetRequest{
+	req := structs.ACLAuthMethodSetRequest{
 		Datacenter: datacenter,
-		IdentityProvider: structs.ACLIdentityProvider{
-			Name: "test-idp-" + name,
+		AuthMethod: structs.ACLAuthMethod{
+			Name: "test-method-" + name,
 			Type: "testing",
 			Config: map[string]interface{}{
 				"SessionID": sessionID,
@@ -4556,9 +4556,9 @@ func upsertTestIDP(
 		WriteRequest: structs.WriteRequest{Token: masterToken},
 	}
 
-	var out structs.ACLIdentityProvider
+	var out structs.ACLAuthMethod
 
-	err = msgpackrpc.CallWithCodec(codec, "ACL.IdentityProviderSet", &req, &out)
+	err = msgpackrpc.CallWithCodec(codec, "ACL.AuthMethodSet", &req, &out)
 	if err != nil {
 		return nil, err
 	}
@@ -4566,10 +4566,10 @@ func upsertTestIDP(
 	return &out, nil
 }
 
-func upsertTestKubernetesIDP(
+func upsertTestKubernetesAuthMethod(
 	codec rpc.ClientCodec, masterToken string, datacenter string,
 	caCert, kubeHost, kubeJWT string,
-) (*structs.ACLIdentityProvider, error) {
+) (*structs.ACLAuthMethod, error) {
 	name, err := uuid.GenerateUUID()
 	if err != nil {
 		return nil, err
@@ -4582,10 +4582,10 @@ func upsertTestKubernetesIDP(
 		kubeJWT = goodJWT_A
 	}
 
-	req := structs.ACLIdentityProviderSetRequest{
+	req := structs.ACLAuthMethodSetRequest{
 		Datacenter: datacenter,
-		IdentityProvider: structs.ACLIdentityProvider{
-			Name: "test-idp-" + name,
+		AuthMethod: structs.ACLAuthMethod{
+			Name: "test-method-" + name,
 			Type: "kubernetes",
 			Config: map[string]interface{}{
 				"Host":              kubeHost,
@@ -4596,9 +4596,9 @@ func upsertTestKubernetesIDP(
 		WriteRequest: structs.WriteRequest{Token: masterToken},
 	}
 
-	var out structs.ACLIdentityProvider
+	var out structs.ACLAuthMethod
 
-	err = msgpackrpc.CallWithCodec(codec, "ACL.IdentityProviderSet", &req, &out)
+	err = msgpackrpc.CallWithCodec(codec, "ACL.AuthMethodSet", &req, &out)
 	if err != nil {
 		return nil, err
 	}
@@ -4606,16 +4606,16 @@ func upsertTestKubernetesIDP(
 	return &out, nil
 }
 
-func retrieveTestIDP(codec rpc.ClientCodec, masterToken string, datacenter string, name string) (*structs.ACLIdentityProviderResponse, error) {
-	arg := structs.ACLIdentityProviderGetRequest{
-		Datacenter:           datacenter,
-		IdentityProviderName: name,
-		QueryOptions:         structs.QueryOptions{Token: masterToken},
+func retrieveTestAuthMethod(codec rpc.ClientCodec, masterToken string, datacenter string, name string) (*structs.ACLAuthMethodResponse, error) {
+	arg := structs.ACLAuthMethodGetRequest{
+		Datacenter:     datacenter,
+		AuthMethodName: name,
+		QueryOptions:   structs.QueryOptions{Token: masterToken},
 	}
 
-	var out structs.ACLIdentityProviderResponse
+	var out structs.ACLAuthMethodResponse
 
-	err := msgpackrpc.CallWithCodec(codec, "ACL.IdentityProviderRead", &arg, &out)
+	err := msgpackrpc.CallWithCodec(codec, "ACL.AuthMethodRead", &arg, &out)
 
 	if err != nil {
 		return nil, err
@@ -4640,7 +4640,7 @@ func upsertTestBindingRule(
 	codec rpc.ClientCodec,
 	masterToken string,
 	datacenter string,
-	idpName string,
+	methodName string,
 	selector string,
 	bindType string,
 	bindName string,
@@ -4648,10 +4648,10 @@ func upsertTestBindingRule(
 	req := structs.ACLBindingRuleSetRequest{
 		Datacenter: datacenter,
 		BindingRule: structs.ACLBindingRule{
-			IDPName:  idpName,
-			BindType: bindType,
-			BindName: bindName,
-			Selector: selector,
+			AuthMethod: methodName,
+			BindType:   bindType,
+			BindName:   bindName,
+			Selector:   selector,
 		},
 		WriteRequest: structs.WriteRequest{Token: masterToken},
 	}
@@ -4707,8 +4707,8 @@ func requireErrorContains(t *testing.T, err error, expectedErrorMessage string) 
 	}
 }
 
-// 'default/consul-idp-token-review-account-token-m62ds'
-const goodJWT_A = "eyJhbGciOiJSUzI1NiIsImtpZCI6IiJ9.eyJpc3MiOiJrdWJlcm5ldGVzL3NlcnZpY2VhY2NvdW50Iiwia3ViZXJuZXRlcy5pby9zZXJ2aWNlYWNjb3VudC9uYW1lc3BhY2UiOiJkZWZhdWx0Iiwia3ViZXJuZXRlcy5pby9zZXJ2aWNlYWNjb3VudC9zZWNyZXQubmFtZSI6ImNvbnN1bC1pZHAtdG9rZW4tcmV2aWV3LWFjY291bnQtdG9rZW4tbTYyZHMiLCJrdWJlcm5ldGVzLmlvL3NlcnZpY2VhY2NvdW50L3NlcnZpY2UtYWNjb3VudC5uYW1lIjoiY29uc3VsLWlkcC10b2tlbi1yZXZpZXctYWNjb3VudCIsImt1YmVybmV0ZXMuaW8vc2VydmljZWFjY291bnQvc2VydmljZS1hY2NvdW50LnVpZCI6Ijc1ZTNjYmVhLTRiNTYtMTFlOS1hYzRiLTcwOGIxMTgwMWNiZSIsInN1YiI6InN5c3RlbTpzZXJ2aWNlYWNjb3VudDpkZWZhdWx0OmNvbnN1bC1pZHAtdG9rZW4tcmV2aWV3LWFjY291bnQifQ.uMb66tZ8d8gNzS8EnjlkzbrGKc5M-BESwS5B46IUbKfdMtajsCwgBXICytWKQ2X7wfm4QQykHVaElijBlO8QVvYeYzQE0uy75eH9EXNXmRh862YL_Qcy_doPC0R6FQXZW99S5Joc-3riKsq7N-sjEDBshOqyfDaGfan3hxaiV4Bv4hXXWRFUQ9aTAfPVvk1FQi21U9Fbml9ufk8kkk6gAmIEA_o7p-ve6WIhm48t7MJv314YhyVqXdrvmRykPdMwj4TfwSn3pTJ82P4NgSbXMJhwNkwIadJPZrM8EfN5ISpR4EW3jzP3IHtgQxrIovWQ9TQib1Z5zdRaLWaFVm6XaQ"
+// 'default/admin'
+const goodJWT_A = "eyJhbGciOiJSUzI1NiIsImtpZCI6IiJ9.eyJpc3MiOiJrdWJlcm5ldGVzL3NlcnZpY2VhY2NvdW50Iiwia3ViZXJuZXRlcy5pby9zZXJ2aWNlYWNjb3VudC9uYW1lc3BhY2UiOiJkZWZhdWx0Iiwia3ViZXJuZXRlcy5pby9zZXJ2aWNlYWNjb3VudC9zZWNyZXQubmFtZSI6ImFkbWluLXRva2VuLXFsejQyIiwia3ViZXJuZXRlcy5pby9zZXJ2aWNlYWNjb3VudC9zZXJ2aWNlLWFjY291bnQubmFtZSI6ImFkbWluIiwia3ViZXJuZXRlcy5pby9zZXJ2aWNlYWNjb3VudC9zZXJ2aWNlLWFjY291bnQudWlkIjoiNzM4YmMyNTEtNjUzMi0xMWU5LWI2N2YtNDhlNmM4YjhlY2I1Iiwic3ViIjoic3lzdGVtOnNlcnZpY2VhY2NvdW50OmRlZmF1bHQ6YWRtaW4ifQ.ixMlnWrAG7NVuTTKu8cdcYfM7gweS3jlKaEsIBNGOVEjPE7rtXtgMkAwjQTdYR08_0QBjkgzy5fQC5ZNyglSwONJ-bPaXGvhoH1cTnRi1dz9H_63CfqOCvQP1sbdkMeRxNTGVAyWZT76rXoCUIfHP4LY2I8aab0KN9FTIcgZRF0XPTtT70UwGIrSmRpxW38zjiy2ymWL01cc5VWGhJqVysmWmYk3wNp0h5N57H_MOrz4apQR4pKaamzskzjLxO55gpbmZFC76qWuUdexAR7DT2fpbHLOw90atN_NlLMY-VrXyW3-Ei5EhYaVreMB9PSpKwkrA4jULITohV-sxpa1LA"
 
 // 'default/demo'
 const goodJWT_B = "eyJhbGciOiJSUzI1NiIsImtpZCI6IiJ9.eyJpc3MiOiJrdWJlcm5ldGVzL3NlcnZpY2VhY2NvdW50Iiwia3ViZXJuZXRlcy5pby9zZXJ2aWNlYWNjb3VudC9uYW1lc3BhY2UiOiJkZWZhdWx0Iiwia3ViZXJuZXRlcy5pby9zZXJ2aWNlYWNjb3VudC9zZWNyZXQubmFtZSI6ImRlbW8tdG9rZW4ta21iOW4iLCJrdWJlcm5ldGVzLmlvL3NlcnZpY2VhY2NvdW50L3NlcnZpY2UtYWNjb3VudC5uYW1lIjoiZGVtbyIsImt1YmVybmV0ZXMuaW8vc2VydmljZWFjY291bnQvc2VydmljZS1hY2NvdW50LnVpZCI6Ijc2MDkxYWY0LTRiNTYtMTFlOS1hYzRiLTcwOGIxMTgwMWNiZSIsInN1YiI6InN5c3RlbTpzZXJ2aWNlYWNjb3VudDpkZWZhdWx0OmRlbW8ifQ.ZiAHjijBAOsKdum0Aix6lgtkLkGo9_Tu87dWQ5Zfwnn3r2FejEWDAnftTft1MqqnMzivZ9Wyyki5ZjQRmTAtnMPJuHC-iivqY4Wh4S6QWCJ1SivBv5tMZR79t5t8mE7R1-OHwst46spru1pps9wt9jsA04d3LpV0eeKYgdPTVaQKklxTm397kIMUugA6yINIBQ3Rh8eQqBgNwEmL4iqyYubzHLVkGkoP9MJikFI05vfRiHtYr-piXz6JFDzXMQj9rW6xtMmrBSn79ChbyvC5nz-Nj2rJPnHsb_0rDUbmXY5PpnMhBpdSH-CbZ4j8jsiib6DtaGJhVZeEQ1GjsFAZwQ"

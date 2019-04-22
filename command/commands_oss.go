@@ -3,6 +3,12 @@ package command
 import (
 	"github.com/hashicorp/consul/command/acl"
 	aclagent "github.com/hashicorp/consul/command/acl/agenttokens"
+	aclam "github.com/hashicorp/consul/command/acl/authmethod"
+	aclamcreate "github.com/hashicorp/consul/command/acl/authmethod/create"
+	aclamdelete "github.com/hashicorp/consul/command/acl/authmethod/delete"
+	aclamlist "github.com/hashicorp/consul/command/acl/authmethod/list"
+	aclamread "github.com/hashicorp/consul/command/acl/authmethod/read"
+	aclamupdate "github.com/hashicorp/consul/command/acl/authmethod/update"
 	aclbr "github.com/hashicorp/consul/command/acl/bindingrule"
 	aclbrcreate "github.com/hashicorp/consul/command/acl/bindingrule/create"
 	aclbrdelete "github.com/hashicorp/consul/command/acl/bindingrule/delete"
@@ -10,12 +16,6 @@ import (
 	aclbrread "github.com/hashicorp/consul/command/acl/bindingrule/read"
 	aclbrupdate "github.com/hashicorp/consul/command/acl/bindingrule/update"
 	aclbootstrap "github.com/hashicorp/consul/command/acl/bootstrap"
-	aclidp "github.com/hashicorp/consul/command/acl/idp"
-	aclidpcreate "github.com/hashicorp/consul/command/acl/idp/create"
-	aclidpdelete "github.com/hashicorp/consul/command/acl/idp/delete"
-	aclidplist "github.com/hashicorp/consul/command/acl/idp/list"
-	aclidpread "github.com/hashicorp/consul/command/acl/idp/read"
-	aclidpupdate "github.com/hashicorp/consul/command/acl/idp/update"
 	aclpolicy "github.com/hashicorp/consul/command/acl/policy"
 	aclpcreate "github.com/hashicorp/consul/command/acl/policy/create"
 	aclpdelete "github.com/hashicorp/consul/command/acl/policy/delete"
@@ -132,12 +132,12 @@ func init() {
 	Register("acl role read", func(ui cli.Ui) (cli.Command, error) { return aclrread.New(ui), nil })
 	Register("acl role update", func(ui cli.Ui) (cli.Command, error) { return aclrupdate.New(ui), nil })
 	Register("acl role delete", func(ui cli.Ui) (cli.Command, error) { return aclrdelete.New(ui), nil })
-	Register("acl idp", func(cli.Ui) (cli.Command, error) { return aclidp.New(), nil })
-	Register("acl idp create", func(ui cli.Ui) (cli.Command, error) { return aclidpcreate.New(ui), nil })
-	Register("acl idp list", func(ui cli.Ui) (cli.Command, error) { return aclidplist.New(ui), nil })
-	Register("acl idp read", func(ui cli.Ui) (cli.Command, error) { return aclidpread.New(ui), nil })
-	Register("acl idp update", func(ui cli.Ui) (cli.Command, error) { return aclidpupdate.New(ui), nil })
-	Register("acl idp delete", func(ui cli.Ui) (cli.Command, error) { return aclidpdelete.New(ui), nil })
+	Register("acl auth-method", func(cli.Ui) (cli.Command, error) { return aclam.New(), nil })
+	Register("acl auth-method create", func(ui cli.Ui) (cli.Command, error) { return aclamcreate.New(ui), nil })
+	Register("acl auth-method list", func(ui cli.Ui) (cli.Command, error) { return aclamlist.New(ui), nil })
+	Register("acl auth-method read", func(ui cli.Ui) (cli.Command, error) { return aclamread.New(ui), nil })
+	Register("acl auth-method update", func(ui cli.Ui) (cli.Command, error) { return aclamupdate.New(ui), nil })
+	Register("acl auth-method delete", func(ui cli.Ui) (cli.Command, error) { return aclamdelete.New(ui), nil })
 	Register("acl binding-rule", func(cli.Ui) (cli.Command, error) { return aclbr.New(), nil })
 	Register("acl binding-rule create", func(ui cli.Ui) (cli.Command, error) { return aclbrcreate.New(ui), nil })
 	Register("acl binding-rule list", func(ui cli.Ui) (cli.Command, error) { return aclbrlist.New(ui), nil })

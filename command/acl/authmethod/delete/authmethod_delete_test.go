@@ -1,6 +1,7 @@
-package idpread
+package authmethoddelete
 
 import (
+	"fmt"
 	"os"
 	"strings"
 	"testing"
@@ -14,11 +15,11 @@ import (
 	"github.com/mitchellh/cli"
 	"github.com/stretchr/testify/require"
 
-	// activate testing idp
-	_ "github.com/hashicorp/consul/agent/consul/idp/testing"
+	// activate testing auth method
+	_ "github.com/hashicorp/consul/agent/consul/authmethod/testauth"
 )
 
-func TestIDPReadCommand_noTabs(t *testing.T) {
+func TestAuthMethodDeleteCommand_noTabs(t *testing.T) {
 	t.Parallel()
 
 	if strings.ContainsRune(New(cli.NewMockUi()).Help(), '\t') {
@@ -26,7 +27,7 @@ func TestIDPReadCommand_noTabs(t *testing.T) {
 	}
 }
 
-func TestIDPReadCommand(t *testing.T) {
+func TestAuthMethodDeleteCommand(t *testing.T) {
 	t.Parallel()
 
 	testDir := testutil.TempDir(t, "acl")
@@ -62,7 +63,7 @@ func TestIDPReadCommand(t *testing.T) {
 		require.Contains(t, ui.ErrorWriter.String(), "Must specify the -name parameter")
 	})
 
-	t.Run("not found", func(t *testing.T) {
+	t.Run("delete notfound", func(t *testing.T) {
 		ui := cli.NewMockUi()
 		cmd := New(ui)
 
@@ -73,31 +74,35 @@ func TestIDPReadCommand(t *testing.T) {
 		}
 
 		code := cmd.Run(args)
-		require.Equal(t, code, 1)
-		require.Contains(t, ui.ErrorWriter.String(), "Identity provider not found with name")
+		require.Equal(t, code, 0)
+		require.Empty(t, ui.ErrorWriter.String())
+
+		output := ui.OutputWriter.String()
+		require.Contains(t, output, fmt.Sprintf("deleted successfully"))
+		require.Contains(t, output, "notfound")
 	})
 
-	createIDP := func(t *testing.T) string {
+	createAuthMethod := func(t *testing.T) string {
 		id, err := uuid.GenerateUUID()
 		require.NoError(t, err)
 
-		idpName := "test-" + id
+		methodName := "test-" + id
 
-		_, _, err = client.ACL().IdentityProviderCreate(
-			&api.ACLIdentityProvider{
-				Name:        idpName,
+		_, _, err = client.ACL().AuthMethodCreate(
+			&api.ACLAuthMethod{
+				Name:        methodName,
 				Type:        "testing",
-				Description: "test idp",
+				Description: "test",
 			},
 			&api.WriteOptions{Token: "root"},
 		)
 		require.NoError(t, err)
 
-		return idpName
+		return methodName
 	}
 
-	t.Run("read by name", func(t *testing.T) {
-		name := createIDP(t)
+	t.Run("delete works", func(t *testing.T) {
+		name := createAuthMethod(t)
 
 		ui := cli.NewMockUi()
 		cmd := New(ui)
@@ -113,6 +118,14 @@ func TestIDPReadCommand(t *testing.T) {
 		require.Empty(t, ui.ErrorWriter.String())
 
 		output := ui.OutputWriter.String()
+		require.Contains(t, output, fmt.Sprintf("deleted successfully"))
 		require.Contains(t, output, name)
+
+		method, _, err := client.ACL().AuthMethodRead(
+			name,
+			&api.QueryOptions{Token: "root"},
+		)
+		require.NoError(t, err)
+		require.Nil(t, method)
 	})
 }

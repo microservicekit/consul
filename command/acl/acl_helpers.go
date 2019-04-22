@@ -150,35 +150,35 @@ func PrintRoleListEntry(role *api.ACLRole, ui cli.Ui, showMeta bool) {
 	}
 }
 
-func PrintIdentityProvider(idp *api.ACLIdentityProvider, ui cli.Ui, showMeta bool) {
-	ui.Info(fmt.Sprintf("Name:         %s", idp.Name))
-	ui.Info(fmt.Sprintf("Type:         %s", idp.Type))
-	ui.Info(fmt.Sprintf("Description:  %s", idp.Description))
+func PrintAuthMethod(method *api.ACLAuthMethod, ui cli.Ui, showMeta bool) {
+	ui.Info(fmt.Sprintf("Name:         %s", method.Name))
+	ui.Info(fmt.Sprintf("Type:         %s", method.Type))
+	ui.Info(fmt.Sprintf("Description:  %s", method.Description))
 	if showMeta {
-		ui.Info(fmt.Sprintf("Create Index: %d", idp.CreateIndex))
-		ui.Info(fmt.Sprintf("Modify Index: %d", idp.ModifyIndex))
+		ui.Info(fmt.Sprintf("Create Index: %d", method.CreateIndex))
+		ui.Info(fmt.Sprintf("Modify Index: %d", method.ModifyIndex))
 	}
 	ui.Info(fmt.Sprintf("Config:"))
-	output, err := json.MarshalIndent(idp.Config, "", "  ")
+	output, err := json.MarshalIndent(method.Config, "", "  ")
 	if err != nil {
-		ui.Error(fmt.Sprintf("Error formatting identity provider configuration: %s", err))
+		ui.Error(fmt.Sprintf("Error formatting auth method configuration: %s", err))
 	}
 	ui.Output(string(output))
 }
 
-func PrintIdentityProviderListEntry(idp *api.ACLIdentityProviderListEntry, ui cli.Ui, showMeta bool) {
-	ui.Info(fmt.Sprintf("%s:", idp.Name))
-	ui.Info(fmt.Sprintf("   Type:         %s", idp.Type))
-	ui.Info(fmt.Sprintf("   Description:  %s", idp.Description))
+func PrintAuthMethodListEntry(method *api.ACLAuthMethodListEntry, ui cli.Ui, showMeta bool) {
+	ui.Info(fmt.Sprintf("%s:", method.Name))
+	ui.Info(fmt.Sprintf("   Type:         %s", method.Type))
+	ui.Info(fmt.Sprintf("   Description:  %s", method.Description))
 	if showMeta {
-		ui.Info(fmt.Sprintf("   Create Index: %d", idp.CreateIndex))
-		ui.Info(fmt.Sprintf("   Modify Index: %d", idp.ModifyIndex))
+		ui.Info(fmt.Sprintf("   Create Index: %d", method.CreateIndex))
+		ui.Info(fmt.Sprintf("   Modify Index: %d", method.ModifyIndex))
 	}
 }
 
 func PrintBindingRule(rule *api.ACLBindingRule, ui cli.Ui, showMeta bool) {
 	ui.Info(fmt.Sprintf("ID:           %s", rule.ID))
-	ui.Info(fmt.Sprintf("IDPName:      %s", rule.IDPName))
+	ui.Info(fmt.Sprintf("AuthMethod:   %s", rule.AuthMethod))
 	ui.Info(fmt.Sprintf("Description:  %s", rule.Description))
 	ui.Info(fmt.Sprintf("BindType:     %s", rule.BindType))
 	ui.Info(fmt.Sprintf("BindName:     %s", rule.BindName))
@@ -191,7 +191,7 @@ func PrintBindingRule(rule *api.ACLBindingRule, ui cli.Ui, showMeta bool) {
 
 func PrintBindingRuleListEntry(rule *api.ACLBindingRule, ui cli.Ui, showMeta bool) {
 	ui.Info(fmt.Sprintf("%s:", rule.ID))
-	ui.Info(fmt.Sprintf("   IDPName:      %s", rule.IDPName))
+	ui.Info(fmt.Sprintf("   AuthMethod:   %s", rule.AuthMethod))
 	ui.Info(fmt.Sprintf("   Description:  %s", rule.Description))
 	ui.Info(fmt.Sprintf("   BindType:     %s", rule.BindType))
 	ui.Info(fmt.Sprintf("   BindName:     %s", rule.BindName))
@@ -416,12 +416,12 @@ func ExtractServiceIdentities(serviceIdents []string) ([]*api.ACLServiceIdentity
 // {
 //   "iss": "kubernetes/serviceaccount",
 //   "kubernetes.io/serviceaccount/namespace": "default",
-//   "kubernetes.io/serviceaccount/secret.name": "consul-idp-token-review-account-token-m62ds",
-//   "kubernetes.io/serviceaccount/service-account.name": "consul-idp-token-review-account",
-//   "kubernetes.io/serviceaccount/service-account.uid": "75e3cbea-4b56-11e9-ac4b-708b11801cbe",
-//   "sub": "system:serviceaccount:default:consul-idp-token-review-account"
+//   "kubernetes.io/serviceaccount/secret.name": "admin-token-qlz42",
+//   "kubernetes.io/serviceaccount/service-account.name": "admin",
+//   "kubernetes.io/serviceaccount/service-account.uid": "738bc251-6532-11e9-b67f-48e6c8b8ecb5",
+//   "sub": "system:serviceaccount:default:admin"
 // }
-const TestKubernetesJWT_A = "eyJhbGciOiJSUzI1NiIsImtpZCI6IiJ9.eyJpc3MiOiJrdWJlcm5ldGVzL3NlcnZpY2VhY2NvdW50Iiwia3ViZXJuZXRlcy5pby9zZXJ2aWNlYWNjb3VudC9uYW1lc3BhY2UiOiJkZWZhdWx0Iiwia3ViZXJuZXRlcy5pby9zZXJ2aWNlYWNjb3VudC9zZWNyZXQubmFtZSI6ImNvbnN1bC1pZHAtdG9rZW4tcmV2aWV3LWFjY291bnQtdG9rZW4tbTYyZHMiLCJrdWJlcm5ldGVzLmlvL3NlcnZpY2VhY2NvdW50L3NlcnZpY2UtYWNjb3VudC5uYW1lIjoiY29uc3VsLWlkcC10b2tlbi1yZXZpZXctYWNjb3VudCIsImt1YmVybmV0ZXMuaW8vc2VydmljZWFjY291bnQvc2VydmljZS1hY2NvdW50LnVpZCI6Ijc1ZTNjYmVhLTRiNTYtMTFlOS1hYzRiLTcwOGIxMTgwMWNiZSIsInN1YiI6InN5c3RlbTpzZXJ2aWNlYWNjb3VudDpkZWZhdWx0OmNvbnN1bC1pZHAtdG9rZW4tcmV2aWV3LWFjY291bnQifQ.uMb66tZ8d8gNzS8EnjlkzbrGKc5M-BESwS5B46IUbKfdMtajsCwgBXICytWKQ2X7wfm4QQykHVaElijBlO8QVvYeYzQE0uy75eH9EXNXmRh862YL_Qcy_doPC0R6FQXZW99S5Joc-3riKsq7N-sjEDBshOqyfDaGfan3hxaiV4Bv4hXXWRFUQ9aTAfPVvk1FQi21U9Fbml9ufk8kkk6gAmIEA_o7p-ve6WIhm48t7MJv314YhyVqXdrvmRykPdMwj4TfwSn3pTJ82P4NgSbXMJhwNkwIadJPZrM8EfN5ISpR4EW3jzP3IHtgQxrIovWQ9TQib1Z5zdRaLWaFVm6XaQ"
+const TestKubernetesJWT_A = "eyJhbGciOiJSUzI1NiIsImtpZCI6IiJ9.eyJpc3MiOiJrdWJlcm5ldGVzL3NlcnZpY2VhY2NvdW50Iiwia3ViZXJuZXRlcy5pby9zZXJ2aWNlYWNjb3VudC9uYW1lc3BhY2UiOiJkZWZhdWx0Iiwia3ViZXJuZXRlcy5pby9zZXJ2aWNlYWNjb3VudC9zZWNyZXQubmFtZSI6ImFkbWluLXRva2VuLXFsejQyIiwia3ViZXJuZXRlcy5pby9zZXJ2aWNlYWNjb3VudC9zZXJ2aWNlLWFjY291bnQubmFtZSI6ImFkbWluIiwia3ViZXJuZXRlcy5pby9zZXJ2aWNlYWNjb3VudC9zZXJ2aWNlLWFjY291bnQudWlkIjoiNzM4YmMyNTEtNjUzMi0xMWU5LWI2N2YtNDhlNmM4YjhlY2I1Iiwic3ViIjoic3lzdGVtOnNlcnZpY2VhY2NvdW50OmRlZmF1bHQ6YWRtaW4ifQ.ixMlnWrAG7NVuTTKu8cdcYfM7gweS3jlKaEsIBNGOVEjPE7rtXtgMkAwjQTdYR08_0QBjkgzy5fQC5ZNyglSwONJ-bPaXGvhoH1cTnRi1dz9H_63CfqOCvQP1sbdkMeRxNTGVAyWZT76rXoCUIfHP4LY2I8aab0KN9FTIcgZRF0XPTtT70UwGIrSmRpxW38zjiy2ymWL01cc5VWGhJqVysmWmYk3wNp0h5N57H_MOrz4apQR4pKaamzskzjLxO55gpbmZFC76qWuUdexAR7DT2fpbHLOw90atN_NlLMY-VrXyW3-Ei5EhYaVreMB9PSpKwkrA4jULITohV-sxpa1LA"
 
 // TestKubernetesJWT_B is a valid service account jwt extracted from a minikube setup.
 //

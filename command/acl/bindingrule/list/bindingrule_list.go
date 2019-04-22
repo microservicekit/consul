@@ -21,7 +21,7 @@ type cmd struct {
 	http  *flags.HTTPFlags
 	help  string
 
-	idpName string
+	authMethodName string
 
 	showMeta bool
 }
@@ -38,10 +38,10 @@ func (c *cmd) init() {
 	)
 
 	c.flags.StringVar(
-		&c.idpName,
-		"idp-name",
+		&c.authMethodName,
+		"method",
 		"",
-		"Only show rules linked to the identity provider with the given name.",
+		"Only show rules linked to the auth method with the given name.",
 	)
 
 	c.http = &flags.HTTPFlags{}
@@ -61,7 +61,7 @@ func (c *cmd) Run(args []string) int {
 		return 1
 	}
 
-	rules, _, err := client.ACL().BindingRuleList(c.idpName, nil)
+	rules, _, err := client.ACL().BindingRuleList(c.authMethodName, nil)
 	if err != nil {
 		c.UI.Error(fmt.Sprintf("Failed to retrieve the binding rule list: %v", err))
 		return 1
@@ -92,7 +92,7 @@ Usage: consul acl binding-rule list [options]
 
     $ consul acl binding-rule list
 
-  Show all for a specific identity provider:
+  Show all for a specific auth method:
 
-    $ consul acl binding-rule list -idp-name="my-idp"
+    $ consul acl binding-rule list -method="my-method"
 `

@@ -1,10 +1,9 @@
-package idplist
+package authmethoddelete
 
 import (
 	"flag"
 	"fmt"
 
-	"github.com/hashicorp/consul/command/acl"
 	"github.com/hashicorp/consul/command/flags"
 	"github.com/mitchellh/cli"
 )
@@ -21,18 +20,17 @@ type cmd struct {
 	http  *flags.HTTPFlags
 	help  string
 
-	showMeta bool
+	name string
 }
 
 func (c *cmd) init() {
 	c.flags = flag.NewFlagSet("", flag.ContinueOnError)
 
-	c.flags.BoolVar(
-		&c.showMeta,
-		"meta",
-		false,
-		"Indicates that identity provider metadata such "+
-			"as the content hash and raft indices should be shown for each entry.",
+	c.flags.StringVar(
+		&c.name,
+		"name",
+		"",
+		"The name of the auth method to delete.",
 	)
 
 	c.http = &flags.HTTPFlags{}
@@ -46,22 +44,23 @@ func (c *cmd) Run(args []string) int {
 		return 1
 	}
 
+	if c.name == "" {
+		c.UI.Error(fmt.Sprintf("Must specify the -name parameter"))
+		return 1
+	}
+
 	client, err := c.http.APIClient()
 	if err != nil {
 		c.UI.Error(fmt.Sprintf("Error connecting to Consul agent: %s", err))
 		return 1
 	}
 
-	idps, _, err := client.ACL().IdentityProviderList(nil)
-	if err != nil {
-		c.UI.Error(fmt.Sprintf("Failed to retrieve the identity provider list: %v", err))
+	if _, err := client.ACL().AuthMethodDelete(c.name, nil); err != nil {
+		c.UI.Error(fmt.Sprintf("Error deleting auth method %q: %v", c.name, err))
 		return 1
 	}
 
-	for _, idp := range idps {
-		acl.PrintIdentityProviderListEntry(idp, c.UI, c.showMeta)
-	}
-
+	c.UI.Info(fmt.Sprintf("Auth method %q deleted successfully", c.name))
 	return 0
 }
 
@@ -73,11 +72,11 @@ func (c *cmd) Help() string {
 	return flags.Usage(c.help, nil)
 }
 
-const synopsis = "Lists ACL Identity Providers"
+const synopsis = "Delete an ACL Auth Method"
 const help = `
-Usage: consul acl idp list [options]
+Usage: consul acl auth-method delete -name NAME [options]
 
-  List all identity providers:
+  Delete an auth method:
 
-    $ consul acl idp list
+    $ consul acl auth-method delete -name "my-auth-method"
 `

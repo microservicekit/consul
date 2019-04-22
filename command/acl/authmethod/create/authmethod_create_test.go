@@ -1,4 +1,4 @@
-package idpcreate
+package authmethodcreate
 
 import (
 	"io/ioutil"
@@ -16,11 +16,11 @@ import (
 	"github.com/mitchellh/cli"
 	"github.com/stretchr/testify/require"
 
-	// activate testing idp
-	_ "github.com/hashicorp/consul/agent/consul/idp/testing"
+	// activate testing auth method
+	_ "github.com/hashicorp/consul/agent/consul/authmethod/testauth"
 )
 
-func TestIDPCreateCommand_noTabs(t *testing.T) {
+func TestAuthMethodCreateCommand_noTabs(t *testing.T) {
 	t.Parallel()
 
 	if strings.ContainsRune(New(cli.NewMockUi()).Help(), '\t') {
@@ -28,7 +28,7 @@ func TestIDPCreateCommand_noTabs(t *testing.T) {
 	}
 }
 
-func TestIDPCreateCommand(t *testing.T) {
+func TestAuthMethodCreateCommand(t *testing.T) {
 	t.Parallel()
 
 	testDir := testutil.TempDir(t, "acl")
@@ -82,7 +82,7 @@ func TestIDPCreateCommand(t *testing.T) {
 			"-http-addr=" + a.HTTPAddr(),
 			"-token=root",
 			"-type=invalid",
-			"-name=my-idp",
+			"-name=my-method",
 		}
 
 		ui := cli.NewMockUi()
@@ -90,7 +90,7 @@ func TestIDPCreateCommand(t *testing.T) {
 
 		code := cmd.Run(args)
 		require.Equal(t, code, 1)
-		require.Contains(t, ui.ErrorWriter.String(), "Invalid Identity Provider: Type should be one of")
+		require.Contains(t, ui.ErrorWriter.String(), "Invalid Auth Method: Type should be one of")
 	})
 
 	t.Run("create testing", func(t *testing.T) {
@@ -110,7 +110,7 @@ func TestIDPCreateCommand(t *testing.T) {
 	})
 }
 
-func TestIDPCreateCommand_k8s(t *testing.T) {
+func TestAuthMethodCreateCommand_k8s(t *testing.T) {
 	t.Parallel()
 
 	testDir := testutil.TempDir(t, "acl")

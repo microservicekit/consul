@@ -1,4 +1,4 @@
-package idp
+package authmethod
 
 import (
 	"github.com/hashicorp/consul/command/flags"
@@ -23,42 +23,42 @@ func (c *cmd) Help() string {
 	return flags.Usage(help, nil)
 }
 
-const synopsis = "Manage Consul's ACL Identity Providers"
+const synopsis = "Manage Consul's ACL Auth Methods"
 const help = `
-Usage: consul acl idp <subcommand> [options] [args]
+Usage: consul acl auth-method <subcommand> [options] [args]
 
-  This command has subcommands for managing Consul's ACL Identity Providers.
+  This command has subcommands for managing Consul's ACL Auth Methods.
   Here are some simple examples, and more detailed examples are available in
   the subcommands or the documentation.
 
-  Create a new identity provider:
+  Create a new auth method:
 
-    $ consul acl idp create -type "kubernetes" \
-                            -name "my-idp" \
-                            -description "This is an example kube idp" \
+    $ consul acl auth-method create -type "kubernetes" \
+                            -name "my-k8s" \
+                            -description "This is an example kube auth method" \
                             -kubernetes-host "https://apiserver.example.com:8443" \
                             -kubernetes-ca-file /path/to/kube.ca.crt \
                             -kubernetes-service-account-jwt "JWT_CONTENTS"
 
-  List all identity providers:
+  List all auth methods:
 
-    $ consul acl idp list
+    $ consul acl auth-method list
 
-  Update all editable fields of the identity provider:
+  Update all editable fields of the auth method:
 
-    $ consul acl idp update -name "my-idp" \
+    $ consul acl auth-method update -name "my-k8s" \
                             -description "new description" \
                             -kubernetes-host "https://new-apiserver.example.com:8443" \
                             -kubernetes-ca-file /path/to/new-kube.ca.crt \
                             -kubernetes-service-account-jwt "NEW_JWT_CONTENTS"
 
-  Read an identity provider:
+  Read an auth method:
 
-    $ consul acl idp read -name my-idp
+    $ consul acl auth-method read -name my-k8s
 
-  Delete an identity provider:
+  Delete an auth method:
 
-    $ consul acl idp delete -name "my-idp"
+    $ consul acl auth-method delete -name my-k8s
 
   For more examples, ask for subcommand help or view the documentation.
 `

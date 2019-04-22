@@ -148,7 +148,7 @@ const (
 type ACLBindingRule struct {
 	ID          string
 	Description string
-	IDPName     string
+	AuthMethod  string
 	Selector    string
 	BindType    BindingRuleBindType
 	BindName    string
@@ -157,32 +157,32 @@ type ACLBindingRule struct {
 	ModifyIndex uint64
 }
 
-type ACLIdentityProvider struct {
+type ACLAuthMethod struct {
 	Name        string
-	Description string
 	Type        string
+	Description string
 
-	// Configuration is arbitrary configuration for the provider. This
-	// should only contain primitive values and containers (such as lists
-	// and maps).
+	// Configuration is arbitrary configuration for the auth method. This
+	// should only contain primitive values and containers (such as lists and
+	// maps).
 	Config map[string]interface{}
 
 	CreateIndex uint64
 	ModifyIndex uint64
 }
 
-type ACLIdentityProviderListEntry struct {
+type ACLAuthMethodListEntry struct {
 	Name        string
-	Description string
 	Type        string
+	Description string
 	CreateIndex uint64
 	ModifyIndex uint64
 }
 
-// ParseKubernetesIdentityProviderConfig takes a raw config map and returns a
-// parsed KubernetesIdentityProviderConfig.
-func ParseKubernetesIdentityProviderConfig(raw map[string]interface{}) (*KubernetesIdentityProviderConfig, error) {
-	var config KubernetesIdentityProviderConfig
+// ParseKubernetesAuthMethodConfig takes a raw config map and returns a parsed
+// KubernetesAuthMethodConfig.
+func ParseKubernetesAuthMethodConfig(raw map[string]interface{}) (*KubernetesAuthMethodConfig, error) {
+	var config KubernetesAuthMethodConfig
 	decodeConf := &mapstructure.DecoderConfig{
 		Result:           &config,
 		WeaklyTypedInput: true,
@@ -200,18 +200,18 @@ func ParseKubernetesIdentityProviderConfig(raw map[string]interface{}) (*Kuberne
 	return &config, nil
 }
 
-// KubernetesIdentityProviderConfig is the config for the built-in Consul
-// Identity Provider for Kubernetes.
-type KubernetesIdentityProviderConfig struct {
+// KubernetesAuthMethodConfig is the config for the built-in Consul auth method
+// for Kubernetes.
+type KubernetesAuthMethodConfig struct {
 	Host              string `json:",omitempty"`
 	CACert            string `json:",omitempty"`
 	ServiceAccountJWT string `json:",omitempty"`
 }
 
 type ACLLoginParams struct {
-	IDPName  string
-	IDPToken string
-	Meta     map[string]string `json:",omitempty"`
+	AuthMethod  string
+	BearerToken string
+	Meta        map[string]string `json:",omitempty"`
 }
 
 // ACL can be used to query the ACL endpoints
@@ -846,15 +846,15 @@ func (a *ACL) RoleList(q *QueryOptions) ([]*ACLRole, *QueryMeta, error) {
 	return entries, qm, nil
 }
 
-// IdentityProviderCreate will create a new identity provider.
-func (a *ACL) IdentityProviderCreate(idp *ACLIdentityProvider, q *WriteOptions) (*ACLIdentityProvider, *WriteMeta, error) {
-	if idp.Name == "" {
-		return nil, nil, fmt.Errorf("Must specify a Name in Identity Provider Creation")
+// AuthMethodCreate will create a new auth method.
+func (a *ACL) AuthMethodCreate(method *ACLAuthMethod, q *WriteOptions) (*ACLAuthMethod, *WriteMeta, error) {
+	if method.Name == "" {
+		return nil, nil, fmt.Errorf("Must specify a Name in Auth Method Creation")
 	}
 
-	r := a.c.newRequest("PUT", "/v1/acl/idp")
+	r := a.c.newRequest("PUT", "/v1/acl/auth-method")
 	r.setWriteOptions(q)
-	r.obj = idp
+	r.obj = method
 	rtt, resp, err := requireOK(a.c.doRequest(r))
 	if err != nil {
 		return nil, nil, err
@@ -862,7 +862,7 @@ func (a *ACL) IdentityProviderCreate(idp *ACLIdentityProvider, q *WriteOptions) 
 	defer resp.Body.Close()
 
 	wm := &WriteMeta{RequestTime: rtt}
-	var out ACLIdentityProvider
+	var out ACLAuthMethod
 	if err := decodeBody(resp, &out); err != nil {
 		return nil, nil, err
 	}
@@ -870,15 +870,15 @@ func (a *ACL) IdentityProviderCreate(idp *ACLIdentityProvider, q *WriteOptions) 
 	return &out, wm, nil
 }
 
-// IdentityProviderUpdate updates an identity provider.
-func (a *ACL) IdentityProviderUpdate(idp *ACLIdentityProvider, q *WriteOptions) (*ACLIdentityProvider, *WriteMeta, error) {
-	if idp.Name == "" {
-		return nil, nil, fmt.Errorf("Must specify a Name in Identity Provider Update")
+// AuthMethodUpdate updates an auth method.
+func (a *ACL) AuthMethodUpdate(method *ACLAuthMethod, q *WriteOptions) (*ACLAuthMethod, *WriteMeta, error) {
+	if method.Name == "" {
+		return nil, nil, fmt.Errorf("Must specify a Name in Auth Method Update")
 	}
 
-	r := a.c.newRequest("PUT", "/v1/acl/idp/"+url.QueryEscape(idp.Name))
+	r := a.c.newRequest("PUT", "/v1/acl/auth-method/"+url.QueryEscape(method.Name))
 	r.setWriteOptions(q)
-	r.obj = idp
+	r.obj = method
 	rtt, resp, err := requireOK(a.c.doRequest(r))
 	if err != nil {
 		return nil, nil, err
@@ -886,7 +886,7 @@ func (a *ACL) IdentityProviderUpdate(idp *ACLIdentityProvider, q *WriteOptions) 
 	defer resp.Body.Close()
 
 	wm := &WriteMeta{RequestTime: rtt}
-	var out ACLIdentityProvider
+	var out ACLAuthMethod
 	if err := decodeBody(resp, &out); err != nil {
 		return nil, nil, err
 	}
@@ -894,13 +894,13 @@ func (a *ACL) IdentityProviderUpdate(idp *ACLIdentityProvider, q *WriteOptions) 
 	return &out, wm, nil
 }
 
-// IdentityProviderDelete deletes an identity provider given its Name.
-func (a *ACL) IdentityProviderDelete(idpName string, q *WriteOptions) (*WriteMeta, error) {
-	if idpName == "" {
-		return nil, fmt.Errorf("Must specify a Name in Identity Provider Delete")
+// AuthMethodDelete deletes an auth method given its Name.
+func (a *ACL) AuthMethodDelete(methodName string, q *WriteOptions) (*WriteMeta, error) {
+	if methodName == "" {
+		return nil, fmt.Errorf("Must specify a Name in Auth Method Delete")
 	}
 
-	r := a.c.newRequest("DELETE", "/v1/acl/idp/"+url.QueryEscape(idpName))
+	r := a.c.newRequest("DELETE", "/v1/acl/auth-method/"+url.QueryEscape(methodName))
 	r.setWriteOptions(q)
 	rtt, resp, err := requireOK(a.c.doRequest(r))
 	if err != nil {
@@ -912,13 +912,13 @@ func (a *ACL) IdentityProviderDelete(idpName string, q *WriteOptions) (*WriteMet
 	return wm, nil
 }
 
-// IdentityProviderRead retrieves the identity provider. Returns nil if not found.
-func (a *ACL) IdentityProviderRead(idpName string, q *QueryOptions) (*ACLIdentityProvider, *QueryMeta, error) {
-	if idpName == "" {
-		return nil, nil, fmt.Errorf("Must specify a Name in Identity Provider Read")
+// AuthMethodRead retrieves the auth method. Returns nil if not found.
+func (a *ACL) AuthMethodRead(methodName string, q *QueryOptions) (*ACLAuthMethod, *QueryMeta, error) {
+	if methodName == "" {
+		return nil, nil, fmt.Errorf("Must specify a Name in Auth Method Read")
 	}
 
-	r := a.c.newRequest("GET", "/v1/acl/idp/"+url.QueryEscape(idpName))
+	r := a.c.newRequest("GET", "/v1/acl/auth-method/"+url.QueryEscape(methodName))
 	r.setQueryOptions(q)
 	found, rtt, resp, err := requireNotFoundOrOK(a.c.doRequest(r))
 	if err != nil {
@@ -934,7 +934,7 @@ func (a *ACL) IdentityProviderRead(idpName string, q *QueryOptions) (*ACLIdentit
 		return nil, qm, nil
 	}
 
-	var out ACLIdentityProvider
+	var out ACLAuthMethod
 	if err := decodeBody(resp, &out); err != nil {
 		return nil, nil, err
 	}
@@ -942,11 +942,11 @@ func (a *ACL) IdentityProviderRead(idpName string, q *QueryOptions) (*ACLIdentit
 	return &out, qm, nil
 }
 
-// IdentityProviderList retrieves a listing of all identity providers. The
-// listing does not include some metadata for the identity provider as those
-// should be retrieved by subsequent calls to IdentityProviderRead.
-func (a *ACL) IdentityProviderList(q *QueryOptions) ([]*ACLIdentityProviderListEntry, *QueryMeta, error) {
-	r := a.c.newRequest("GET", "/v1/acl/idps")
+// AuthMethodList retrieves a listing of all auth methods. The listing does not
+// include some metadata for the auth method as those should be retrieved by
+// subsequent calls to AuthMethodRead.
+func (a *ACL) AuthMethodList(q *QueryOptions) ([]*ACLAuthMethodListEntry, *QueryMeta, error) {
+	r := a.c.newRequest("GET", "/v1/acl/auth-methods")
 	r.setQueryOptions(q)
 	rtt, resp, err := requireOK(a.c.doRequest(r))
 	if err != nil {
@@ -958,16 +958,16 @@ func (a *ACL) IdentityProviderList(q *QueryOptions) ([]*ACLIdentityProviderListE
 	parseQueryMeta(resp, qm)
 	qm.RequestTime = rtt
 
-	var entries []*ACLIdentityProviderListEntry
+	var entries []*ACLAuthMethodListEntry
 	if err := decodeBody(resp, &entries); err != nil {
 		return nil, nil, err
 	}
 	return entries, qm, nil
 }
 
-// BindingRuleCreate will create a new binding rule. It is not allowed
-// for the binding rule parameter's ID field to be set as this will be
-// generated by Consul while processing the request.
+// BindingRuleCreate will create a new binding rule. It is not allowed for the
+// binding rule parameter's ID field to be set as this will be generated by
+// Consul while processing the request.
 func (a *ACL) BindingRuleCreate(rule *ACLBindingRule, q *WriteOptions) (*ACLBindingRule, *WriteMeta, error) {
 	if rule.ID != "" {
 		return nil, nil, fmt.Errorf("Cannot specify an ID in Binding Rule Creation")
@@ -991,8 +991,8 @@ func (a *ACL) BindingRuleCreate(rule *ACLBindingRule, q *WriteOptions) (*ACLBind
 	return &out, wm, nil
 }
 
-// BindingRuleUpdate updates a binding rule. The ID field of the role
-// binding rule parameter must be set to an existing binding rule ID.
+// BindingRuleUpdate updates a binding rule. The ID field of the role binding
+// rule parameter must be set to an existing binding rule ID.
 func (a *ACL) BindingRuleUpdate(rule *ACLBindingRule, q *WriteOptions) (*ACLBindingRule, *WriteMeta, error) {
 	if rule.ID == "" {
 		return nil, nil, fmt.Errorf("Must specify an ID in Binding Rule Update")
@@ -1057,10 +1057,10 @@ func (a *ACL) BindingRuleRead(bindingRuleID string, q *QueryOptions) (*ACLBindin
 }
 
 // BindingRuleList retrieves a listing of all binding rules.
-func (a *ACL) BindingRuleList(idpName string, q *QueryOptions) ([]*ACLBindingRule, *QueryMeta, error) {
+func (a *ACL) BindingRuleList(methodName string, q *QueryOptions) ([]*ACLBindingRule, *QueryMeta, error) {
 	r := a.c.newRequest("GET", "/v1/acl/binding-rules")
-	if idpName != "" {
-		r.params.Set("idp", idpName)
+	if methodName != "" {
+		r.params.Set("authmethod", methodName)
 	}
 	r.setQueryOptions(q)
 	rtt, resp, err := requireOK(a.c.doRequest(r))
@@ -1080,8 +1080,7 @@ func (a *ACL) BindingRuleList(idpName string, q *QueryOptions) ([]*ACLBindingRul
 	return entries, qm, nil
 }
 
-// Login is used to exchange identity provider credentials for a newly-minted
-// Consul Token.
+// Login is used to exchange auth method credentials for a newly-minted Consul Token.
 func (a *ACL) Login(auth *ACLLoginParams, q *WriteOptions) (*ACLToken, *WriteMeta, error) {
 	r := a.c.newRequest("POST", "/v1/acl/login")
 	r.setWriteOptions(q)

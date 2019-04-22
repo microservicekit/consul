@@ -376,7 +376,7 @@ func (s *HTTPServer) ACLTokenList(resp http.ResponseWriter, req *http.Request) (
 
 	args.Policy = req.URL.Query().Get("policy")
 	args.Role = req.URL.Query().Get("role")
-	args.IDPName = req.URL.Query().Get("idp")
+	args.AuthMethod = req.URL.Query().Get("authmethod")
 
 	var out structs.ACLTokenListResponse
 	defer setMeta(resp, &out.QueryMeta)
@@ -717,7 +717,7 @@ func (s *HTTPServer) ACLBindingRuleList(resp http.ResponseWriter, req *http.Requ
 		args.Datacenter = s.agent.config.Datacenter
 	}
 
-	args.IDPName = req.URL.Query().Get("idp")
+	args.AuthMethod = req.URL.Query().Get("authmethod")
 
 	var out structs.ACLBindingRuleListResponse
 	defer setMeta(resp, &out.QueryMeta)
@@ -836,12 +836,12 @@ func (s *HTTPServer) ACLBindingRuleDelete(resp http.ResponseWriter, req *http.Re
 	return true, nil
 }
 
-func (s *HTTPServer) ACLIdentityProviderList(resp http.ResponseWriter, req *http.Request) (interface{}, error) {
+func (s *HTTPServer) ACLAuthMethodList(resp http.ResponseWriter, req *http.Request) (interface{}, error) {
 	if s.checkACLDisabled(resp, req) {
 		return nil, nil
 	}
 
-	var args structs.ACLIdentityProviderListRequest
+	var args structs.ACLAuthMethodListRequest
 	if done := s.parse(resp, req, &args.Datacenter, &args.QueryOptions); done {
 		return nil, nil
 	}
@@ -850,53 +850,53 @@ func (s *HTTPServer) ACLIdentityProviderList(resp http.ResponseWriter, req *http
 		args.Datacenter = s.agent.config.Datacenter
 	}
 
-	var out structs.ACLIdentityProviderListResponse
+	var out structs.ACLAuthMethodListResponse
 	defer setMeta(resp, &out.QueryMeta)
-	if err := s.agent.RPC("ACL.IdentityProviderList", &args, &out); err != nil {
+	if err := s.agent.RPC("ACL.AuthMethodList", &args, &out); err != nil {
 		return nil, err
 	}
 
 	// make sure we return an array and not nil
-	if out.IdentityProviders == nil {
-		out.IdentityProviders = make(structs.ACLIdentityProviderListStubs, 0)
+	if out.AuthMethods == nil {
+		out.AuthMethods = make(structs.ACLAuthMethodListStubs, 0)
 	}
 
-	return out.IdentityProviders, nil
+	return out.AuthMethods, nil
 }
 
-func (s *HTTPServer) ACLIdentityProviderCRUD(resp http.ResponseWriter, req *http.Request) (interface{}, error) {
+func (s *HTTPServer) ACLAuthMethodCRUD(resp http.ResponseWriter, req *http.Request) (interface{}, error) {
 	if s.checkACLDisabled(resp, req) {
 		return nil, nil
 	}
 
-	var fn func(resp http.ResponseWriter, req *http.Request, idpName string) (interface{}, error)
+	var fn func(resp http.ResponseWriter, req *http.Request, methodName string) (interface{}, error)
 
 	switch req.Method {
 	case "GET":
-		fn = s.ACLIdentityProviderRead
+		fn = s.ACLAuthMethodRead
 
 	case "PUT":
-		fn = s.ACLIdentityProviderWrite
+		fn = s.ACLAuthMethodWrite
 
 	case "DELETE":
-		fn = s.ACLIdentityProviderDelete
+		fn = s.ACLAuthMethodDelete
 
 	default:
 		return nil, MethodNotAllowedError{req.Method, []string{"GET", "PUT", "DELETE"}}
 	}
 
-	idpName := strings.TrimPrefix(req.URL.Path, "/v1/acl/idp/")
-	if idpName == "" && req.Method != "PUT" {
-		return nil, BadRequestError{Reason: "Missing identity provider name"}
+	methodName := strings.TrimPrefix(req.URL.Path, "/v1/acl/auth-method/")
+	if methodName == "" && req.Method != "PUT" {
+		return nil, BadRequestError{Reason: "Missing auth method name"}
 	}
 
-	return fn(resp, req, idpName)
+	return fn(resp, req, methodName)
 }
 
-func (s *HTTPServer) ACLIdentityProviderRead(resp http.ResponseWriter, req *http.Request, idpName string) (interface{}, error) {
-	args := structs.ACLIdentityProviderGetRequest{
-		Datacenter:           s.agent.config.Datacenter,
-		IdentityProviderName: idpName,
+func (s *HTTPServer) ACLAuthMethodRead(resp http.ResponseWriter, req *http.Request, methodName string) (interface{}, error) {
+	args := structs.ACLAuthMethodGetRequest{
+		Datacenter:     s.agent.config.Datacenter,
+		AuthMethodName: methodName,
 	}
 	if done := s.parse(resp, req, &args.Datacenter, &args.QueryOptions); done {
 		return nil, nil
@@ -906,65 +906,65 @@ func (s *HTTPServer) ACLIdentityProviderRead(resp http.ResponseWriter, req *http
 		args.Datacenter = s.agent.config.Datacenter
 	}
 
-	var out structs.ACLIdentityProviderResponse
+	var out structs.ACLAuthMethodResponse
 	defer setMeta(resp, &out.QueryMeta)
-	if err := s.agent.RPC("ACL.IdentityProviderRead", &args, &out); err != nil {
+	if err := s.agent.RPC("ACL.AuthMethodRead", &args, &out); err != nil {
 		return nil, err
 	}
 
-	if out.IdentityProvider == nil {
+	if out.AuthMethod == nil {
 		resp.WriteHeader(http.StatusNotFound)
 		return nil, nil
 	}
 
-	fixupIdentityProviderConfig(out.IdentityProvider)
-	return out.IdentityProvider, nil
+	fixupAuthMethodConfig(out.AuthMethod)
+	return out.AuthMethod, nil
 }
 
-func (s *HTTPServer) ACLIdentityProviderCreate(resp http.ResponseWriter, req *http.Request) (interface{}, error) {
+func (s *HTTPServer) ACLAuthMethodCreate(resp http.ResponseWriter, req *http.Request) (interface{}, error) {
 	if s.checkACLDisabled(resp, req) {
 		return nil, nil
 	}
 
-	return s.ACLIdentityProviderWrite(resp, req, "")
+	return s.ACLAuthMethodWrite(resp, req, "")
 }
 
-func (s *HTTPServer) ACLIdentityProviderWrite(resp http.ResponseWriter, req *http.Request, idpName string) (interface{}, error) {
-	args := structs.ACLIdentityProviderSetRequest{
+func (s *HTTPServer) ACLAuthMethodWrite(resp http.ResponseWriter, req *http.Request, methodName string) (interface{}, error) {
+	args := structs.ACLAuthMethodSetRequest{
 		Datacenter: s.agent.config.Datacenter,
 	}
 	s.parseToken(req, &args.Token)
 
-	if err := decodeBody(req, &args.IdentityProvider, fixTimeAndHashFields); err != nil {
-		return nil, BadRequestError{Reason: fmt.Sprintf("IdentityProvider decoding failed: %v", err)}
+	if err := decodeBody(req, &args.AuthMethod, fixTimeAndHashFields); err != nil {
+		return nil, BadRequestError{Reason: fmt.Sprintf("AuthMethod decoding failed: %v", err)}
 	}
 
-	if idpName != "" {
-		if args.IdentityProvider.Name != "" && args.IdentityProvider.Name != idpName {
-			return nil, BadRequestError{Reason: "IdentityProvider Name in URL and payload do not match"}
-		} else if args.IdentityProvider.Name == "" {
-			args.IdentityProvider.Name = idpName
+	if methodName != "" {
+		if args.AuthMethod.Name != "" && args.AuthMethod.Name != methodName {
+			return nil, BadRequestError{Reason: "AuthMethod Name in URL and payload do not match"}
+		} else if args.AuthMethod.Name == "" {
+			args.AuthMethod.Name = methodName
 		}
 	}
 
-	var out structs.ACLIdentityProvider
-	if err := s.agent.RPC("ACL.IdentityProviderSet", args, &out); err != nil {
+	var out structs.ACLAuthMethod
+	if err := s.agent.RPC("ACL.AuthMethodSet", args, &out); err != nil {
 		return nil, err
 	}
 
-	fixupIdentityProviderConfig(&out)
+	fixupAuthMethodConfig(&out)
 	return &out, nil
 }
 
-func (s *HTTPServer) ACLIdentityProviderDelete(resp http.ResponseWriter, req *http.Request, idpName string) (interface{}, error) {
-	args := structs.ACLIdentityProviderDeleteRequest{
-		Datacenter:           s.agent.config.Datacenter,
-		IdentityProviderName: idpName,
+func (s *HTTPServer) ACLAuthMethodDelete(resp http.ResponseWriter, req *http.Request, methodName string) (interface{}, error) {
+	args := structs.ACLAuthMethodDeleteRequest{
+		Datacenter:     s.agent.config.Datacenter,
+		AuthMethodName: methodName,
 	}
 	s.parseToken(req, &args.Token)
 
 	var ignored bool
-	if err := s.agent.RPC("ACL.IdentityProviderDelete", args, &ignored); err != nil {
+	if err := s.agent.RPC("ACL.AuthMethodDelete", args, &ignored); err != nil {
 		return nil, err
 	}
 
@@ -1020,11 +1020,11 @@ func (s *HTTPServer) ACLLogout(resp http.ResponseWriter, req *http.Request) (int
 // so that they get formatted correctly during json.Marshal. Without this,
 // string values that get converted to []uint8 end up getting output back
 // to the user in base64-encoded form.
-func fixupIdentityProviderConfig(idp *structs.ACLIdentityProvider) {
-	for k, v := range idp.Config {
+func fixupAuthMethodConfig(method *structs.ACLAuthMethod) {
+	for k, v := range method.Config {
 		if raw, ok := v.([]uint8); ok {
 			strVal := structs.Uint8ToString(raw)
-			idp.Config[k] = strVal
+			method.Config[k] = strVal
 		}
 	}
 }

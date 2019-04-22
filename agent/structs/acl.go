@@ -238,10 +238,8 @@ type ACLToken struct {
 	// to the ACL datacenter and replicated to others.
 	Local bool
 
-	// IDPName is the name of the identity provider used to create this token.
-	//
-	// example: "kube-eu-1"
-	IDPName string `json:",omitempty"`
+	// AuthMethod is the name of the auth method used to create this token.
+	AuthMethod string `json:",omitempty"`
 
 	// ExpirationTime represents the point after which a token should be
 	// considered revoked and is eligible for destruction. The zero value
@@ -357,7 +355,7 @@ func (t *ACLToken) UsesNonLegacyFields() bool {
 		t.Type == "" ||
 		t.HasExpirationTime() ||
 		t.ExpirationTTL != 0 ||
-		t.IDPName != ""
+		t.AuthMethod != ""
 }
 
 func (t *ACLToken) EmbeddedPolicy() *ACLPolicy {
@@ -440,7 +438,7 @@ func (t *ACLToken) SetHash(force bool) []byte {
 
 func (t *ACLToken) EstimateSize() int {
 	// 41 = 16 (RaftIndex) + 8 (Hash) + 8 (ExpirationTime) + 8 (CreateTime) + 1 (Local)
-	size := 41 + len(t.AccessorID) + len(t.SecretID) + len(t.Description) + len(t.Type) + len(t.Rules) + len(t.IDPName)
+	size := 41 + len(t.AccessorID) + len(t.SecretID) + len(t.Description) + len(t.Type) + len(t.Rules) + len(t.AuthMethod)
 	for _, link := range t.Policies {
 		size += len(link.ID) + len(link.Name)
 	}
@@ -463,7 +461,7 @@ type ACLTokenListStub struct {
 	Roles             []ACLTokenRoleLink    `json:",omitempty"`
 	ServiceIdentities []*ACLServiceIdentity `json:",omitempty"`
 	Local             bool
-	IDPName           string     `json:",omitempty"`
+	AuthMethod        string     `json:",omitempty"`
 	ExpirationTime    *time.Time `json:",omitempty"`
 	CreateTime        time.Time  `json:",omitempty"`
 	Hash              []byte
@@ -482,7 +480,7 @@ func (token *ACLToken) Stub() *ACLTokenListStub {
 		Roles:             token.Roles,
 		ServiceIdentities: token.ServiceIdentities,
 		Local:             token.Local,
-		IDPName:           token.IDPName,
+		AuthMethod:        token.AuthMethod,
 		ExpirationTime:    token.ExpirationTime,
 		CreateTime:        token.CreateTime,
 		Hash:              token.Hash,
@@ -869,12 +867,11 @@ type ACLBindingRule struct {
 	// Description is a human readable description (Optional)
 	Description string
 
-	// IDPName is the configured name of the identity provider. The rule only
-	// applies when credentials from this provider are exchanged.
-	IDPName string
+	// AuthMethod is the name of the auth method for which this rule applies.
+	AuthMethod string
 
 	// Selector is an expression that matches against verified identity
-	// attributes returned from the identity provider during login.
+	// attributes returned from the auth method during login.
 	Selector string
 
 	// BindType adjusts how this binding rule is applied at login time.  The
@@ -906,7 +903,7 @@ func (rules ACLBindingRules) Sort() {
 	})
 }
 
-type ACLIdentityProviderListStub struct {
+type ACLAuthMethodListStub struct {
 	Name        string
 	Description string
 	Type        string
@@ -914,8 +911,8 @@ type ACLIdentityProviderListStub struct {
 	ModifyIndex uint64
 }
 
-func (p *ACLIdentityProvider) Stub() *ACLIdentityProviderListStub {
-	return &ACLIdentityProviderListStub{
+func (p *ACLAuthMethod) Stub() *ACLAuthMethodListStub {
+	return &ACLAuthMethodListStub{
 		Name:        p.Name,
 		Description: p.Description,
 		Type:        p.Type,
@@ -924,39 +921,38 @@ func (p *ACLIdentityProvider) Stub() *ACLIdentityProviderListStub {
 	}
 }
 
-type ACLIdentityProviders []*ACLIdentityProvider
-type ACLIdentityProviderListStubs []*ACLIdentityProviderListStub
+type ACLAuthMethods []*ACLAuthMethod
+type ACLAuthMethodListStubs []*ACLAuthMethodListStub
 
-func (idps ACLIdentityProviders) Sort() {
-	sort.Slice(idps, func(i, j int) bool {
-		return idps[i].Name < idps[j].Name
+func (methods ACLAuthMethods) Sort() {
+	sort.Slice(methods, func(i, j int) bool {
+		return methods[i].Name < methods[j].Name
 	})
 }
 
-func (idps ACLIdentityProviderListStubs) Sort() {
-	sort.Slice(idps, func(i, j int) bool {
-		return idps[i].Name < idps[j].Name
+func (methods ACLAuthMethodListStubs) Sort() {
+	sort.Slice(methods, func(i, j int) bool {
+		return methods[i].Name < methods[j].Name
 	})
 }
 
-type ACLIdentityProvider struct {
-	// Name is a unique identifier for this specific IdP. It is used later when
-	// scoping Binding Rules.
+type ACLAuthMethod struct {
+	// Name is a unique identifier for this specific auth method.
 	//
 	// Immutable once set and only settable during create.
 	Name string
 
-	// Description is just an optional bunch of explanatory text.
-	Description string
-
-	// Type is the type of the IdP backend this is. Available
-	// types will be "kubernetes".
+	// Type is the type of the auth method this is.
 	//
 	// Immutable once set and only settable during create.
 	Type string
 
-	// Configuration is arbitrary configuration for the provider. This should
-	// only contain primitive values and containers (such as lists and maps).
+	// Description is just an optional bunch of explanatory text.
+	Description string
+
+	// Configuration is arbitrary configuration for the auth method. This
+	// should only contain primitive values and containers (such as lists and
+	// maps).
 	Config map[string]interface{}
 
 	// Embedded Raft Metadata
@@ -1042,7 +1038,7 @@ type ACLTokenListRequest struct {
 	IncludeGlobal bool   // Whether global tokens should be included
 	Policy        string // Policy filter
 	Role          string // Role filter
-	IDPName       string // Identity Provider filter
+	AuthMethod    string // Auth Method filter
 	Datacenter    string // The datacenter to perform the request within
 	QueryOptions
 }
@@ -1335,7 +1331,7 @@ func (r *ACLBindingRuleGetRequest) RequestDatacenter() string {
 
 // ACLBindingRuleListRequest is used at the RPC layer to request a listing of rules
 type ACLBindingRuleListRequest struct {
-	IDPName    string // optional filter
+	AuthMethod string // optional filter
 	Datacenter string // The datacenter to perform the request within
 	QueryOptions
 }
@@ -1367,78 +1363,76 @@ type ACLBindingRuleBatchDeleteRequest struct {
 	BindingRuleIDs []string
 }
 
-// ACLIdentityProviderSetRequest is used at the RPC layer for creation and update requests
-type ACLIdentityProviderSetRequest struct {
-	IdentityProvider ACLIdentityProvider // The idp to upsert
-	Datacenter       string              // The datacenter to perform the request within
+// ACLAuthMethodSetRequest is used at the RPC layer for creation and update requests
+type ACLAuthMethodSetRequest struct {
+	AuthMethod ACLAuthMethod // The auth method to upsert
+	Datacenter string        // The datacenter to perform the request within
 	WriteRequest
 }
 
-func (r *ACLIdentityProviderSetRequest) RequestDatacenter() string {
+func (r *ACLAuthMethodSetRequest) RequestDatacenter() string {
 	return r.Datacenter
 }
 
-// ACLIdentityProviderDeleteRequest is used at the RPC layer deletion requests
-type ACLIdentityProviderDeleteRequest struct {
-	IdentityProviderName string // name of the idp to delete
-	Datacenter           string // The datacenter to perform the request within
+// ACLAuthMethodDeleteRequest is used at the RPC layer deletion requests
+type ACLAuthMethodDeleteRequest struct {
+	AuthMethodName string // name of the auth method to delete
+	Datacenter     string // The datacenter to perform the request within
 	WriteRequest
 }
 
-func (r *ACLIdentityProviderDeleteRequest) RequestDatacenter() string {
+func (r *ACLAuthMethodDeleteRequest) RequestDatacenter() string {
 	return r.Datacenter
 }
 
-// ACLIdentityProviderGetRequest is used at the RPC layer to perform rule read operations
-type ACLIdentityProviderGetRequest struct {
-	IdentityProviderName string // name used for the idp lookup
-	Datacenter           string // The datacenter to perform the request within
+// ACLAuthMethodGetRequest is used at the RPC layer to perform rule read operations
+type ACLAuthMethodGetRequest struct {
+	AuthMethodName string // name used for the auth method lookup
+	Datacenter     string // The datacenter to perform the request within
 	QueryOptions
 }
 
-func (r *ACLIdentityProviderGetRequest) RequestDatacenter() string {
+func (r *ACLAuthMethodGetRequest) RequestDatacenter() string {
 	return r.Datacenter
 }
 
-// ACLIdentityProviderListRequest is used at the RPC layer to request a listing of idps
-type ACLIdentityProviderListRequest struct {
+// ACLAuthMethodListRequest is used at the RPC layer to request a listing of auth methods
+type ACLAuthMethodListRequest struct {
 	Datacenter string // The datacenter to perform the request within
 	QueryOptions
 }
 
-func (r *ACLIdentityProviderListRequest) RequestDatacenter() string {
+func (r *ACLAuthMethodListRequest) RequestDatacenter() string {
 	return r.Datacenter
 }
 
-type ACLIdentityProviderListResponse struct {
-	IdentityProviders ACLIdentityProviderListStubs
+type ACLAuthMethodListResponse struct {
+	AuthMethods ACLAuthMethodListStubs
 	QueryMeta
 }
 
-// ACLIdentityProviderResponse returns a single idp + metadata
-type ACLIdentityProviderResponse struct {
-	IdentityProvider *ACLIdentityProvider
+// ACLAuthMethodResponse returns a single auth method + metadata
+type ACLAuthMethodResponse struct {
+	AuthMethod *ACLAuthMethod
 	QueryMeta
 }
 
-// ACLIdentityProviderBatchSetRequest is used at the Raft layer for batching
-// multiple idp creations and updates
-type ACLIdentityProviderBatchSetRequest struct {
-	IdentityProviders ACLIdentityProviders
+// ACLAuthMethodBatchSetRequest is used at the Raft layer for batching
+// multiple auth method creations and updates
+type ACLAuthMethodBatchSetRequest struct {
+	AuthMethods ACLAuthMethods
 }
 
-// ACLIdentityProviderBatchDeleteRequest is used at the Raft layer for batching
-// multiple idp deletions
-type ACLIdentityProviderBatchDeleteRequest struct {
-	IdentityProviderNames []string
+// ACLAuthMethodBatchDeleteRequest is used at the Raft layer for batching
+// multiple auth method deletions
+type ACLAuthMethodBatchDeleteRequest struct {
+	AuthMethodNames []string
 }
 
 type ACLLoginParams struct {
-	// IDPName is the name of the IdP being logged into.
-	IDPName string
-	// IDPToken is the bearer token for the given IdP.
-	IDPToken string
-	Meta     map[string]string `json:",omitempty"`
+	AuthMethod  string
+	BearerToken string
+	Meta        map[string]string `json:",omitempty"`
 }
 
 type ACLLoginRequest struct {

@@ -34,7 +34,7 @@ Usage: consul acl binding-rule <subcommand> [options] [args]
   Create a new binding rule:
 
     $ consul acl binding-rule create \
-          -idp-name=minikube \
+          -method=minikube \
           -bind-type=service \
           -bind-name='k8s-${serviceaccount.name}' \
           -selector='serviceaccount.namespace==default and serviceaccount.name==web'

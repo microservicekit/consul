@@ -5,7 +5,7 @@ import (
 	"fmt"
 
 	"github.com/hashicorp/consul/api"
-	aclhelpers "github.com/hashicorp/consul/command/acl"
+	"github.com/hashicorp/consul/command/acl"
 	"github.com/hashicorp/consul/command/flags"
 	"github.com/mitchellh/cli"
 )
@@ -22,11 +22,11 @@ type cmd struct {
 	http  *flags.HTTPFlags
 	help  string
 
-	idpName     string
-	description string
-	selector    string
-	bindType    string
-	bindName    string
+	authMethodName string
+	description    string
+	selector       string
+	bindType       string
+	bindName       string
 
 	showMeta bool
 }
@@ -43,10 +43,10 @@ func (c *cmd) init() {
 	)
 
 	c.flags.StringVar(
-		&c.idpName,
-		"idp-name",
+		&c.authMethodName,
+		"method",
 		"",
-		"The identity provider's name for which this binding rule applies. "+
+		"The auth method's name for which this binding rule applies. "+
 			"This flag is required.",
 	)
 	c.flags.StringVar(
@@ -60,7 +60,7 @@ func (c *cmd) init() {
 		"selector",
 		"",
 		"Selector is an expression that matches against verified identity "+
-			"attributes returned from the identity provider during login.",
+			"attributes returned from the auth method during login.",
 	)
 	c.flags.StringVar(
 		&c.bindType,
@@ -87,8 +87,8 @@ func (c *cmd) Run(args []string) int {
 		return 1
 	}
 
-	if c.idpName == "" {
-		c.UI.Error(fmt.Sprintf("Missing required '-idp-name' flag"))
+	if c.authMethodName == "" {
+		c.UI.Error(fmt.Sprintf("Missing required '-method' flag"))
 		c.UI.Error(c.Help())
 		return 1
 	} else if c.bindType == "" {
@@ -103,7 +103,7 @@ func (c *cmd) Run(args []string) int {
 
 	newRule := &api.ACLBindingRule{
 		Description: c.description,
-		IDPName:     c.idpName,
+		AuthMethod:  c.authMethodName,
 		BindType:    api.BindingRuleBindType(c.bindType),
 		BindName:    c.bindName,
 		Selector:    c.selector,
@@ -121,7 +121,7 @@ func (c *cmd) Run(args []string) int {
 		return 1
 	}
 
-	aclhelpers.PrintBindingRule(rule, c.UI, c.showMeta)
+	acl.PrintBindingRule(rule, c.UI, c.showMeta)
 	return 0
 }
 
@@ -141,7 +141,7 @@ Usage: consul acl binding-rule create [options]
   Create a new binding rule:
 
     $ consul acl binding-rule create \
-          -idp-name=minikube \
+          -method=minikube \
           -bind-type=service \
           -bind-name='k8s-${serviceaccount.name}' \
           -selector='serviceaccount.namespace==default and serviceaccount.name==web'

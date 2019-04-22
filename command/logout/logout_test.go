@@ -6,8 +6,8 @@ import (
 	"testing"
 
 	"github.com/hashicorp/consul/agent"
-	"github.com/hashicorp/consul/agent/consul/idp/k8s"
-	testidp "github.com/hashicorp/consul/agent/consul/idp/testing"
+	"github.com/hashicorp/consul/agent/consul/authmethod/kubeauth"
+	"github.com/hashicorp/consul/agent/consul/authmethod/testauth"
 	"github.com/hashicorp/consul/api"
 	"github.com/hashicorp/consul/command/acl"
 	"github.com/hashicorp/consul/logger"
@@ -98,18 +98,18 @@ func TestLogoutCommand(t *testing.T) {
 		require.Contains(t, ui.ErrorWriter.String(), "403 (Permission denied)")
 	})
 
-	testSessionID := testidp.StartSession()
-	defer testidp.ResetSession(testSessionID)
+	testSessionID := testauth.StartSession()
+	defer testauth.ResetSession(testSessionID)
 
-	testidp.InstallSessionToken(
+	testauth.InstallSessionToken(
 		testSessionID,
 		"demo-token",
 		"default", "demo", "76091af4-4b56-11e9-ac4b-708b11801cbe",
 	)
 
 	{
-		_, _, err := client.ACL().IdentityProviderCreate(
-			&api.ACLIdentityProvider{
+		_, _, err := client.ACL().AuthMethodCreate(
+			&api.ACLAuthMethod{
 				Name: "test",
 				Type: "testing",
 				Config: map[string]interface{}{
@@ -122,9 +122,9 @@ func TestLogoutCommand(t *testing.T) {
 	}
 	{
 		_, _, err := client.ACL().BindingRuleCreate(&api.ACLBindingRule{
-			IDPName:  "test",
-			BindType: api.BindingRuleBindTypeService,
-			BindName: "${serviceaccount.name}",
+			AuthMethod: "test",
+			BindType:   api.BindingRuleBindTypeService,
+			BindName:   "${serviceaccount.name}",
 		},
 			&api.WriteOptions{Token: "root"},
 		)
@@ -134,8 +134,8 @@ func TestLogoutCommand(t *testing.T) {
 	var loginTokenSecret string
 	{
 		tok, _, err := client.ACL().Login(&api.ACLLoginParams{
-			IDPName:  "test",
-			IDPToken: "demo-token",
+			AuthMethod:  "test",
+			BearerToken: "demo-token",
 		}, nil)
 		require.NoError(t, err)
 
@@ -230,10 +230,10 @@ func TestLogoutCommand_k8s(t *testing.T) {
 	})
 
 	// go to the trouble of creating a login token
-	// require.NoError(t, ioutil.WriteFile(idpTokenFile, []byte(acl.TestKubernetesJWT_B), 0600))
+	// require.NoError(t, ioutil.WriteFile(bearerTokenFile, []byte(acl.TestKubernetesJWT_B), 0600))
 
 	// spin up a fake api server
-	testSrv := k8s.StartTestAPIServer(t)
+	testSrv := kubeauth.StartTestAPIServer(t)
 	defer testSrv.Stop()
 
 	testSrv.AuthorizeJWT(acl.TestKubernetesJWT_A)
@@ -246,8 +246,8 @@ func TestLogoutCommand_k8s(t *testing.T) {
 	)
 
 	{
-		_, _, err := client.ACL().IdentityProviderCreate(
-			&api.ACLIdentityProvider{
+		_, _, err := client.ACL().AuthMethodCreate(
+			&api.ACLAuthMethod{
 				Name: "k8s",
 				Type: "kubernetes",
 				Config: map[string]interface{}{
@@ -263,9 +263,9 @@ func TestLogoutCommand_k8s(t *testing.T) {
 	}
 	{
 		_, _, err := client.ACL().BindingRuleCreate(&api.ACLBindingRule{
-			IDPName:  "k8s",
-			BindType: api.BindingRuleBindTypeService,
-			BindName: "${serviceaccount.name}",
+			AuthMethod: "k8s",
+			BindType:   api.BindingRuleBindTypeService,
+			BindName:   "${serviceaccount.name}",
 		},
 			&api.WriteOptions{Token: "root"},
 		)
@@ -275,8 +275,8 @@ func TestLogoutCommand_k8s(t *testing.T) {
 	var loginTokenSecret string
 	{
 		tok, _, err := client.ACL().Login(&api.ACLLoginParams{
-			IDPName:  "k8s",
-			IDPToken: acl.TestKubernetesJWT_B,
+			AuthMethod:  "k8s",
+			BearerToken: acl.TestKubernetesJWT_B,
 		}, nil)
 		require.NoError(t, err)
 

@@ -1,4 +1,4 @@
-package idpupdate
+package authmethodupdate
 
 import (
 	"flag"
@@ -6,7 +6,7 @@ import (
 	"io/ioutil"
 
 	"github.com/hashicorp/consul/api"
-	aclhelpers "github.com/hashicorp/consul/command/acl"
+	"github.com/hashicorp/consul/command/acl"
 	"github.com/hashicorp/consul/command/flags"
 	"github.com/mitchellh/cli"
 )
@@ -42,7 +42,7 @@ func (c *cmd) init() {
 		&c.showMeta,
 		"meta",
 		false,
-		"Indicates that identity provider metadata such "+
+		"Indicates that auth method metadata such "+
 			"as the content hash and raft indices should be shown for each entry.",
 	)
 
@@ -50,14 +50,14 @@ func (c *cmd) init() {
 		&c.name,
 		"name",
 		"",
-		"The identity provider name.",
+		"The auth method name.",
 	)
 
 	c.flags.StringVar(
 		&c.description,
 		"description",
 		"",
-		"A description of the identity provider.",
+		"A description of the auth method.",
 	)
 
 	c.flags.StringVar(
@@ -84,7 +84,7 @@ func (c *cmd) init() {
 			"This flag is required for type=kubernetes.",
 	)
 
-	c.flags.BoolVar(&c.noMerge, "no-merge", false, "Do not merge the current identity provider "+
+	c.flags.BoolVar(&c.noMerge, "no-merge", false, "Do not merge the current auth method "+
 		"information with what is provided to the command. Instead overwrite all fields "+
 		"with the exception of the name which is immutable.")
 
@@ -100,7 +100,7 @@ func (c *cmd) Run(args []string) int {
 	}
 
 	if c.name == "" {
-		c.UI.Error(fmt.Sprintf("Cannot update an identity provider without specifying the -name parameter"))
+		c.UI.Error(fmt.Sprintf("Cannot update an auth method without specifying the -name parameter"))
 		return 1
 	}
 
@@ -111,12 +111,12 @@ func (c *cmd) Run(args []string) int {
 	}
 
 	// Regardless of merge, we need to fetch the prior immutable fields first.
-	currentIDP, _, err := client.ACL().IdentityProviderRead(c.name, nil)
+	currentAuthMethod, _, err := client.ACL().AuthMethodRead(c.name, nil)
 	if err != nil {
-		c.UI.Error(fmt.Sprintf("Error when retrieving current identity provider: %v", err))
+		c.UI.Error(fmt.Sprintf("Error when retrieving current auth method: %v", err))
 		return 1
-	} else if currentIDP == nil {
-		c.UI.Error(fmt.Sprintf("Identity Provider not found with name %q", c.name))
+	} else if currentAuthMethod == nil {
+		c.UI.Error(fmt.Sprintf("Auth method not found with name %q", c.name))
 		return 1
 	}
 
@@ -133,15 +133,15 @@ func (c *cmd) Run(args []string) int {
 		}
 	}
 
-	var idp *api.ACLIdentityProvider
+	var method *api.ACLAuthMethod
 	if c.noMerge {
-		idp = &api.ACLIdentityProvider{
-			Name:        currentIDP.Name,
-			Type:        currentIDP.Type,
+		method = &api.ACLAuthMethod{
+			Name:        currentAuthMethod.Name,
+			Type:        currentAuthMethod.Type,
 			Description: c.description,
 		}
 
-		if currentIDP.Type == "kubernetes" {
+		if currentAuthMethod.Type == "kubernetes" {
 			if c.k8sHost == "" {
 				c.UI.Error(fmt.Sprintf("Missing required '-kubernetes-host' flag"))
 				return 1
@@ -153,43 +153,43 @@ func (c *cmd) Run(args []string) int {
 				return 1
 			}
 
-			idp.Config = map[string]interface{}{
+			method.Config = map[string]interface{}{
 				"Host":              c.k8sHost,
 				"CACert":            c.k8sCACert,
 				"ServiceAccountJWT": c.k8sServiceAccountJWT,
 			}
 		}
 	} else {
-		idpCopy := *currentIDP
-		idp = &idpCopy
+		methodCopy := *currentAuthMethod
+		method = &methodCopy
 
 		if c.description != "" {
-			idp.Description = c.description
+			method.Description = c.description
 		}
-		if idp.Config == nil {
-			idp.Config = make(map[string]interface{})
+		if method.Config == nil {
+			method.Config = make(map[string]interface{})
 		}
-		if currentIDP.Type == "kubernetes" {
+		if currentAuthMethod.Type == "kubernetes" {
 			if c.k8sHost != "" {
-				idp.Config["Host"] = c.k8sHost
+				method.Config["Host"] = c.k8sHost
 			}
 			if c.k8sCACert != "" {
-				idp.Config["CACert"] = c.k8sCACert
+				method.Config["CACert"] = c.k8sCACert
 			}
 			if c.k8sServiceAccountJWT != "" {
-				idp.Config["ServiceAccountJWT"] = c.k8sServiceAccountJWT
+				method.Config["ServiceAccountJWT"] = c.k8sServiceAccountJWT
 			}
 		}
 	}
 
-	idp, _, err = client.ACL().IdentityProviderUpdate(idp, nil)
+	method, _, err = client.ACL().AuthMethodUpdate(method, nil)
 	if err != nil {
-		c.UI.Error(fmt.Sprintf("Error updating identity provider %q: %v", c.name, err))
+		c.UI.Error(fmt.Sprintf("Error updating auth method %q: %v", c.name, err))
 		return 1
 	}
 
-	c.UI.Info(fmt.Sprintf("Identity Provider updated successfully"))
-	aclhelpers.PrintIdentityProvider(idp, c.UI, c.showMeta)
+	c.UI.Info(fmt.Sprintf("Auth method updated successfully"))
+	acl.PrintAuthMethod(method, c.UI, c.showMeta)
 	return 0
 }
 
@@ -201,17 +201,17 @@ func (c *cmd) Help() string {
 	return flags.Usage(c.help, nil)
 }
 
-const synopsis = "Update an ACL Identity Provider"
+const synopsis = "Update an ACL Auth Method"
 const help = `
-Usage: consul acl idp update -name NAME [options]
+Usage: consul acl auth-method update -name NAME [options]
 
-  Updates an identity provider. By default it will merge the identity provider
+  Updates an auth method. By default it will merge the auth method
   information with its current state so that you do not have to provide all
   parameters. This behavior can be disabled by passing -no-merge.
 
-  Update all editable fields of the identity provider:
+  Update all editable fields of the auth method:
 
-    $ consul acl idp update -name "my-idp" \
+    $ consul acl auth-method update -name "my-k8s" \
                             -description "new description" \
                             -kubernetes-host "https://new-apiserver.example.com:8443" \
                             -kubernetes-ca-file /path/to/new-kube.ca.crt \

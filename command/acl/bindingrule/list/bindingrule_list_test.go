@@ -14,8 +14,8 @@ import (
 	"github.com/mitchellh/cli"
 	"github.com/stretchr/testify/require"
 
-	// activate testing idp
-	_ "github.com/hashicorp/consul/agent/consul/idp/testing"
+	// activate testing auth method
+	_ "github.com/hashicorp/consul/agent/consul/authmethod/testauth"
 )
 
 func TestBindingRuleListCommand_noTabs(t *testing.T) {
@@ -49,8 +49,8 @@ func TestBindingRuleListCommand(t *testing.T) {
 	client := a.Client()
 
 	{
-		_, _, err := client.ACL().IdentityProviderCreate(
-			&api.ACLIdentityProvider{
+		_, _, err := client.ACL().AuthMethodCreate(
+			&api.ACLAuthMethod{
 				Name: "test-1",
 				Type: "testing",
 			},
@@ -58,8 +58,8 @@ func TestBindingRuleListCommand(t *testing.T) {
 		)
 		require.NoError(t, err)
 
-		_, _, err = client.ACL().IdentityProviderCreate(
-			&api.ACLIdentityProvider{
+		_, _, err = client.ACL().AuthMethodCreate(
+			&api.ACLAuthMethod{
 				Name: "test-2",
 				Type: "testing",
 			},
@@ -68,10 +68,10 @@ func TestBindingRuleListCommand(t *testing.T) {
 		require.NoError(t, err)
 	}
 
-	createRule := func(t *testing.T, idpName, description string) string {
+	createRule := func(t *testing.T, methodName, description string) string {
 		rule, _, err := client.ACL().BindingRuleCreate(
 			&api.ACLBindingRule{
-				IDPName:     idpName,
+				AuthMethod:  methodName,
 				Description: description,
 				BindType:    api.BindingRuleBindTypeService,
 				BindName:    "test-${serviceaccount.name}",
@@ -87,14 +87,14 @@ func TestBindingRuleListCommand(t *testing.T) {
 	for i := 0; i < 10; i++ {
 		name := fmt.Sprintf("test-rule-%d", i)
 
-		var idpName string
+		var methodName string
 		if i%2 == 0 {
-			idpName = "test-1"
+			methodName = "test-1"
 		} else {
-			idpName = "test-2"
+			methodName = "test-2"
 		}
 
-		id := createRule(t, idpName, name)
+		id := createRule(t, methodName, name)
 
 		ruleIDs = append(ruleIDs, id)
 	}
@@ -119,11 +119,11 @@ func TestBindingRuleListCommand(t *testing.T) {
 		}
 	})
 
-	t.Run("filter by idp 1", func(t *testing.T) {
+	t.Run("filter by method 1", func(t *testing.T) {
 		args := []string{
 			"-http-addr=" + a.HTTPAddr(),
 			"-token=root",
-			"-idp-name=test-1",
+			"-method=test-1",
 		}
 
 		ui := cli.NewMockUi()
@@ -142,11 +142,11 @@ func TestBindingRuleListCommand(t *testing.T) {
 		}
 	})
 
-	t.Run("filter by idp 2", func(t *testing.T) {
+	t.Run("filter by method 2", func(t *testing.T) {
 		args := []string{
 			"-http-addr=" + a.HTTPAddr(),
 			"-token=root",
-			"-idp-name=test-2",
+			"-method=test-2",
 		}
 
 		ui := cli.NewMockUi()

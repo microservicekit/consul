@@ -33,8 +33,8 @@ func init() {
 	registerCommand(structs.ACLRoleDeleteRequestType, (*FSM).applyACLRoleDeleteOperation)
 	registerCommand(structs.ACLBindingRuleSetRequestType, (*FSM).applyACLBindingRuleSetOperation)
 	registerCommand(structs.ACLBindingRuleDeleteRequestType, (*FSM).applyACLBindingRuleDeleteOperation)
-	registerCommand(structs.ACLIdentityProviderSetRequestType, (*FSM).applyACLIdentityProviderSetOperation)
-	registerCommand(structs.ACLIdentityProviderDeleteRequestType, (*FSM).applyACLIdentityProviderDeleteOperation)
+	registerCommand(structs.ACLAuthMethodSetRequestType, (*FSM).applyACLAuthMethodSetOperation)
+	registerCommand(structs.ACLAuthMethodDeleteRequestType, (*FSM).applyACLAuthMethodDeleteOperation)
 }
 
 func (c *FSM) applyRegister(buf []byte, index uint64) interface{} {
@@ -480,24 +480,24 @@ func (c *FSM) applyACLBindingRuleDeleteOperation(buf []byte, index uint64) inter
 	return c.state.ACLBindingRuleBatchDelete(index, req.BindingRuleIDs)
 }
 
-func (c *FSM) applyACLIdentityProviderSetOperation(buf []byte, index uint64) interface{} {
-	var req structs.ACLIdentityProviderBatchSetRequest
+func (c *FSM) applyACLAuthMethodSetOperation(buf []byte, index uint64) interface{} {
+	var req structs.ACLAuthMethodBatchSetRequest
 	if err := structs.Decode(buf, &req); err != nil {
 		panic(fmt.Errorf("failed to decode request: %v", err))
 	}
-	defer metrics.MeasureSinceWithLabels([]string{"fsm", "acl", "identityprovider"}, time.Now(),
+	defer metrics.MeasureSinceWithLabels([]string{"fsm", "acl", "authmethod"}, time.Now(),
 		[]metrics.Label{{Name: "op", Value: "upsert"}})
 
-	return c.state.ACLIdentityProviderBatchSet(index, req.IdentityProviders)
+	return c.state.ACLAuthMethodBatchSet(index, req.AuthMethods)
 }
 
-func (c *FSM) applyACLIdentityProviderDeleteOperation(buf []byte, index uint64) interface{} {
-	var req structs.ACLIdentityProviderBatchDeleteRequest
+func (c *FSM) applyACLAuthMethodDeleteOperation(buf []byte, index uint64) interface{} {
+	var req structs.ACLAuthMethodBatchDeleteRequest
 	if err := structs.Decode(buf, &req); err != nil {
 		panic(fmt.Errorf("failed to decode request: %v", err))
 	}
-	defer metrics.MeasureSinceWithLabels([]string{"fsm", "acl", "identityprovider"}, time.Now(),
+	defer metrics.MeasureSinceWithLabels([]string{"fsm", "acl", "authmethod"}, time.Now(),
 		[]metrics.Label{{Name: "op", Value: "delete"}})
 
-	return c.state.ACLIdentityProviderBatchDelete(index, req.IdentityProviderNames)
+	return c.state.ACLAuthMethodBatchDelete(index, req.AuthMethodNames)
 }

@@ -49,17 +49,17 @@ var (
 	// is called on a binding rule with an empty ID.
 	ErrMissingACLBindingRuleID = errors.New("Missing ACL Binding Rule ID")
 
-	// ErrMissingACLBindingRuleIDPName is returned when a binding rule set
-	// is called on a binding rule with an empty IDPName.
-	ErrMissingACLBindingRuleIDPName = errors.New("Missing ACL Binding Rule IDPName")
+	// ErrMissingACLBindingRuleAuthMethod is returned when a binding rule set
+	// is called on a binding rule with an empty AuthMethod.
+	ErrMissingACLBindingRuleAuthMethod = errors.New("Missing ACL Binding Rule Auth Method")
 
-	// ErrMissingACLIdentityProviderName is returned when an identity provider
-	// set is called on an identity provider with an empty Name.
-	ErrMissingACLIdentityProviderName = errors.New("Missing ACL Identity Provider Name")
+	// ErrMissingACLAuthMethodName is returned when an auth method set is
+	// called on an auth method with an empty Name.
+	ErrMissingACLAuthMethodName = errors.New("Missing ACL Auth Method Name")
 
-	// ErrMissingACLIdentityProviderType is returned when an identity provider
-	// set is called on an identity provider with an empty Type.
-	ErrMissingACLIdentityProviderType = errors.New("Missing ACL Identity Provider Type")
+	// ErrMissingACLAuthMethodType is returned when an auth method set is
+	// called on an auth method with an empty Type.
+	ErrMissingACLAuthMethodType = errors.New("Missing ACL Auth Method Type")
 
 	// ErrMissingQueryID is returned when a Query set is called on
 	// a Query with an empty ID.

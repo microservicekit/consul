@@ -1,4 +1,4 @@
-package idpupdate
+package authmethodupdate
 
 import (
 	"io/ioutil"
@@ -18,11 +18,11 @@ import (
 	"github.com/mitchellh/cli"
 	"github.com/stretchr/testify/require"
 
-	// activate testing idp
-	_ "github.com/hashicorp/consul/agent/consul/idp/testing"
+	// activate testing auth method
+	_ "github.com/hashicorp/consul/agent/consul/authmethod/testauth"
 )
 
-func TestIDPUpdateCommand_noTabs(t *testing.T) {
+func TestAuthMethodUpdateCommand_noTabs(t *testing.T) {
 	t.Parallel()
 
 	if strings.ContainsRune(New(cli.NewMockUi()).Help(), '\t') {
@@ -30,7 +30,7 @@ func TestIDPUpdateCommand_noTabs(t *testing.T) {
 	}
 }
 
-func TestIDPUpdateCommand(t *testing.T) {
+func TestAuthMethodUpdateCommand(t *testing.T) {
 	t.Parallel()
 
 	testDir := testutil.TempDir(t, "acl")
@@ -63,10 +63,10 @@ func TestIDPUpdateCommand(t *testing.T) {
 
 		code := cmd.Run(args)
 		require.Equal(t, code, 1)
-		require.Contains(t, ui.ErrorWriter.String(), "Cannot update an identity provider without specifying the -name parameter")
+		require.Contains(t, ui.ErrorWriter.String(), "Cannot update an auth method without specifying the -name parameter")
 	})
 
-	t.Run("update nonexistent idp", func(t *testing.T) {
+	t.Run("update nonexistent method", func(t *testing.T) {
 		args := []string{
 			"-http-addr=" + a.HTTPAddr(),
 			"-token=root",
@@ -78,30 +78,30 @@ func TestIDPUpdateCommand(t *testing.T) {
 
 		code := cmd.Run(args)
 		require.Equal(t, code, 1)
-		require.Contains(t, ui.ErrorWriter.String(), "Identity Provider not found with name")
+		require.Contains(t, ui.ErrorWriter.String(), "Auth method not found with name")
 	})
 
-	createIDP := func(t *testing.T) string {
+	createAuthMethod := func(t *testing.T) string {
 		id, err := uuid.GenerateUUID()
 		require.NoError(t, err)
 
-		idpName := "test-" + id
+		methodName := "test-" + id
 
-		_, _, err = client.ACL().IdentityProviderCreate(
-			&api.ACLIdentityProvider{
-				Name:        idpName,
+		_, _, err = client.ACL().AuthMethodCreate(
+			&api.ACLAuthMethod{
+				Name:        methodName,
 				Type:        "testing",
-				Description: "test idp",
+				Description: "test",
 			},
 			&api.WriteOptions{Token: "root"},
 		)
 		require.NoError(t, err)
 
-		return idpName
+		return methodName
 	}
 
 	t.Run("update all fields", func(t *testing.T) {
-		name := createIDP(t)
+		name := createAuthMethod(t)
 
 		args := []string{
 			"-http-addr=" + a.HTTPAddr(),
@@ -117,17 +117,17 @@ func TestIDPUpdateCommand(t *testing.T) {
 		require.Equal(t, code, 0)
 		require.Empty(t, ui.ErrorWriter.String())
 
-		idp, _, err := client.ACL().IdentityProviderRead(
+		method, _, err := client.ACL().AuthMethodRead(
 			name,
 			&api.QueryOptions{Token: "root"},
 		)
 		require.NoError(t, err)
-		require.NotNil(t, idp)
-		require.Equal(t, "updated description", idp.Description)
+		require.NotNil(t, method)
+		require.Equal(t, "updated description", method.Description)
 	})
 }
 
-func TestIDPUpdateCommand_noMerge(t *testing.T) {
+func TestAuthMethodUpdateCommand_noMerge(t *testing.T) {
 	t.Parallel()
 
 	testDir := testutil.TempDir(t, "acl")
@@ -161,10 +161,10 @@ func TestIDPUpdateCommand_noMerge(t *testing.T) {
 
 		code := cmd.Run(args)
 		require.Equal(t, code, 1)
-		require.Contains(t, ui.ErrorWriter.String(), "Cannot update an identity provider without specifying the -name parameter")
+		require.Contains(t, ui.ErrorWriter.String(), "Cannot update an auth method without specifying the -name parameter")
 	})
 
-	t.Run("update nonexistent idp", func(t *testing.T) {
+	t.Run("update nonexistent method", func(t *testing.T) {
 		args := []string{
 			"-http-addr=" + a.HTTPAddr(),
 			"-token=root",
@@ -177,30 +177,30 @@ func TestIDPUpdateCommand_noMerge(t *testing.T) {
 
 		code := cmd.Run(args)
 		require.Equal(t, code, 1)
-		require.Contains(t, ui.ErrorWriter.String(), "Identity Provider not found with name")
+		require.Contains(t, ui.ErrorWriter.String(), "Auth method not found with name")
 	})
 
-	createIDP := func(t *testing.T) string {
+	createAuthMethod := func(t *testing.T) string {
 		id, err := uuid.GenerateUUID()
 		require.NoError(t, err)
 
-		idpName := "test-" + id
+		methodName := "test-" + id
 
-		_, _, err = client.ACL().IdentityProviderCreate(
-			&api.ACLIdentityProvider{
-				Name:        idpName,
+		_, _, err = client.ACL().AuthMethodCreate(
+			&api.ACLAuthMethod{
+				Name:        methodName,
 				Type:        "testing",
-				Description: "test idp",
+				Description: "test",
 			},
 			&api.WriteOptions{Token: "root"},
 		)
 		require.NoError(t, err)
 
-		return idpName
+		return methodName
 	}
 
 	t.Run("update all fields", func(t *testing.T) {
-		name := createIDP(t)
+		name := createAuthMethod(t)
 
 		args := []string{
 			"-http-addr=" + a.HTTPAddr(),
@@ -217,17 +217,17 @@ func TestIDPUpdateCommand_noMerge(t *testing.T) {
 		require.Equal(t, code, 0, "err: %s", ui.ErrorWriter.String())
 		require.Empty(t, ui.ErrorWriter.String())
 
-		idp, _, err := client.ACL().IdentityProviderRead(
+		method, _, err := client.ACL().AuthMethodRead(
 			name,
 			&api.QueryOptions{Token: "root"},
 		)
 		require.NoError(t, err)
-		require.NotNil(t, idp)
-		require.Equal(t, "updated description", idp.Description)
+		require.NotNil(t, method)
+		require.Equal(t, "updated description", method.Description)
 	})
 }
 
-func TestIDPUpdateCommand_k8s(t *testing.T) {
+func TestAuthMethodUpdateCommand_k8s(t *testing.T) {
 	t.Parallel()
 
 	testDir := testutil.TempDir(t, "acl")
@@ -252,17 +252,17 @@ func TestIDPUpdateCommand_k8s(t *testing.T) {
 	ca := connect.TestCA(t, nil)
 	ca2 := connect.TestCA(t, nil)
 
-	createIDP := func(t *testing.T) string {
+	createAuthMethod := func(t *testing.T) string {
 		id, err := uuid.GenerateUUID()
 		require.NoError(t, err)
 
-		idpName := "k8s-" + id
+		methodName := "k8s-" + id
 
-		_, _, err = client.ACL().IdentityProviderCreate(
-			&api.ACLIdentityProvider{
-				Name:        idpName,
+		_, _, err = client.ACL().AuthMethodCreate(
+			&api.ACLAuthMethod{
+				Name:        methodName,
 				Type:        "kubernetes",
-				Description: "test idp",
+				Description: "test",
 				Config: map[string]interface{}{
 					"Host":              "https://foo.internal:8443",
 					"CACert":            ca.RootCert,
@@ -273,11 +273,11 @@ func TestIDPUpdateCommand_k8s(t *testing.T) {
 		)
 		require.NoError(t, err)
 
-		return idpName
+		return methodName
 	}
 
 	t.Run("update all fields", func(t *testing.T) {
-		name := createIDP(t)
+		name := createAuthMethod(t)
 
 		args := []string{
 			"-http-addr=" + a.HTTPAddr(),
@@ -296,15 +296,15 @@ func TestIDPUpdateCommand_k8s(t *testing.T) {
 		require.Equal(t, code, 0)
 		require.Empty(t, ui.ErrorWriter.String())
 
-		idp, _, err := client.ACL().IdentityProviderRead(
+		method, _, err := client.ACL().AuthMethodRead(
 			name,
 			&api.QueryOptions{Token: "root"},
 		)
 		require.NoError(t, err)
-		require.NotNil(t, idp)
-		require.Equal(t, "updated description", idp.Description)
+		require.NotNil(t, method)
+		require.Equal(t, "updated description", method.Description)
 
-		config, err := api.ParseKubernetesIdentityProviderConfig(idp.Config)
+		config, err := api.ParseKubernetesAuthMethodConfig(method.Config)
 		require.NoError(t, err)
 		require.Equal(t, "https://foo-new.internal:8443", config.Host)
 		require.Equal(t, ca2.RootCert, config.CACert)
@@ -315,7 +315,7 @@ func TestIDPUpdateCommand_k8s(t *testing.T) {
 	require.NoError(t, ioutil.WriteFile(ca2File, []byte(ca2.RootCert), 0600))
 
 	t.Run("update all fields with cert file", func(t *testing.T) {
-		name := createIDP(t)
+		name := createAuthMethod(t)
 
 		args := []string{
 			"-http-addr=" + a.HTTPAddr(),
@@ -334,15 +334,15 @@ func TestIDPUpdateCommand_k8s(t *testing.T) {
 		require.Equal(t, code, 0)
 		require.Empty(t, ui.ErrorWriter.String())
 
-		idp, _, err := client.ACL().IdentityProviderRead(
+		method, _, err := client.ACL().AuthMethodRead(
 			name,
 			&api.QueryOptions{Token: "root"},
 		)
 		require.NoError(t, err)
-		require.NotNil(t, idp)
-		require.Equal(t, "updated description", idp.Description)
+		require.NotNil(t, method)
+		require.Equal(t, "updated description", method.Description)
 
-		config, err := api.ParseKubernetesIdentityProviderConfig(idp.Config)
+		config, err := api.ParseKubernetesAuthMethodConfig(method.Config)
 		require.NoError(t, err)
 
 		require.Equal(t, "https://foo-new.internal:8443", config.Host)
@@ -351,7 +351,7 @@ func TestIDPUpdateCommand_k8s(t *testing.T) {
 	})
 
 	t.Run("update all fields but k8s host", func(t *testing.T) {
-		name := createIDP(t)
+		name := createAuthMethod(t)
 
 		args := []string{
 			"-http-addr=" + a.HTTPAddr(),
@@ -369,15 +369,15 @@ func TestIDPUpdateCommand_k8s(t *testing.T) {
 		require.Equal(t, code, 0)
 		require.Empty(t, ui.ErrorWriter.String())
 
-		idp, _, err := client.ACL().IdentityProviderRead(
+		method, _, err := client.ACL().AuthMethodRead(
 			name,
 			&api.QueryOptions{Token: "root"},
 		)
 		require.NoError(t, err)
-		require.NotNil(t, idp)
-		require.Equal(t, "updated description", idp.Description)
+		require.NotNil(t, method)
+		require.Equal(t, "updated description", method.Description)
 
-		config, err := api.ParseKubernetesIdentityProviderConfig(idp.Config)
+		config, err := api.ParseKubernetesAuthMethodConfig(method.Config)
 		require.NoError(t, err)
 
 		require.Equal(t, "https://foo.internal:8443", config.Host)
@@ -386,7 +386,7 @@ func TestIDPUpdateCommand_k8s(t *testing.T) {
 	})
 
 	t.Run("update all fields but k8s ca cert", func(t *testing.T) {
-		name := createIDP(t)
+		name := createAuthMethod(t)
 
 		args := []string{
 			"-http-addr=" + a.HTTPAddr(),
@@ -404,15 +404,15 @@ func TestIDPUpdateCommand_k8s(t *testing.T) {
 		require.Equal(t, code, 0)
 		require.Empty(t, ui.ErrorWriter.String())
 
-		idp, _, err := client.ACL().IdentityProviderRead(
+		method, _, err := client.ACL().AuthMethodRead(
 			name,
 			&api.QueryOptions{Token: "root"},
 		)
 		require.NoError(t, err)
-		require.NotNil(t, idp)
-		require.Equal(t, "updated description", idp.Description)
+		require.NotNil(t, method)
+		require.Equal(t, "updated description", method.Description)
 
-		config, err := api.ParseKubernetesIdentityProviderConfig(idp.Config)
+		config, err := api.ParseKubernetesAuthMethodConfig(method.Config)
 		require.NoError(t, err)
 
 		require.Equal(t, "https://foo-new.internal:8443", config.Host)
@@ -421,7 +421,7 @@ func TestIDPUpdateCommand_k8s(t *testing.T) {
 	})
 
 	t.Run("update all fields but k8s jwt", func(t *testing.T) {
-		name := createIDP(t)
+		name := createAuthMethod(t)
 
 		args := []string{
 			"-http-addr=" + a.HTTPAddr(),
@@ -439,15 +439,15 @@ func TestIDPUpdateCommand_k8s(t *testing.T) {
 		require.Equal(t, code, 0)
 		require.Empty(t, ui.ErrorWriter.String())
 
-		idp, _, err := client.ACL().IdentityProviderRead(
+		method, _, err := client.ACL().AuthMethodRead(
 			name,
 			&api.QueryOptions{Token: "root"},
 		)
 		require.NoError(t, err)
-		require.NotNil(t, idp)
-		require.Equal(t, "updated description", idp.Description)
+		require.NotNil(t, method)
+		require.Equal(t, "updated description", method.Description)
 
-		config, err := api.ParseKubernetesIdentityProviderConfig(idp.Config)
+		config, err := api.ParseKubernetesAuthMethodConfig(method.Config)
 		require.NoError(t, err)
 
 		require.Equal(t, "https://foo-new.internal:8443", config.Host)
@@ -456,7 +456,7 @@ func TestIDPUpdateCommand_k8s(t *testing.T) {
 	})
 }
 
-func TestIDPUpdateCommand_k8s_noMerge(t *testing.T) {
+func TestAuthMethodUpdateCommand_k8s_noMerge(t *testing.T) {
 	t.Parallel()
 
 	testDir := testutil.TempDir(t, "acl")
@@ -481,17 +481,17 @@ func TestIDPUpdateCommand_k8s_noMerge(t *testing.T) {
 	ca := connect.TestCA(t, nil)
 	ca2 := connect.TestCA(t, nil)
 
-	createIDP := func(t *testing.T) string {
+	createAuthMethod := func(t *testing.T) string {
 		id, err := uuid.GenerateUUID()
 		require.NoError(t, err)
 
-		idpName := "k8s-" + id
+		methodName := "k8s-" + id
 
-		_, _, err = client.ACL().IdentityProviderCreate(
-			&api.ACLIdentityProvider{
-				Name:        idpName,
+		_, _, err = client.ACL().AuthMethodCreate(
+			&api.ACLAuthMethod{
+				Name:        methodName,
 				Type:        "kubernetes",
-				Description: "test idp",
+				Description: "test",
 				Config: map[string]interface{}{
 					"Host":              "https://foo.internal:8443",
 					"CACert":            ca.RootCert,
@@ -502,11 +502,11 @@ func TestIDPUpdateCommand_k8s_noMerge(t *testing.T) {
 		)
 		require.NoError(t, err)
 
-		return idpName
+		return methodName
 	}
 
 	t.Run("update missing k8s host", func(t *testing.T) {
-		name := createIDP(t)
+		name := createAuthMethod(t)
 
 		args := []string{
 			"-http-addr=" + a.HTTPAddr(),
@@ -527,7 +527,7 @@ func TestIDPUpdateCommand_k8s_noMerge(t *testing.T) {
 	})
 
 	t.Run("update missing k8s ca cert", func(t *testing.T) {
-		name := createIDP(t)
+		name := createAuthMethod(t)
 
 		args := []string{
 			"-http-addr=" + a.HTTPAddr(),
@@ -548,7 +548,7 @@ func TestIDPUpdateCommand_k8s_noMerge(t *testing.T) {
 	})
 
 	t.Run("update missing k8s jwt", func(t *testing.T) {
-		name := createIDP(t)
+		name := createAuthMethod(t)
 
 		args := []string{
 			"-http-addr=" + a.HTTPAddr(),
@@ -569,7 +569,7 @@ func TestIDPUpdateCommand_k8s_noMerge(t *testing.T) {
 	})
 
 	t.Run("update all fields", func(t *testing.T) {
-		name := createIDP(t)
+		name := createAuthMethod(t)
 
 		args := []string{
 			"-http-addr=" + a.HTTPAddr(),
@@ -589,15 +589,15 @@ func TestIDPUpdateCommand_k8s_noMerge(t *testing.T) {
 		require.Equal(t, code, 0)
 		require.Empty(t, ui.ErrorWriter.String())
 
-		idp, _, err := client.ACL().IdentityProviderRead(
+		method, _, err := client.ACL().AuthMethodRead(
 			name,
 			&api.QueryOptions{Token: "root"},
 		)
 		require.NoError(t, err)
-		require.NotNil(t, idp)
-		require.Equal(t, "updated description", idp.Description)
+		require.NotNil(t, method)
+		require.Equal(t, "updated description", method.Description)
 
-		config, err := api.ParseKubernetesIdentityProviderConfig(idp.Config)
+		config, err := api.ParseKubernetesAuthMethodConfig(method.Config)
 		require.NoError(t, err)
 
 		require.Equal(t, "https://foo-new.internal:8443", config.Host)
@@ -609,7 +609,7 @@ func TestIDPUpdateCommand_k8s_noMerge(t *testing.T) {
 	require.NoError(t, ioutil.WriteFile(ca2File, []byte(ca2.RootCert), 0600))
 
 	t.Run("update all fields with cert file", func(t *testing.T) {
-		name := createIDP(t)
+		name := createAuthMethod(t)
 
 		args := []string{
 			"-http-addr=" + a.HTTPAddr(),
@@ -629,15 +629,15 @@ func TestIDPUpdateCommand_k8s_noMerge(t *testing.T) {
 		require.Equal(t, code, 0)
 		require.Empty(t, ui.ErrorWriter.String())
 
-		idp, _, err := client.ACL().IdentityProviderRead(
+		method, _, err := client.ACL().AuthMethodRead(
 			name,
 			&api.QueryOptions{Token: "root"},
 		)
 		require.NoError(t, err)
-		require.NotNil(t, idp)
-		require.Equal(t, "updated description", idp.Description)
+		require.NotNil(t, method)
+		require.Equal(t, "updated description", method.Description)
 
-		config, err := api.ParseKubernetesIdentityProviderConfig(idp.Config)
+		config, err := api.ParseKubernetesAuthMethodConfig(method.Config)
 		require.NoError(t, err)
 
 		require.Equal(t, "https://foo-new.internal:8443", config.Host)

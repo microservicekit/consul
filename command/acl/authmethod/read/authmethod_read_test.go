@@ -1,4 +1,4 @@
-package idplist
+package authmethodread
 
 import (
 	"os"
@@ -14,11 +14,11 @@ import (
 	"github.com/mitchellh/cli"
 	"github.com/stretchr/testify/require"
 
-	// activate testing idp
-	_ "github.com/hashicorp/consul/agent/consul/idp/testing"
+	// activate testing auth method
+	_ "github.com/hashicorp/consul/agent/consul/authmethod/testauth"
 )
 
-func TestIDPListCommand_noTabs(t *testing.T) {
+func TestAuthMethodReadCommand_noTabs(t *testing.T) {
 	t.Parallel()
 
 	if strings.ContainsRune(New(cli.NewMockUi()).Help(), '\t') {
@@ -26,7 +26,7 @@ func TestIDPListCommand_noTabs(t *testing.T) {
 	}
 }
 
-func TestIDPListCommand(t *testing.T) {
+func TestAuthMethodReadCommand(t *testing.T) {
 	t.Parallel()
 
 	testDir := testutil.TempDir(t, "acl")
@@ -46,7 +46,9 @@ func TestIDPListCommand(t *testing.T) {
 	defer a.Shutdown()
 	testrpc.WaitForLeader(t, a.RPC, "dc1")
 
-	t.Run("found none", func(t *testing.T) {
+	client := a.Client()
+
+	t.Run("name required", func(t *testing.T) {
 		ui := cli.NewMockUi()
 		cmd := New(ui)
 
@@ -56,54 +58,61 @@ func TestIDPListCommand(t *testing.T) {
 		}
 
 		code := cmd.Run(args)
-		require.Equal(t, code, 0)
-		require.Empty(t, ui.ErrorWriter.String())
-		require.Empty(t, ui.OutputWriter.String())
+		require.Equal(t, code, 1)
+		require.Contains(t, ui.ErrorWriter.String(), "Must specify the -name parameter")
 	})
 
-	client := a.Client()
+	t.Run("not found", func(t *testing.T) {
+		ui := cli.NewMockUi()
+		cmd := New(ui)
 
-	createIDP := func(t *testing.T) string {
+		args := []string{
+			"-http-addr=" + a.HTTPAddr(),
+			"-token=root",
+			"-name=notfound",
+		}
+
+		code := cmd.Run(args)
+		require.Equal(t, code, 1)
+		require.Contains(t, ui.ErrorWriter.String(), "Auth method not found with name")
+	})
+
+	createAuthMethod := func(t *testing.T) string {
 		id, err := uuid.GenerateUUID()
 		require.NoError(t, err)
 
-		idpName := "test-" + id
+		methodName := "test-" + id
 
-		_, _, err = client.ACL().IdentityProviderCreate(
-			&api.ACLIdentityProvider{
-				Name:        idpName,
+		_, _, err = client.ACL().AuthMethodCreate(
+			&api.ACLAuthMethod{
+				Name:        methodName,
 				Type:        "testing",
-				Description: "test idp",
+				Description: "test",
 			},
 			&api.WriteOptions{Token: "root"},
 		)
 		require.NoError(t, err)
 
-		return idpName
+		return methodName
 	}
 
-	var idpNames []string
-	for i := 0; i < 5; i++ {
-		idpName := createIDP(t)
-		idpNames = append(idpNames, idpName)
-	}
+	t.Run("read by name", func(t *testing.T) {
+		name := createAuthMethod(t)
 
-	t.Run("found some", func(t *testing.T) {
 		ui := cli.NewMockUi()
 		cmd := New(ui)
 
 		args := []string{
 			"-http-addr=" + a.HTTPAddr(),
 			"-token=root",
+			"-name=" + name,
 		}
 
 		code := cmd.Run(args)
 		require.Equal(t, code, 0)
 		require.Empty(t, ui.ErrorWriter.String())
-		output := ui.OutputWriter.String()
 
-		for _, idpName := range idpNames {
-			require.Contains(t, output, idpName)
-		}
+		output := ui.OutputWriter.String()
+		require.Contains(t, output, name)
 	})
 }

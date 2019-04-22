@@ -1,11 +1,11 @@
-package k8s
+package kubeauth
 
 import (
 	"errors"
 	"fmt"
 	"strings"
 
-	idp_pkg "github.com/hashicorp/consul/agent/consul/idp"
+	"github.com/hashicorp/consul/agent/consul/authmethod"
 	"github.com/hashicorp/consul/agent/structs"
 	cleanhttp "github.com/hashicorp/go-cleanhttp"
 	"gopkg.in/square/go-jose.v2/jwt"
@@ -19,9 +19,9 @@ import (
 )
 
 func init() {
-	// register this as an available idp type
-	idp_pkg.Register("kubernetes", func(idp *structs.ACLIdentityProvider) (idp_pkg.Validator, error) {
-		v, err := NewValidator(idp)
+	// register this as an available auth method type
+	authmethod.Register("kubernetes", func(method *structs.ACLAuthMethod) (authmethod.Validator, error) {
+		v, err := NewValidator(method)
 		if err != nil {
 			return nil, err
 		}
@@ -53,7 +53,7 @@ type Config struct {
 }
 
 // Validator is the wrapper around the relevant portions of the Kubernetes API
-// that also conforms to the IdentityProviderValidator interface.
+// that also conforms to the authmethod.Validator interface.
 type Validator struct {
 	name     string
 	config   *Config
@@ -61,13 +61,13 @@ type Validator struct {
 	trGetter client_authv1.TokenReviewsGetter
 }
 
-func NewValidator(idp *structs.ACLIdentityProvider) (*Validator, error) {
-	if idp.Type != "kubernetes" {
-		return nil, fmt.Errorf("%q is not a kubernetes identity provider", idp.Name)
+func NewValidator(method *structs.ACLAuthMethod) (*Validator, error) {
+	if method.Type != "kubernetes" {
+		return nil, fmt.Errorf("%q is not a kubernetes auth method", method.Name)
 	}
 
 	var config Config
-	if err := idp_pkg.ParseConfig(idp.Config, &config); err != nil {
+	if err := authmethod.ParseConfig(method.Config, &config); err != nil {
 		return nil, err
 	}
 
@@ -107,7 +107,7 @@ func NewValidator(idp *structs.ACLIdentityProvider) (*Validator, error) {
 	}
 
 	return &Validator{
-		name:     idp.Name,
+		name:     method.Name,
 		config:   &config,
 		saGetter: client.CoreV1(),
 		trGetter: client.AuthenticationV1(),

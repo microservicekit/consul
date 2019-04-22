@@ -1,4 +1,4 @@
-package idpread
+package authmethodlist
 
 import (
 	"flag"
@@ -21,8 +21,6 @@ type cmd struct {
 	http  *flags.HTTPFlags
 	help  string
 
-	name string
-
 	showMeta bool
 }
 
@@ -33,15 +31,8 @@ func (c *cmd) init() {
 		&c.showMeta,
 		"meta",
 		false,
-		"Indicates that identity provider metadata such "+
+		"Indicates that auth method metadata such "+
 			"as the content hash and raft indices should be shown for each entry.",
-	)
-
-	c.flags.StringVar(
-		&c.name,
-		"name",
-		"",
-		"The name of the identity provider to read.",
 	)
 
 	c.http = &flags.HTTPFlags{}
@@ -55,26 +46,22 @@ func (c *cmd) Run(args []string) int {
 		return 1
 	}
 
-	if c.name == "" {
-		c.UI.Error(fmt.Sprintf("Must specify the -name parameter"))
-		return 1
-	}
-
 	client, err := c.http.APIClient()
 	if err != nil {
 		c.UI.Error(fmt.Sprintf("Error connecting to Consul agent: %s", err))
 		return 1
 	}
 
-	idp, _, err := client.ACL().IdentityProviderRead(c.name, nil)
+	methods, _, err := client.ACL().AuthMethodList(nil)
 	if err != nil {
-		c.UI.Error(fmt.Sprintf("Error reading identity provider %q: %v", c.name, err))
-		return 1
-	} else if idp == nil {
-		c.UI.Error(fmt.Sprintf("Identity provider not found with name %q", c.name))
+		c.UI.Error(fmt.Sprintf("Failed to retrieve the auth method list: %v", err))
 		return 1
 	}
-	acl.PrintIdentityProvider(idp, c.UI, c.showMeta)
+
+	for _, method := range methods {
+		acl.PrintAuthMethodListEntry(method, c.UI, c.showMeta)
+	}
+
 	return 0
 }
 
@@ -86,11 +73,11 @@ func (c *cmd) Help() string {
 	return flags.Usage(c.help, nil)
 }
 
-const synopsis = "Read an ACL Identity Provider"
+const synopsis = "Lists ACL Auth Methods"
 const help = `
-Usage: consul acl idp read -name NAME [options]
+Usage: consul acl auth-method list [options]
 
-  Read an identity provider:
+  List all auth methods:
 
-    $ consul acl idp read -name my-idp
+    $ consul acl auth-method list
 `

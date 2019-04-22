@@ -1,4 +1,4 @@
-package idp
+package authmethod
 
 import (
 	"fmt"
@@ -9,25 +9,27 @@ import (
 	"github.com/mitchellh/mapstructure"
 )
 
-type ValidatorFactory func(idp *structs.ACLIdentityProvider) (Validator, error)
+type ValidatorFactory func(method *structs.ACLAuthMethod) (Validator, error)
 
 type Validator interface {
-	// Name returns the name of the identity provider backing this validator.
+	// Name returns the name of the auth method backing this validator.
 	Name() string
 
-	// ValidateLogin takes raw user-provided IdP metadata and ensures it is
-	// sane, provably correct, and currently valid. Relevant identifying data
-	// is extracted and returned for immediate use by the role binding process.
+	// ValidateLogin takes raw user-provided auth method metadata and ensures
+	// it is sane, provably correct, and currently valid. Relevant identifying
+	// data is extracted and returned for immediate use by the role binding
+	// process.
 	//
-	// Depending upon the provider, it may make sense to use these calls to
+	// Depending upon the method, it may make sense to use these calls to
 	// continue to extend the life of the underlying token.
 	//
-	// Returns IdP specific metadata suitable for the Role Binding process.
+	// Returns auth method specific metadata suitable for the Role Binding
+	// process.
 	ValidateLogin(loginToken string) (map[string]string, error)
 
 	// AvailableFields returns a slice of all fields that are returned as a
 	// result of ValidateLogin. These are valid fields for use in any
-	// BindingRule tied to this identity provider.
+	// BindingRule tied to this auth method.
 	AvailableFields() []string
 
 	// MakeFieldMapSelectable converts a field map as returned by ValidateLogin
@@ -40,26 +42,19 @@ var (
 	types   = make(map[string]ValidatorFactory)
 )
 
-// Register makes an identity provider with the given type available for use.
-// If Register is called twice with the same name or if validator is nil, it
+// Register makes an auth method with the given type available for use. If
+// Register is called twice with the same name or if validator is nil, it
 // panics.
 func Register(name string, factory ValidatorFactory) {
 	typesMu.Lock()
 	defer typesMu.Unlock()
 	if factory == nil {
-		panic("idp: Register factory is nil for type " + name)
+		panic("authmethod: Register factory is nil for type " + name)
 	}
 	if _, dup := types[name]; dup {
-		panic("idp: Register called twice for type " + name)
+		panic("authmethod: Register called twice for type " + name)
 	}
 	types[name] = factory
-}
-
-func unregisterAllTypes() {
-	typesMu.Lock()
-	defer typesMu.Unlock()
-	// For tests.
-	types = make(map[string]ValidatorFactory)
 }
 
 func IsRegisteredType(typeName string) bool {
@@ -69,19 +64,19 @@ func IsRegisteredType(typeName string) bool {
 	return ok
 }
 
-// Create instantiates a new Validator for the given identity provider
-// configuration.  If no idp is registered with the provided type an error is
-// returned.
-func Create(idp *structs.ACLIdentityProvider) (Validator, error) {
+// NewValidator instantiates a new Validator for the given auth method
+// configuration. If no auth method is registered with the provided type an
+// error is returned.
+func NewValidator(method *structs.ACLAuthMethod) (Validator, error) {
 	typesMu.RLock()
-	factory, ok := types[idp.Type]
+	factory, ok := types[method.Type]
 	typesMu.RUnlock()
 
 	if !ok {
-		return nil, fmt.Errorf("no identity provider registered with type: %s", idp.Type)
+		return nil, fmt.Errorf("no auth method registered with type: %s", method.Type)
 	}
 
-	return factory(idp)
+	return factory(method)
 }
 
 // Types returns a sorted list of the names of the registered types.
@@ -96,7 +91,7 @@ func Types() []string {
 	return list
 }
 
-// ParseConfig parses the config block for a identity provider.
+// ParseConfig parses the config block for a auth method.
 func ParseConfig(rawConfig map[string]interface{}, out interface{}) error {
 	decodeConf := &mapstructure.DecoderConfig{
 		Result:           out,

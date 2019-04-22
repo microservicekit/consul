@@ -12,7 +12,7 @@ import (
 
 	metrics "github.com/armon/go-metrics"
 	"github.com/hashicorp/consul/acl"
-	idp_pkg "github.com/hashicorp/consul/agent/consul/idp"
+	"github.com/hashicorp/consul/agent/consul/authmethod"
 	"github.com/hashicorp/consul/agent/consul/state"
 	"github.com/hashicorp/consul/agent/structs"
 	"github.com/hashicorp/consul/lib"
@@ -33,7 +33,7 @@ var (
 	validServiceIdentityName     = regexp.MustCompile(`^[a-z0-9]([a-z0-9\-_]*[a-z0-9])?$`)
 	serviceIdentityNameMaxLength = 256
 	validRoleName                = regexp.MustCompile(`^[A-Za-z0-9\-_]{1,256}$`)
-	validIDPName                 = regexp.MustCompile(`^[A-Za-z0-9\-_]{1,128}$`)
+	validAuthMethod              = regexp.MustCompile(`^[A-Za-z0-9\-_]{1,128}$`)
 )
 
 // ACL endpoint is used to manipulate ACLs
@@ -278,8 +278,8 @@ func (a *ACL) TokenClone(args *structs.ACLTokenSetRequest, reply *structs.ACLTok
 		return a.srv.forwardDC("ACL.TokenClone", a.srv.config.ACLDatacenter, args, reply)
 	}
 
-	if token.IDPName != "" {
-		return fmt.Errorf("Cannot clone a token created from an identity provider")
+	if token.AuthMethod != "" {
+		return fmt.Errorf("Cannot clone a token created from an auth method")
 	}
 
 	if token.Rules != "" {
@@ -364,15 +364,15 @@ func (a *ACL) tokenSetInternal(args *structs.ACLTokenSetRequest, reply *structs.
 		token.CreateTime = time.Now()
 
 		if fromLogin {
-			if token.IDPName == "" {
-				return fmt.Errorf("IDPName field is required during Login")
+			if token.AuthMethod == "" {
+				return fmt.Errorf("AuthMethod field is required during Login")
 			}
 			if !token.Local {
 				return fmt.Errorf("Cannot create Global token via Login")
 			}
 		} else {
-			if token.IDPName != "" {
-				return fmt.Errorf("IDPName field is disallowed outside of Login")
+			if token.AuthMethod != "" {
+				return fmt.Errorf("AuthMethod field is disallowed outside of Login")
 			}
 		}
 
@@ -440,10 +440,10 @@ func (a *ACL) tokenSetInternal(args *structs.ACLTokenSetRequest, reply *structs.
 			return fmt.Errorf("cannot toggle local mode of %s", token.AccessorID)
 		}
 
-		if token.IDPName == "" {
-			token.IDPName = existing.IDPName
-		} else if token.IDPName != existing.IDPName {
-			return fmt.Errorf("Cannot change IDPName of %s", token.AccessorID)
+		if token.AuthMethod == "" {
+			token.AuthMethod = existing.AuthMethod
+		} else if token.AuthMethod != existing.AuthMethod {
+			return fmt.Errorf("Cannot change AuthMethod of %s", token.AccessorID)
 		}
 
 		if token.ExpirationTTL != 0 {
@@ -722,7 +722,7 @@ func (a *ACL) TokenList(args *structs.ACLTokenListRequest, reply *structs.ACLTok
 
 	return a.srv.blockingQuery(&args.QueryOptions, &reply.QueryMeta,
 		func(ws memdb.WatchSet, state *state.Store) error {
-			index, tokens, err := state.ACLTokenList(ws, args.IncludeLocal, args.IncludeGlobal, args.Policy, args.Role, args.IDPName)
+			index, tokens, err := state.ACLTokenList(ws, args.IncludeLocal, args.IncludeGlobal, args.Policy, args.Role, args.AuthMethod)
 			if err != nil {
 				return err
 			}
@@ -1553,24 +1553,24 @@ func (a *ACL) BindingRuleSet(args *structs.ACLBindingRuleSetRequest, reply *stru
 			return fmt.Errorf("cannot find binding rule %s", rule.ID)
 		}
 
-		if rule.IDPName == "" {
-			rule.IDPName = existing.IDPName
-		} else if existing.IDPName != rule.IDPName {
-			return fmt.Errorf("the IDPName field of an Binding Rule is immutable")
+		if rule.AuthMethod == "" {
+			rule.AuthMethod = existing.AuthMethod
+		} else if existing.AuthMethod != rule.AuthMethod {
+			return fmt.Errorf("the AuthMethod field of an Binding Rule is immutable")
 		}
 	}
 
-	if rule.IDPName == "" {
-		return fmt.Errorf("Invalid Binding Rule: no IDPName is set")
+	if rule.AuthMethod == "" {
+		return fmt.Errorf("Invalid Binding Rule: no AuthMethod is set")
 	}
 
-	idpIdx, idp, err := state.ACLIdentityProviderGetByName(nil, rule.IDPName)
+	methodIdx, method, err := state.ACLAuthMethodGetByName(nil, rule.AuthMethod)
 	if err != nil {
-		return fmt.Errorf("acl identity provider lookup failed: %v", err)
-	} else if idp == nil {
-		return fmt.Errorf("cannot find identity provider with name %q", rule.IDPName)
+		return fmt.Errorf("acl auth method lookup failed: %v", err)
+	} else if method == nil {
+		return fmt.Errorf("cannot find auth method with name %q", rule.AuthMethod)
 	}
-	validator, err := a.srv.loadIdentityProviderValidator(idpIdx, idp)
+	validator, err := a.srv.loadAuthMethodValidator(methodIdx, method)
 	if err != nil {
 		return err
 	}
@@ -1690,7 +1690,7 @@ func (a *ACL) BindingRuleList(args *structs.ACLBindingRuleListRequest, reply *st
 
 	return a.srv.blockingQuery(&args.QueryOptions, &reply.QueryMeta,
 		func(ws memdb.WatchSet, state *state.Store) error {
-			index, rules, err := state.ACLBindingRuleList(ws, args.IDPName)
+			index, rules, err := state.ACLBindingRuleList(ws, args.AuthMethod)
 			if err != nil {
 				return err
 			}
@@ -1700,12 +1700,12 @@ func (a *ACL) BindingRuleList(args *structs.ACLBindingRuleListRequest, reply *st
 		})
 }
 
-func (a *ACL) IdentityProviderRead(args *structs.ACLIdentityProviderGetRequest, reply *structs.ACLIdentityProviderResponse) error {
+func (a *ACL) AuthMethodRead(args *structs.ACLAuthMethodGetRequest, reply *structs.ACLAuthMethodResponse) error {
 	if err := a.aclPreCheck(); err != nil {
 		return err
 	}
 
-	if done, err := a.srv.forward("ACL.IdentityProviderRead", args, args, reply); done {
+	if done, err := a.srv.forward("ACL.AuthMethodRead", args, args, reply); done {
 		return err
 	}
 
@@ -1717,18 +1717,18 @@ func (a *ACL) IdentityProviderRead(args *structs.ACLIdentityProviderGetRequest, 
 
 	return a.srv.blockingQuery(&args.QueryOptions, &reply.QueryMeta,
 		func(ws memdb.WatchSet, state *state.Store) error {
-			index, idp, err := state.ACLIdentityProviderGetByName(ws, args.IdentityProviderName)
+			index, method, err := state.ACLAuthMethodGetByName(ws, args.AuthMethodName)
 
 			if err != nil {
 				return err
 			}
 
-			reply.Index, reply.IdentityProvider = index, idp
+			reply.Index, reply.AuthMethod = index, method
 			return nil
 		})
 }
 
-func (a *ACL) IdentityProviderSet(args *structs.ACLIdentityProviderSetRequest, reply *structs.ACLIdentityProvider) error {
+func (a *ACL) AuthMethodSet(args *structs.ACLAuthMethodSetRequest, reply *structs.ACLAuthMethod) error {
 	if err := a.aclPreCheck(); err != nil {
 		return err
 	}
@@ -1737,11 +1737,11 @@ func (a *ACL) IdentityProviderSet(args *structs.ACLIdentityProviderSetRequest, r
 		args.Datacenter = a.srv.config.ACLDatacenter
 	}
 
-	if done, err := a.srv.forward("ACL.IdentityProviderSet", args, args, reply); done {
+	if done, err := a.srv.forward("ACL.AuthMethodSet", args, args, reply); done {
 		return err
 	}
 
-	defer metrics.MeasureSince([]string{"acl", "identityprovider", "upsert"}, time.Now())
+	defer metrics.MeasureSince([]string{"acl", "authmethod", "upsert"}, time.Now())
 
 	// Verify token is permitted to modify ACLs
 	if rule, err := a.srv.ResolveToken(args.Token); err != nil {
@@ -1750,62 +1750,62 @@ func (a *ACL) IdentityProviderSet(args *structs.ACLIdentityProviderSetRequest, r
 		return acl.ErrPermissionDenied
 	}
 
-	idp := &args.IdentityProvider
+	method := &args.AuthMethod
 	state := a.srv.fsm.State()
 
 	// ensure a name is set
-	if idp.Name == "" {
-		return fmt.Errorf("Invalid Identity Provider: no Name is set")
+	if method.Name == "" {
+		return fmt.Errorf("Invalid Auth Method: no Name is set")
 	}
-	if !validIDPName.MatchString(idp.Name) {
-		return fmt.Errorf("Invalid Identity provider: invalid Name. Only alphanumeric characters, '-' and '_' are allowed")
+	if !validAuthMethod.MatchString(method.Name) {
+		return fmt.Errorf("Invalid Auth Method: invalid Name. Only alphanumeric characters, '-' and '_' are allowed")
 	}
 
-	// Check to see if the idp exists first.
-	_, existing, err := state.ACLIdentityProviderGetByName(nil, idp.Name)
+	// Check to see if the method exists first.
+	_, existing, err := state.ACLAuthMethodGetByName(nil, method.Name)
 	if err != nil {
-		return fmt.Errorf("acl identity provider lookup failed: %v", err)
+		return fmt.Errorf("acl auth method lookup failed: %v", err)
 	}
 
 	if existing != nil {
-		if idp.Type == "" {
-			idp.Type = existing.Type
-		} else if existing.Type != idp.Type {
-			return fmt.Errorf("the Type field of an Identity Provider is immutable")
+		if method.Type == "" {
+			method.Type = existing.Type
+		} else if existing.Type != method.Type {
+			return fmt.Errorf("the Type field of an Auth Method is immutable")
 		}
 	}
 
-	if !idp_pkg.IsRegisteredType(idp.Type) {
-		return fmt.Errorf("Invalid Identity Provider: Type should be one of: %v", idp_pkg.Types())
+	if !authmethod.IsRegisteredType(method.Type) {
+		return fmt.Errorf("Invalid Auth Method: Type should be one of: %v", authmethod.Types())
 	}
 
 	// Instantiate a validator but do not cache it yet. This will validate the
 	// configuration.
-	if _, err := idp_pkg.Create(idp); err != nil {
-		return fmt.Errorf("Invalid Identity Provider: %v", err)
+	if _, err := authmethod.NewValidator(method); err != nil {
+		return fmt.Errorf("Invalid Auth Method: %v", err)
 	}
 
-	req := &structs.ACLIdentityProviderBatchSetRequest{
-		IdentityProviders: structs.ACLIdentityProviders{idp},
+	req := &structs.ACLAuthMethodBatchSetRequest{
+		AuthMethods: structs.ACLAuthMethods{method},
 	}
 
-	resp, err := a.srv.raftApply(structs.ACLIdentityProviderSetRequestType, req)
+	resp, err := a.srv.raftApply(structs.ACLAuthMethodSetRequestType, req)
 	if err != nil {
-		return fmt.Errorf("Failed to apply identity provider upsert request: %v", err)
+		return fmt.Errorf("Failed to apply auth method upsert request: %v", err)
 	}
 
 	if respErr, ok := resp.(error); ok {
 		return respErr
 	}
 
-	if _, idp, err := a.srv.fsm.State().ACLIdentityProviderGetByName(nil, idp.Name); err == nil && idp != nil {
-		*reply = *idp
+	if _, method, err := a.srv.fsm.State().ACLAuthMethodGetByName(nil, method.Name); err == nil && method != nil {
+		*reply = *method
 	}
 
 	return nil
 }
 
-func (a *ACL) IdentityProviderDelete(args *structs.ACLIdentityProviderDeleteRequest, reply *bool) error {
+func (a *ACL) AuthMethodDelete(args *structs.ACLAuthMethodDeleteRequest, reply *bool) error {
 	if err := a.aclPreCheck(); err != nil {
 		return err
 	}
@@ -1814,11 +1814,11 @@ func (a *ACL) IdentityProviderDelete(args *structs.ACLIdentityProviderDeleteRequ
 		args.Datacenter = a.srv.config.ACLDatacenter
 	}
 
-	if done, err := a.srv.forward("ACL.IdentityProviderDelete", args, args, reply); done {
+	if done, err := a.srv.forward("ACL.AuthMethodDelete", args, args, reply); done {
 		return err
 	}
 
-	defer metrics.MeasureSince([]string{"acl", "identityprovider", "delete"}, time.Now())
+	defer metrics.MeasureSince([]string{"acl", "authmethod", "delete"}, time.Now())
 
 	// Verify token is permitted to modify ACLs
 	if rule, err := a.srv.ResolveToken(args.Token); err != nil {
@@ -1827,22 +1827,22 @@ func (a *ACL) IdentityProviderDelete(args *structs.ACLIdentityProviderDeleteRequ
 		return acl.ErrPermissionDenied
 	}
 
-	_, idp, err := a.srv.fsm.State().ACLIdentityProviderGetByName(nil, args.IdentityProviderName)
+	_, method, err := a.srv.fsm.State().ACLAuthMethodGetByName(nil, args.AuthMethodName)
 	if err != nil {
 		return err
 	}
 
-	if idp == nil {
+	if method == nil {
 		return nil
 	}
 
-	req := structs.ACLIdentityProviderBatchDeleteRequest{
-		IdentityProviderNames: []string{args.IdentityProviderName},
+	req := structs.ACLAuthMethodBatchDeleteRequest{
+		AuthMethodNames: []string{args.AuthMethodName},
 	}
 
-	resp, err := a.srv.raftApply(structs.ACLIdentityProviderDeleteRequestType, &req)
+	resp, err := a.srv.raftApply(structs.ACLAuthMethodDeleteRequestType, &req)
 	if err != nil {
-		return fmt.Errorf("Failed to apply identity provider delete request: %v", err)
+		return fmt.Errorf("Failed to apply auth method delete request: %v", err)
 	}
 
 	if respErr, ok := resp.(error); ok {
@@ -1854,12 +1854,12 @@ func (a *ACL) IdentityProviderDelete(args *structs.ACLIdentityProviderDeleteRequ
 	return nil
 }
 
-func (a *ACL) IdentityProviderList(args *structs.ACLIdentityProviderListRequest, reply *structs.ACLIdentityProviderListResponse) error {
+func (a *ACL) AuthMethodList(args *structs.ACLAuthMethodListRequest, reply *structs.ACLAuthMethodListResponse) error {
 	if err := a.aclPreCheck(); err != nil {
 		return err
 	}
 
-	if done, err := a.srv.forward("ACL.IdentityProviderList", args, args, reply); done {
+	if done, err := a.srv.forward("ACL.AuthMethodList", args, args, reply); done {
 		return err
 	}
 
@@ -1871,17 +1871,17 @@ func (a *ACL) IdentityProviderList(args *structs.ACLIdentityProviderListRequest,
 
 	return a.srv.blockingQuery(&args.QueryOptions, &reply.QueryMeta,
 		func(ws memdb.WatchSet, state *state.Store) error {
-			index, idps, err := state.ACLIdentityProviderList(ws)
+			index, methods, err := state.ACLAuthMethodList(ws)
 			if err != nil {
 				return err
 			}
 
-			var stubs structs.ACLIdentityProviderListStubs
-			for _, idp := range idps {
-				stubs = append(stubs, idp.Stub())
+			var stubs structs.ACLAuthMethodListStubs
+			for _, method := range methods {
+				stubs = append(stubs, method.Stub())
 			}
 
-			reply.Index, reply.IdentityProviders = index, stubs
+			reply.Index, reply.AuthMethods = index, stubs
 			return nil
 		})
 }
@@ -1907,21 +1907,21 @@ func (a *ACL) Login(args *structs.ACLLoginRequest, reply *structs.ACLToken) erro
 
 	auth := args.Auth
 
-	// 1. take args.Data.IDPName to get an IdentityProvider Validator
-	idx, idp, err := a.srv.fsm.State().ACLIdentityProviderGetByName(nil, auth.IDPName)
+	// 1. take args.Data.AuthMethod to get an AuthMethod Validator
+	idx, method, err := a.srv.fsm.State().ACLAuthMethodGetByName(nil, auth.AuthMethod)
 	if err != nil {
 		return err
-	} else if idp == nil {
+	} else if method == nil {
 		return acl.ErrNotFound
 	}
 
-	validator, err := a.srv.loadIdentityProviderValidator(idx, idp)
+	validator, err := a.srv.loadAuthMethodValidator(idx, method)
 	if err != nil {
 		return err
 	}
 
-	// 2. Send args.Data.IDPToken to idp validator and get back a fields map
-	verifiedFields, err := validator.ValidateLogin(auth.IDPToken)
+	// 2. Send args.Data.BearerToken to method validator and get back a fields map
+	verifiedFields, err := validator.ValidateLogin(auth.BearerToken)
 	if err != nil {
 		return err
 	}
@@ -1951,7 +1951,7 @@ func (a *ACL) Login(args *structs.ACLLoginRequest, reply *structs.ACLToken) erro
 		ACLToken: structs.ACLToken{
 			Description:       description,
 			Local:             true,
-			IDPName:           auth.IDPName,
+			AuthMethod:        auth.AuthMethod,
 			ServiceIdentities: serviceIdentities,
 			Roles:             roleLinks,
 		},
@@ -2000,7 +2000,7 @@ func (a *ACL) Logout(args *structs.ACLLogoutRequest, reply *bool) error {
 	} else if token == nil {
 		return acl.ErrNotFound
 
-	} else if token.IDPName == "" {
+	} else if token.AuthMethod == "" {
 		// Can't "logout" of a token that wasn't a result of login.
 		return acl.ErrPermissionDenied
 

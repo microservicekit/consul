@@ -8,8 +8,8 @@ import (
 	"testing"
 
 	"github.com/hashicorp/consul/agent"
-	"github.com/hashicorp/consul/agent/consul/idp/k8s"
-	testidp "github.com/hashicorp/consul/agent/consul/idp/testing"
+	"github.com/hashicorp/consul/agent/consul/authmethod/kubeauth"
+	"github.com/hashicorp/consul/agent/consul/authmethod/testauth"
 	"github.com/hashicorp/consul/api"
 	"github.com/hashicorp/consul/command/acl"
 	"github.com/hashicorp/consul/logger"
@@ -49,7 +49,7 @@ func TestLoginCommand(t *testing.T) {
 
 	client := a.Client()
 
-	t.Run("idp-name is required", func(t *testing.T) {
+	t.Run("method is required", func(t *testing.T) {
 		ui := cli.NewMockUi()
 		cmd := New(ui)
 
@@ -60,7 +60,7 @@ func TestLoginCommand(t *testing.T) {
 
 		code := cmd.Run(args)
 		require.Equal(t, code, 1, "err: %s", ui.ErrorWriter.String())
-		require.Contains(t, ui.ErrorWriter.String(), "Missing required '-idp-name' flag")
+		require.Contains(t, ui.ErrorWriter.String(), "Missing required '-method' flag")
 	})
 
 	tokenSinkFile := filepath.Join(testDir, "test.token")
@@ -72,7 +72,7 @@ func TestLoginCommand(t *testing.T) {
 		args := []string{
 			"-http-addr=" + a.HTTPAddr(),
 			"-token=root",
-			"-idp-name=test",
+			"-method=test",
 		}
 
 		code := cmd.Run(args)
@@ -80,7 +80,7 @@ func TestLoginCommand(t *testing.T) {
 		require.Contains(t, ui.ErrorWriter.String(), "Missing required '-token-sink-file' flag")
 	})
 
-	t.Run("idp-token-file is required", func(t *testing.T) {
+	t.Run("bearer-token-file is required", func(t *testing.T) {
 		defer os.Remove(tokenSinkFile)
 
 		ui := cli.NewMockUi()
@@ -89,21 +89,21 @@ func TestLoginCommand(t *testing.T) {
 		args := []string{
 			"-http-addr=" + a.HTTPAddr(),
 			"-token=root",
-			"-idp-name=test",
+			"-method=test",
 			"-token-sink-file", tokenSinkFile,
 		}
 
 		code := cmd.Run(args)
 		require.Equal(t, code, 1, "err: %s", ui.ErrorWriter.String())
-		require.Contains(t, ui.ErrorWriter.String(), "Missing required '-idp-token-file' flag")
+		require.Contains(t, ui.ErrorWriter.String(), "Missing required '-bearer-token-file' flag")
 	})
 
-	idpTokenFile := filepath.Join(testDir, "idp.token")
+	bearerTokenFile := filepath.Join(testDir, "bearer.token")
 
-	t.Run("idp-token-file is empty", func(t *testing.T) {
+	t.Run("bearer-token-file is empty", func(t *testing.T) {
 		defer os.Remove(tokenSinkFile)
 
-		require.NoError(t, ioutil.WriteFile(idpTokenFile, []byte(""), 0600))
+		require.NoError(t, ioutil.WriteFile(bearerTokenFile, []byte(""), 0600))
 
 		ui := cli.NewMockUi()
 		cmd := New(ui)
@@ -111,19 +111,19 @@ func TestLoginCommand(t *testing.T) {
 		args := []string{
 			"-http-addr=" + a.HTTPAddr(),
 			"-token=root",
-			"-idp-name=test",
+			"-method=test",
 			"-token-sink-file", tokenSinkFile,
-			"-idp-token-file", idpTokenFile,
+			"-bearer-token-file", bearerTokenFile,
 		}
 
 		code := cmd.Run(args)
 		require.Equal(t, code, 1, "err: %s", ui.ErrorWriter.String())
-		require.Contains(t, ui.ErrorWriter.String(), "No idp token found in")
+		require.Contains(t, ui.ErrorWriter.String(), "No bearer token found in")
 	})
 
-	require.NoError(t, ioutil.WriteFile(idpTokenFile, []byte("demo-token"), 0600))
+	require.NoError(t, ioutil.WriteFile(bearerTokenFile, []byte("demo-token"), 0600))
 
-	t.Run("try login with no idp configured", func(t *testing.T) {
+	t.Run("try login with no method configured", func(t *testing.T) {
 		defer os.Remove(tokenSinkFile)
 
 		ui := cli.NewMockUi()
@@ -132,9 +132,9 @@ func TestLoginCommand(t *testing.T) {
 		args := []string{
 			"-http-addr=" + a.HTTPAddr(),
 			"-token=root",
-			"-idp-name=test",
+			"-method=test",
 			"-token-sink-file", tokenSinkFile,
-			"-idp-token-file", idpTokenFile,
+			"-bearer-token-file", bearerTokenFile,
 		}
 
 		code := cmd.Run(args)
@@ -142,18 +142,18 @@ func TestLoginCommand(t *testing.T) {
 		require.Contains(t, ui.ErrorWriter.String(), "403 (ACL not found)")
 	})
 
-	testSessionID := testidp.StartSession()
-	defer testidp.ResetSession(testSessionID)
+	testSessionID := testauth.StartSession()
+	defer testauth.ResetSession(testSessionID)
 
-	testidp.InstallSessionToken(
+	testauth.InstallSessionToken(
 		testSessionID,
 		"demo-token",
 		"default", "demo", "76091af4-4b56-11e9-ac4b-708b11801cbe",
 	)
 
 	{
-		_, _, err := client.ACL().IdentityProviderCreate(
-			&api.ACLIdentityProvider{
+		_, _, err := client.ACL().AuthMethodCreate(
+			&api.ACLAuthMethod{
 				Name: "test",
 				Type: "testing",
 				Config: map[string]interface{}{
@@ -165,7 +165,7 @@ func TestLoginCommand(t *testing.T) {
 		require.NoError(t, err)
 	}
 
-	t.Run("try login with idp configured but no binding rules", func(t *testing.T) {
+	t.Run("try login with method configured but no binding rules", func(t *testing.T) {
 		defer os.Remove(tokenSinkFile)
 
 		ui := cli.NewMockUi()
@@ -174,9 +174,9 @@ func TestLoginCommand(t *testing.T) {
 		args := []string{
 			"-http-addr=" + a.HTTPAddr(),
 			"-token=root",
-			"-idp-name=test",
+			"-method=test",
 			"-token-sink-file", tokenSinkFile,
-			"-idp-token-file", idpTokenFile,
+			"-bearer-token-file", bearerTokenFile,
 		}
 
 		code := cmd.Run(args)
@@ -186,17 +186,17 @@ func TestLoginCommand(t *testing.T) {
 
 	{
 		_, _, err := client.ACL().BindingRuleCreate(&api.ACLBindingRule{
-			IDPName:  "test",
-			BindType: api.BindingRuleBindTypeService,
-			BindName: "${serviceaccount.name}",
-			Selector: "serviceaccount.namespace==default",
+			AuthMethod: "test",
+			BindType:   api.BindingRuleBindTypeService,
+			BindName:   "${serviceaccount.name}",
+			Selector:   "serviceaccount.namespace==default",
 		},
 			&api.WriteOptions{Token: "root"},
 		)
 		require.NoError(t, err)
 	}
 
-	t.Run("try login with idp configured and binding rules", func(t *testing.T) {
+	t.Run("try login with method configured and binding rules", func(t *testing.T) {
 		defer os.Remove(tokenSinkFile)
 
 		ui := cli.NewMockUi()
@@ -205,9 +205,9 @@ func TestLoginCommand(t *testing.T) {
 		args := []string{
 			"-http-addr=" + a.HTTPAddr(),
 			"-token=root",
-			"-idp-name=test",
+			"-method=test",
 			"-token-sink-file", tokenSinkFile,
-			"-idp-token-file", idpTokenFile,
+			"-bearer-token-file", bearerTokenFile,
 		}
 
 		code := cmd.Run(args)
@@ -246,13 +246,13 @@ func TestLoginCommand_k8s(t *testing.T) {
 	client := a.Client()
 
 	tokenSinkFile := filepath.Join(testDir, "test.token")
-	idpTokenFile := filepath.Join(testDir, "idp.token")
+	bearerTokenFile := filepath.Join(testDir, "bearer.token")
 
 	// the "B" jwt will be the one being reviewed
-	require.NoError(t, ioutil.WriteFile(idpTokenFile, []byte(acl.TestKubernetesJWT_B), 0600))
+	require.NoError(t, ioutil.WriteFile(bearerTokenFile, []byte(acl.TestKubernetesJWT_B), 0600))
 
 	// spin up a fake api server
-	testSrv := k8s.StartTestAPIServer(t)
+	testSrv := kubeauth.StartTestAPIServer(t)
 	defer testSrv.Stop()
 
 	testSrv.AuthorizeJWT(acl.TestKubernetesJWT_A)
@@ -265,8 +265,8 @@ func TestLoginCommand_k8s(t *testing.T) {
 	)
 
 	{
-		_, _, err := client.ACL().IdentityProviderCreate(
-			&api.ACLIdentityProvider{
+		_, _, err := client.ACL().AuthMethodCreate(
+			&api.ACLAuthMethod{
 				Name: "k8s",
 				Type: "kubernetes",
 				Config: map[string]interface{}{
@@ -283,17 +283,17 @@ func TestLoginCommand_k8s(t *testing.T) {
 
 	{
 		_, _, err := client.ACL().BindingRuleCreate(&api.ACLBindingRule{
-			IDPName:  "k8s",
-			BindType: api.BindingRuleBindTypeService,
-			BindName: "${serviceaccount.name}",
-			Selector: "serviceaccount.namespace==default",
+			AuthMethod: "k8s",
+			BindType:   api.BindingRuleBindTypeService,
+			BindName:   "${serviceaccount.name}",
+			Selector:   "serviceaccount.namespace==default",
 		},
 			&api.WriteOptions{Token: "root"},
 		)
 		require.NoError(t, err)
 	}
 
-	t.Run("try login with idp configured and binding rules", func(t *testing.T) {
+	t.Run("try login with method configured and binding rules", func(t *testing.T) {
 		defer os.Remove(tokenSinkFile)
 
 		ui := cli.NewMockUi()
@@ -302,9 +302,9 @@ func TestLoginCommand_k8s(t *testing.T) {
 		args := []string{
 			"-http-addr=" + a.HTTPAddr(),
 			"-token=root",
-			"-idp-name=k8s",
+			"-method=k8s",
 			"-token-sink-file", tokenSinkFile,
-			"-idp-token-file", idpTokenFile,
+			"-bearer-token-file", bearerTokenFile,
 		}
 
 		code := cmd.Run(args)

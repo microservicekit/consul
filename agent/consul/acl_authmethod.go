@@ -3,47 +3,47 @@ package consul
 import (
 	"fmt"
 
-	idp_pkg "github.com/hashicorp/consul/agent/consul/idp"
+	"github.com/hashicorp/consul/agent/consul/authmethod"
 	"github.com/hashicorp/consul/agent/structs"
 	"github.com/hashicorp/go-bexpr"
 
-	// register this as a builtin idp
-	_ "github.com/hashicorp/consul/agent/consul/idp/k8s"
+	// register this as a builtin auth method
+	_ "github.com/hashicorp/consul/agent/consul/authmethod/kubeauth"
 )
 
-type idpValidatorEntry struct {
-	Validator   idp_pkg.Validator
+type authMethodValidatorEntry struct {
+	Validator   authmethod.Validator
 	ModifyIndex uint64 // the raft index when this last changed
 }
 
-// loadIdentityProviderValidator returns an idp_pkg.Validator for the
-// given idp configuration. If the cache is up to date as-of the provided index
+// loadAuthMethodValidator returns an authmethod.Validator for the given auth
+// method configuration. If the cache is up to date as-of the provided index
 // then the cached version is returned, otherwise a new validator is created
 // and cached.
-func (s *Server) loadIdentityProviderValidator(idx uint64, idp *structs.ACLIdentityProvider) (idp_pkg.Validator, error) {
-	if prevIdx, v, ok := s.getCachedIdentityProviderValidator(idp.Name); ok && idx <= prevIdx {
+func (s *Server) loadAuthMethodValidator(idx uint64, method *structs.ACLAuthMethod) (authmethod.Validator, error) {
+	if prevIdx, v, ok := s.getCachedAuthMethodValidator(method.Name); ok && idx <= prevIdx {
 		return v, nil
 	}
 
-	v, err := idp_pkg.Create(idp)
+	v, err := authmethod.NewValidator(method)
 	if err != nil {
-		return nil, fmt.Errorf("identity provider validator for %q could not be initialized: %v", idp.Name, err)
+		return nil, fmt.Errorf("auth method validator for %q could not be initialized: %v", method.Name, err)
 	}
 
-	v = s.getOrReplaceIdentityProviderValidator(idp.Name, idx, v)
+	v = s.getOrReplaceAuthMethodValidator(method.Name, idx, v)
 
 	return v, nil
 }
 
-// getCachedIdentityProviderValidator returns an IdentityProviderValidator for
+// getCachedAuthMethodValidator returns an AuthMethodValidator for
 // the given name exclusively from the cache. If one is not found in the cache
 // nil is returned.
-func (s *Server) getCachedIdentityProviderValidator(name string) (uint64, idp_pkg.Validator, bool) {
-	s.aclIDPValidatorLock.RLock()
-	defer s.aclIDPValidatorLock.RUnlock()
+func (s *Server) getCachedAuthMethodValidator(name string) (uint64, authmethod.Validator, bool) {
+	s.aclAuthMethodValidatorLock.RLock()
+	defer s.aclAuthMethodValidatorLock.RUnlock()
 
-	if s.aclIDPValidators != nil {
-		v, ok := s.aclIDPValidators[name]
+	if s.aclAuthMethodValidators != nil {
+		v, ok := s.aclAuthMethodValidators[name]
 		if ok {
 			return v.ModifyIndex, v.Validator, true
 		}
@@ -51,50 +51,50 @@ func (s *Server) getCachedIdentityProviderValidator(name string) (uint64, idp_pk
 	return 0, nil, false
 }
 
-// getOrReplaceIdentityProviderValidator updates the cached validator with the
+// getOrReplaceAuthMethodValidator updates the cached validator with the
 // provided one UNLESS it has been updated by another goroutine in which case
 // the updated one is returned.
-func (s *Server) getOrReplaceIdentityProviderValidator(name string, idx uint64, v idp_pkg.Validator) idp_pkg.Validator {
-	s.aclIDPValidatorLock.Lock()
-	defer s.aclIDPValidatorLock.Unlock()
+func (s *Server) getOrReplaceAuthMethodValidator(name string, idx uint64, v authmethod.Validator) authmethod.Validator {
+	s.aclAuthMethodValidatorLock.Lock()
+	defer s.aclAuthMethodValidatorLock.Unlock()
 
-	if s.aclIDPValidators == nil {
-		s.aclIDPValidators = make(map[string]*idpValidatorEntry)
+	if s.aclAuthMethodValidators == nil {
+		s.aclAuthMethodValidators = make(map[string]*authMethodValidatorEntry)
 	}
 
-	prev, ok := s.aclIDPValidators[name]
+	prev, ok := s.aclAuthMethodValidators[name]
 	if ok {
 		if prev.ModifyIndex >= idx {
 			return prev.Validator
 		}
 	}
 
-	s.logger.Printf("[DEBUG] acl: updating cached identity provider validator for %q", name)
+	s.logger.Printf("[DEBUG] acl: updating cached auth method validator for %q", name)
 
-	s.aclIDPValidators[name] = &idpValidatorEntry{
+	s.aclAuthMethodValidators[name] = &authMethodValidatorEntry{
 		Validator:   v,
 		ModifyIndex: idx,
 	}
 	return v
 }
 
-// purgeIdentityProviderValidators resets the cache of validators.
-func (s *Server) purgeIdentityProviderValidators() {
-	s.aclIDPValidatorLock.Lock()
-	s.aclIDPValidators = make(map[string]*idpValidatorEntry)
-	s.aclIDPValidatorLock.Unlock()
+// purgeAuthMethodValidators resets the cache of validators.
+func (s *Server) purgeAuthMethodValidators() {
+	s.aclAuthMethodValidatorLock.Lock()
+	s.aclAuthMethodValidators = make(map[string]*authMethodValidatorEntry)
+	s.aclAuthMethodValidatorLock.Unlock()
 }
 
 // evaluateRoleBindings evaluates all current binding rules associated with the
-// given identity provider against the verified data returned from the idp
-// authentication process.
+// given auth method against the verified data returned from the authentication
+// process.
 //
 // A list of role links and service identities are returned.
 func (s *Server) evaluateRoleBindings(
-	validator idp_pkg.Validator,
+	validator authmethod.Validator,
 	verifiedFields map[string]string,
 ) ([]*structs.ACLServiceIdentity, []structs.ACLTokenRoleLink, error) {
-	// Only fetch rules that are relevant for this idp.
+	// Only fetch rules that are relevant for this method.
 	_, rules, err := s.fsm.State().ACLBindingRuleList(nil, validator.Name())
 	if err != nil {
 		return nil, nil, err

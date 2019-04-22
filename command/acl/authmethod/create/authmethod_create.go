@@ -1,4 +1,4 @@
-package idpcreate
+package authmethodcreate
 
 import (
 	"flag"
@@ -6,7 +6,7 @@ import (
 	"io/ioutil"
 
 	"github.com/hashicorp/consul/api"
-	aclhelpers "github.com/hashicorp/consul/command/acl"
+	"github.com/hashicorp/consul/command/acl"
 	"github.com/hashicorp/consul/command/flags"
 	"github.com/mitchellh/cli"
 )
@@ -23,9 +23,9 @@ type cmd struct {
 	http  *flags.HTTPFlags
 	help  string
 
-	idpType     string
-	name        string
-	description string
+	authMethodType string
+	name           string
+	description    string
 
 	k8sHost              string
 	k8sCACert            string
@@ -41,27 +41,27 @@ func (c *cmd) init() {
 		&c.showMeta,
 		"meta",
 		false,
-		"Indicates that identity provider metadata such "+
+		"Indicates that auth method metadata such "+
 			"as the content hash and raft indices should be shown for each entry.",
 	)
 
 	c.flags.StringVar(
-		&c.idpType,
+		&c.authMethodType,
 		"type",
 		"",
-		"The new identity provider's type. This flag is required.",
+		"The new auth method's type. This flag is required.",
 	)
 	c.flags.StringVar(
 		&c.name,
 		"name",
 		"",
-		"The new identity provider's name. This flag is required.",
+		"The new auth method's name. This flag is required.",
 	)
 	c.flags.StringVar(
 		&c.description,
 		"description",
 		"",
-		"A description of the identity provider.",
+		"A description of the auth method.",
 	)
 
 	c.flags.StringVar(
@@ -99,7 +99,7 @@ func (c *cmd) Run(args []string) int {
 		return 1
 	}
 
-	if c.idpType == "" {
+	if c.authMethodType == "" {
 		c.UI.Error(fmt.Sprintf("Missing required '-type' flag"))
 		c.UI.Error(c.Help())
 		return 1
@@ -115,13 +115,13 @@ func (c *cmd) Run(args []string) int {
 		return 1
 	}
 
-	newIDP := &api.ACLIdentityProvider{
-		Type:        c.idpType,
+	newAuthMethod := &api.ACLAuthMethod{
+		Type:        c.authMethodType,
 		Name:        c.name,
 		Description: c.description,
 	}
 
-	if c.idpType == "kubernetes" {
+	if c.authMethodType == "kubernetes" {
 		if c.k8sHost == "" {
 			c.UI.Error(fmt.Sprintf("Missing required '-kubernetes-host' flag"))
 			return 1
@@ -146,20 +146,20 @@ func (c *cmd) Run(args []string) int {
 			}
 		}
 
-		newIDP.Config = map[string]interface{}{
+		newAuthMethod.Config = map[string]interface{}{
 			"Host":              c.k8sHost,
 			"CACert":            c.k8sCACert,
 			"ServiceAccountJWT": c.k8sServiceAccountJWT,
 		}
 	}
 
-	idp, _, err := client.ACL().IdentityProviderCreate(newIDP, nil)
+	method, _, err := client.ACL().AuthMethodCreate(newAuthMethod, nil)
 	if err != nil {
-		c.UI.Error(fmt.Sprintf("Failed to create new identity provider: %v", err))
+		c.UI.Error(fmt.Sprintf("Failed to create new auth method: %v", err))
 		return 1
 	}
 
-	aclhelpers.PrintIdentityProvider(idp, c.UI, c.showMeta)
+	acl.PrintAuthMethod(method, c.UI, c.showMeta)
 	return 0
 }
 
@@ -171,16 +171,16 @@ func (c *cmd) Help() string {
 	return flags.Usage(c.help, nil)
 }
 
-const synopsis = "Create an ACL Identity Provider"
+const synopsis = "Create an ACL Auth Method"
 
 const help = `
-Usage: consul acl idp create -name NAME -type TYPE [options]
+Usage: consul acl auth-method create -name NAME -type TYPE [options]
 
-  Create a new identity provider:
+  Create a new auth method:
 
-    $ consul acl idp create -type "kubernetes" \
-                            -name "my-idp" \
-                            -description "This is an example kube idp" \
+    $ consul acl auth-method create -type "kubernetes" \
+                            -name "my-k8s" \
+                            -description "This is an example kube method" \
                             -kubernetes-host "https://apiserver.example.com:8443" \
                             -kubernetes-ca-file /path/to/kube.ca.crt \
                             -kubernetes-service-account-jwt "JWT_CONTENTS"

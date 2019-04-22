@@ -26,23 +26,23 @@ type cmd struct {
 
 	shutdownCh <-chan struct{}
 
-	idpToken string
+	bearerToken string
 
 	// flags
-	idpName       string
-	idpTokenFile  string
-	tokenSinkFile string
-	meta          map[string]string
+	authMethodName  string
+	bearerTokenFile string
+	tokenSinkFile   string
+	meta            map[string]string
 }
 
 func (c *cmd) init() {
 	c.flags = flag.NewFlagSet("", flag.ContinueOnError)
 
-	c.flags.StringVar(&c.idpName, "idp-name", "",
-		"Name of the identity provider to login to.")
+	c.flags.StringVar(&c.authMethodName, "method", "",
+		"Name of the auth method to login to.")
 
-	c.flags.StringVar(&c.idpTokenFile, "idp-token-file", "",
-		"Path to a file containing a secret bearer token to use with this identity provider.")
+	c.flags.StringVar(&c.bearerTokenFile, "bearer-token-file", "",
+		"Path to a file containing a secret bearer token to use with this auth method.")
 
 	c.flags.StringVar(&c.tokenSinkFile, "token-sink-file", "",
 		"The most recent token's SecretID is kept up to date in this file.")
@@ -66,8 +66,8 @@ func (c *cmd) Run(args []string) int {
 		return 1
 	}
 
-	if c.idpName == "" {
-		c.UI.Error(fmt.Sprintf("Missing required '-idp-name' flag"))
+	if c.authMethodName == "" {
+		c.UI.Error(fmt.Sprintf("Missing required '-method' flag"))
 		return 1
 	}
 	if c.tokenSinkFile == "" {
@@ -75,20 +75,20 @@ func (c *cmd) Run(args []string) int {
 		return 1
 	}
 
-	if c.idpTokenFile == "" {
-		c.UI.Error(fmt.Sprintf("Missing required '-idp-token-file' flag"))
+	if c.bearerTokenFile == "" {
+		c.UI.Error(fmt.Sprintf("Missing required '-bearer-token-file' flag"))
 		return 1
 	}
 
-	data, err := ioutil.ReadFile(c.idpTokenFile)
+	data, err := ioutil.ReadFile(c.bearerTokenFile)
 	if err != nil {
 		c.UI.Error(err.Error())
 		return 1
 	}
-	c.idpToken = strings.TrimSpace(string(data))
+	c.bearerToken = strings.TrimSpace(string(data))
 
-	if c.idpToken == "" {
-		c.UI.Error(fmt.Sprintf("No idp token found in %s", c.idpTokenFile))
+	if c.bearerToken == "" {
+		c.UI.Error(fmt.Sprintf("No bearer token found in %s", c.bearerTokenFile))
 		return 1
 	}
 
@@ -105,9 +105,9 @@ func (c *cmd) Run(args []string) int {
 
 	// Do the login.
 	req := &api.ACLLoginParams{
-		IDPName:  c.idpName,
-		IDPToken: c.idpToken,
-		Meta:     c.meta,
+		AuthMethod:  c.authMethodName,
+		BearerToken: c.bearerToken,
+		Meta:        c.meta,
 	}
 	tok, _, err := client.ACL().Login(req, nil)
 	if err != nil {
@@ -136,13 +136,13 @@ func (c *cmd) Help() string {
 	return flags.Usage(c.help, nil)
 }
 
-const synopsis = "Login to Consul using an Identity Provider"
+const synopsis = "Login to Consul using an Auth Method"
 
 const help = `
 Usage: consul login [options]
 
   The login command will exchange the provided third party credentials with the
-  requested identity provider for a newly minted Consul ACL Token. The
-  companion command 'consul logout' should be used to destroy any tokens
-  created this way to avoid a resource leak.
+  requested auth method for a newly minted Consul ACL Token. The companion
+  command 'consul logout' should be used to destroy any tokens created this way
+  to avoid a resource leak.
 `

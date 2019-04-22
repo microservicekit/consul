@@ -245,12 +245,12 @@ func tokensTableSchema() *memdb.TableSchema {
 				Unique:       false,
 				Indexer:      &TokenRolesIndex{},
 			},
-			"idp": &memdb.IndexSchema{
-				Name:         "idp",
+			"authmethod": &memdb.IndexSchema{
+				Name:         "authmethod",
 				AllowMissing: true,
 				Unique:       false,
 				Indexer: &memdb.StringFieldIndex{
-					Field:     "IDPName",
+					Field:     "AuthMethod",
 					Lowercase: false,
 				},
 			},
@@ -369,12 +369,12 @@ func bindingRulesTableSchema() *memdb.TableSchema {
 					Field: "ID",
 				},
 			},
-			"idp": &memdb.IndexSchema{
-				Name:         "idp",
+			"authmethod": &memdb.IndexSchema{
+				Name:         "authmethod",
 				AllowMissing: false,
 				Unique:       false,
 				Indexer: &memdb.StringFieldIndex{
-					Field:     "IDPName",
+					Field:     "AuthMethod",
 					Lowercase: true,
 				},
 			},
@@ -382,9 +382,9 @@ func bindingRulesTableSchema() *memdb.TableSchema {
 	}
 }
 
-func identityProvidersTableSchema() *memdb.TableSchema {
+func authMethodsTableSchema() *memdb.TableSchema {
 	return &memdb.TableSchema{
-		Name: "acl-identity-providers",
+		Name: "acl-auth-methods",
 		Indexes: map[string]*memdb.IndexSchema{
 			"id": &memdb.IndexSchema{
 				Name:         "id",
@@ -404,7 +404,7 @@ func init() {
 	registerSchema(policiesTableSchema)
 	registerSchema(rolesTableSchema)
 	registerSchema(bindingRulesTableSchema)
-	registerSchema(identityProvidersTableSchema)
+	registerSchema(authMethodsTableSchema)
 }
 
 // ACLTokens is used when saving a snapshot
@@ -489,21 +489,21 @@ func (s *Restore) ACLBindingRule(rule *structs.ACLBindingRule) error {
 	return nil
 }
 
-// ACLIdentityProviders is used when saving a snapshot
-func (s *Snapshot) ACLIdentityProviders() (memdb.ResultIterator, error) {
-	iter, err := s.tx.Get("acl-identity-providers", "id")
+// ACLAuthMethods is used when saving a snapshot
+func (s *Snapshot) ACLAuthMethods() (memdb.ResultIterator, error) {
+	iter, err := s.tx.Get("acl-auth-methods", "id")
 	if err != nil {
 		return nil, err
 	}
 	return iter, nil
 }
 
-func (s *Restore) ACLIdentityProvider(idp *structs.ACLIdentityProvider) error {
-	if err := s.tx.Insert("acl-identity-providers", idp); err != nil {
-		return fmt.Errorf("failed restoring acl identity provider: %s", err)
+func (s *Restore) ACLAuthMethod(method *structs.ACLAuthMethod) error {
+	if err := s.tx.Insert("acl-auth-methods", method); err != nil {
+		return fmt.Errorf("failed restoring acl auth method: %s", err)
 	}
 
-	if err := indexUpdateMaxTxn(s.tx, idp.ModifyIndex, "acl-identity-providers"); err != nil {
+	if err := indexUpdateMaxTxn(s.tx, method.ModifyIndex, "acl-auth-methods"); err != nil {
 		return fmt.Errorf("failed updating index: %s", err)
 	}
 	return nil
@@ -881,12 +881,12 @@ func (s *Store) aclTokenSetTxn(tx *memdb.Txn, idx uint64, token *structs.ACLToke
 		return err
 	}
 
-	if token.IDPName != "" {
-		idp, err := s.getIdentityProviderWithTxn(tx, nil, token.IDPName, "id")
+	if token.AuthMethod != "" {
+		method, err := s.getAuthMethodWithTxn(tx, nil, token.AuthMethod, "id")
 		if err != nil {
 			return err
-		} else if idp == nil {
-			return fmt.Errorf("No such identity provider with Name: %s", token.IDPName)
+		} else if method == nil {
+			return fmt.Errorf("No such auth method with Name: %s", token.AuthMethod)
 		}
 	}
 
@@ -991,7 +991,7 @@ func (s *Store) aclTokenGetTxn(tx *memdb.Txn, ws memdb.WatchSet, value, index st
 }
 
 // ACLTokenList is used to list out all of the ACLs in the state store.
-func (s *Store) ACLTokenList(ws memdb.WatchSet, local, global bool, policy, role, idpName string) (uint64, structs.ACLTokens, error) {
+func (s *Store) ACLTokenList(ws memdb.WatchSet, local, global bool, policy, role, methodName string) (uint64, structs.ACLTokens, error) {
 	tx := s.db.Txn(false)
 	defer tx.Abort()
 
@@ -1003,7 +1003,7 @@ func (s *Store) ACLTokenList(ws memdb.WatchSet, local, global bool, policy, role
 	// all tokens so our checks just ensure that global == local
 
 	needLocalityFilter := false
-	if policy == "" && role == "" && idpName == "" {
+	if policy == "" && role == "" && methodName == "" {
 		if global == local {
 			iter, err = tx.Get("acl-tokens", "id")
 		} else if global {
@@ -1012,20 +1012,20 @@ func (s *Store) ACLTokenList(ws memdb.WatchSet, local, global bool, policy, role
 			iter, err = tx.Get("acl-tokens", "local", true)
 		}
 
-	} else if policy != "" && role == "" && idpName == "" {
+	} else if policy != "" && role == "" && methodName == "" {
 		iter, err = tx.Get("acl-tokens", "policies", policy)
 		needLocalityFilter = true
 
-	} else if policy == "" && role != "" && idpName == "" {
+	} else if policy == "" && role != "" && methodName == "" {
 		iter, err = tx.Get("acl-tokens", "roles", role)
 		needLocalityFilter = true
 
-	} else if policy == "" && role == "" && idpName != "" {
-		iter, err = tx.Get("acl-tokens", "idp", idpName)
+	} else if policy == "" && role == "" && methodName != "" {
+		iter, err = tx.Get("acl-tokens", "authmethod", methodName)
 		needLocalityFilter = true
 
 	} else {
-		return 0, nil, fmt.Errorf("can only filter by one of policy, role, or idpName at a time")
+		return 0, nil, fmt.Errorf("can only filter by one of policy, role, or methodName at a time")
 	}
 
 	if err != nil {
@@ -1211,9 +1211,9 @@ func (s *Store) aclTokenDeleteTxn(tx *memdb.Txn, idx uint64, value, index string
 	return nil
 }
 
-func (s *Store) aclTokenDeleteAllForIdentityProviderTxn(tx *memdb.Txn, idx uint64, idpName string) error {
+func (s *Store) aclTokenDeleteAllForAuthMethodTxn(tx *memdb.Txn, idx uint64, methodName string) error {
 	// collect them all
-	iter, err := tx.Get("acl-tokens", "idp", idpName)
+	iter, err := tx.Get("acl-tokens", "authmethod", methodName)
 	if err != nil {
 		return fmt.Errorf("failed acl token lookup: %v", err)
 	}
@@ -1742,11 +1742,11 @@ func (s *Store) ACLBindingRuleSet(idx uint64, rule *structs.ACLBindingRule) erro
 }
 
 func (s *Store) aclBindingRuleSetTxn(tx *memdb.Txn, idx uint64, rule *structs.ACLBindingRule) error {
-	// Check that the ID and IDPName are set
+	// Check that the ID and AuthMethod are set
 	if rule.ID == "" {
 		return ErrMissingACLBindingRuleID
-	} else if rule.IDPName == "" {
-		return ErrMissingACLBindingRuleIDPName
+	} else if rule.AuthMethod == "" {
+		return ErrMissingACLBindingRuleAuthMethod
 	}
 
 	existing, err := tx.First("acl-binding-rules", "id", rule.ID)
@@ -1763,10 +1763,10 @@ func (s *Store) aclBindingRuleSetTxn(tx *memdb.Txn, idx uint64, rule *structs.AC
 		rule.ModifyIndex = idx
 	}
 
-	if idp, err := tx.First("acl-identity-providers", "id", rule.IDPName); err != nil {
-		return fmt.Errorf("failed acl identity provider lookup: %v", err)
-	} else if idp == nil {
-		return fmt.Errorf("failed inserting acl binding rule: identity provider not found")
+	if method, err := tx.First("acl-auth-methods", "id", rule.AuthMethod); err != nil {
+		return fmt.Errorf("failed acl auth method lookup: %v", err)
+	} else if method == nil {
+		return fmt.Errorf("failed inserting acl binding rule: auth method not found")
 	}
 
 	if err := tx.Insert("acl-binding-rules", rule); err != nil {
@@ -1799,7 +1799,7 @@ func (s *Store) aclBindingRuleGet(ws memdb.WatchSet, value, index string) (uint6
 	return idx, rule, nil
 }
 
-func (s *Store) ACLBindingRuleList(ws memdb.WatchSet, idpName string) (uint64, structs.ACLBindingRules, error) {
+func (s *Store) ACLBindingRuleList(ws memdb.WatchSet, methodName string) (uint64, structs.ACLBindingRules, error) {
 	tx := s.db.Txn(false)
 	defer tx.Abort()
 
@@ -1807,8 +1807,8 @@ func (s *Store) ACLBindingRuleList(ws memdb.WatchSet, idpName string) (uint64, s
 		iter memdb.ResultIterator
 		err  error
 	)
-	if idpName != "" {
-		iter, err = tx.Get("acl-binding-rules", "idp", idpName)
+	if methodName != "" {
+		iter, err = tx.Get("acl-binding-rules", "authmethod", methodName)
 	} else {
 		iter, err = tx.Get("acl-binding-rules", "id")
 	}
@@ -1882,9 +1882,9 @@ func (s *Store) aclBindingRuleDeleteTxn(tx *memdb.Txn, idx uint64, value, index 
 	return nil
 }
 
-func (s *Store) aclBindingRuleDeleteAllForIdentityProviderTxn(tx *memdb.Txn, idx uint64, idpName string) error {
+func (s *Store) aclBindingRuleDeleteAllForAuthMethodTxn(tx *memdb.Txn, idx uint64, methodName string) error {
 	// collect them all
-	iter, err := tx.Get("acl-binding-rules", "idp", idpName)
+	iter, err := tx.Get("acl-binding-rules", "authmethod", methodName)
 	if err != nil {
 		return fmt.Errorf("failed acl binding rule lookup: %v", err)
 	}
@@ -1911,19 +1911,19 @@ func (s *Store) aclBindingRuleDeleteAllForIdentityProviderTxn(tx *memdb.Txn, idx
 	return nil
 }
 
-func (s *Store) ACLIdentityProviderBatchSet(idx uint64, idps structs.ACLIdentityProviders) error {
+func (s *Store) ACLAuthMethodBatchSet(idx uint64, methods structs.ACLAuthMethods) error {
 	tx := s.db.Txn(true)
 	defer tx.Abort()
 
-	for _, idp := range idps {
+	for _, method := range methods {
 		// this is only used when doing batch insertions for upgrades and replication. Therefore
 		// we take whatever those said.
-		if err := s.aclIdentityProviderSetTxn(tx, idx, idp); err != nil {
+		if err := s.aclAuthMethodSetTxn(tx, idx, method); err != nil {
 			return err
 		}
 	}
 
-	if err := indexUpdateMaxTxn(tx, idx, "acl-identity-providers"); err != nil {
+	if err := indexUpdateMaxTxn(tx, idx, "acl-auth-methods"); err != nil {
 		return fmt.Errorf("failed updating index: %s", err)
 	}
 
@@ -1931,14 +1931,14 @@ func (s *Store) ACLIdentityProviderBatchSet(idx uint64, idps structs.ACLIdentity
 	return nil
 }
 
-func (s *Store) ACLIdentityProviderSet(idx uint64, idp *structs.ACLIdentityProvider) error {
+func (s *Store) ACLAuthMethodSet(idx uint64, method *structs.ACLAuthMethod) error {
 	tx := s.db.Txn(true)
 	defer tx.Abort()
 
-	if err := s.aclIdentityProviderSetTxn(tx, idx, idp); err != nil {
+	if err := s.aclAuthMethodSetTxn(tx, idx, method); err != nil {
 		return err
 	}
-	if err := indexUpdateMaxTxn(tx, idx, "acl-identity-providers"); err != nil {
+	if err := indexUpdateMaxTxn(tx, idx, "acl-auth-methods"); err != nil {
 		return fmt.Errorf("failed updating index: %s", err)
 	}
 
@@ -1946,117 +1946,115 @@ func (s *Store) ACLIdentityProviderSet(idx uint64, idp *structs.ACLIdentityProvi
 	return nil
 }
 
-func (s *Store) aclIdentityProviderSetTxn(tx *memdb.Txn, idx uint64, idp *structs.ACLIdentityProvider) error {
+func (s *Store) aclAuthMethodSetTxn(tx *memdb.Txn, idx uint64, method *structs.ACLAuthMethod) error {
 	// Check that the Name and Type are set
-	if idp.Name == "" {
-		return ErrMissingACLIdentityProviderName
-	} else if idp.Type == "" {
-		return ErrMissingACLIdentityProviderType
+	if method.Name == "" {
+		return ErrMissingACLAuthMethodName
+	} else if method.Type == "" {
+		return ErrMissingACLAuthMethodType
 	}
 
-	existing, err := tx.First("acl-identity-providers", "id", idp.Name)
+	existing, err := tx.First("acl-auth-methods", "id", method.Name)
 	if err != nil {
-		return fmt.Errorf("failed acl identity provider lookup: %v", err)
+		return fmt.Errorf("failed acl auth method lookup: %v", err)
 	}
 
 	// Set the indexes
 	if existing != nil {
-		idp.CreateIndex = existing.(*structs.ACLIdentityProvider).CreateIndex
-		idp.ModifyIndex = idx
+		method.CreateIndex = existing.(*structs.ACLAuthMethod).CreateIndex
+		method.ModifyIndex = idx
 	} else {
-		idp.CreateIndex = idx
-		idp.ModifyIndex = idx
+		method.CreateIndex = idx
+		method.ModifyIndex = idx
 	}
 
-	if err := tx.Insert("acl-identity-providers", idp); err != nil {
-		return fmt.Errorf("failed inserting acl identity provider: %v", err)
+	if err := tx.Insert("acl-auth-methods", method); err != nil {
+		return fmt.Errorf("failed inserting acl auth method: %v", err)
 	}
 	return nil
 }
 
-func (s *Store) ACLIdentityProviderGetByName(ws memdb.WatchSet, name string) (uint64, *structs.ACLIdentityProvider, error) {
-	return s.aclIdentityProviderGet(ws, name, "id")
+func (s *Store) ACLAuthMethodGetByName(ws memdb.WatchSet, name string) (uint64, *structs.ACLAuthMethod, error) {
+	return s.aclAuthMethodGet(ws, name, "id")
 }
 
-func (s *Store) aclIdentityProviderGet(ws memdb.WatchSet, value, index string) (uint64, *structs.ACLIdentityProvider, error) {
+func (s *Store) aclAuthMethodGet(ws memdb.WatchSet, value, index string) (uint64, *structs.ACLAuthMethod, error) {
 	tx := s.db.Txn(false)
 	defer tx.Abort()
 
-	idp, err := s.getIdentityProviderWithTxn(tx, ws, value, index)
+	method, err := s.getAuthMethodWithTxn(tx, ws, value, index)
 	if err != nil {
 		return 0, nil, err
 	}
 
-	idx := maxIndexTxn(tx, "acl-identity-providers")
+	idx := maxIndexTxn(tx, "acl-auth-methods")
 
-	return idx, idp, nil
+	return idx, method, nil
 }
 
-func (s *Store) getIdentityProviderWithTxn(tx *memdb.Txn, ws memdb.WatchSet, value, index string) (*structs.ACLIdentityProvider, error) {
-	watchCh, rawIdp, err := tx.FirstWatch("acl-identity-providers", index, value)
+func (s *Store) getAuthMethodWithTxn(tx *memdb.Txn, ws memdb.WatchSet, value, index string) (*structs.ACLAuthMethod, error) {
+	watchCh, rawMethod, err := tx.FirstWatch("acl-auth-methods", index, value)
 	if err != nil {
-		return nil, fmt.Errorf("failed acl identity provider lookup: %v", err)
+		return nil, fmt.Errorf("failed acl auth method lookup: %v", err)
 	}
 	ws.Add(watchCh)
 
-	if rawIdp != nil {
-		// TODO(rb): deep clone?
-		return rawIdp.(*structs.ACLIdentityProvider), nil
+	if rawMethod != nil {
+		return rawMethod.(*structs.ACLAuthMethod), nil
 	}
 
 	return nil, nil
 }
 
-func (s *Store) ACLIdentityProviderList(ws memdb.WatchSet) (uint64, structs.ACLIdentityProviders, error) {
+func (s *Store) ACLAuthMethodList(ws memdb.WatchSet) (uint64, structs.ACLAuthMethods, error) {
 	tx := s.db.Txn(false)
 	defer tx.Abort()
 
-	iter, err := tx.Get("acl-identity-providers", "id")
+	iter, err := tx.Get("acl-auth-methods", "id")
 	if err != nil {
-		return 0, nil, fmt.Errorf("failed acl identity provider lookup: %v", err)
+		return 0, nil, fmt.Errorf("failed acl auth method lookup: %v", err)
 	}
 	ws.Add(iter.WatchCh())
 
-	var result structs.ACLIdentityProviders
+	var result structs.ACLAuthMethods
 	for raw := iter.Next(); raw != nil; raw = iter.Next() {
-		// TODO(rb): deep copy
-		idp := raw.(*structs.ACLIdentityProvider)
-		result = append(result, idp)
+		method := raw.(*structs.ACLAuthMethod)
+		result = append(result, method)
 	}
 
 	// Get the table index.
-	idx := maxIndexTxn(tx, "acl-identity-providers")
+	idx := maxIndexTxn(tx, "acl-auth-methods")
 
 	return idx, result, nil
 }
 
-func (s *Store) ACLIdentityProviderDeleteByName(idx uint64, name string) error {
-	return s.aclIdentityProviderDelete(idx, name, "id")
+func (s *Store) ACLAuthMethodDeleteByName(idx uint64, name string) error {
+	return s.aclAuthMethodDelete(idx, name, "id")
 }
 
-func (s *Store) ACLIdentityProviderBatchDelete(idx uint64, names []string) error {
+func (s *Store) ACLAuthMethodBatchDelete(idx uint64, names []string) error {
 	tx := s.db.Txn(true)
 	defer tx.Abort()
 
 	for _, name := range names {
-		s.aclIdentityProviderDeleteTxn(tx, idx, name, "id")
+		s.aclAuthMethodDeleteTxn(tx, idx, name, "id")
 	}
 
-	if err := indexUpdateMaxTxn(tx, idx, "acl-identity-providers"); err != nil {
+	if err := indexUpdateMaxTxn(tx, idx, "acl-auth-methods"); err != nil {
 		return fmt.Errorf("failed updating index: %v", err)
 	}
 	tx.Commit()
 	return nil
 }
 
-func (s *Store) aclIdentityProviderDelete(idx uint64, value, index string) error {
+func (s *Store) aclAuthMethodDelete(idx uint64, value, index string) error {
 	tx := s.db.Txn(true)
 	defer tx.Abort()
 
-	if err := s.aclIdentityProviderDeleteTxn(tx, idx, value, index); err != nil {
+	if err := s.aclAuthMethodDeleteTxn(tx, idx, value, index); err != nil {
 		return err
 	}
-	if err := indexUpdateMaxTxn(tx, idx, "acl-identity-providers"); err != nil {
+	if err := indexUpdateMaxTxn(tx, idx, "acl-auth-methods"); err != nil {
 		return fmt.Errorf("failed updating index: %v", err)
 	}
 
@@ -2064,29 +2062,29 @@ func (s *Store) aclIdentityProviderDelete(idx uint64, value, index string) error
 	return nil
 }
 
-func (s *Store) aclIdentityProviderDeleteTxn(tx *memdb.Txn, idx uint64, value, index string) error {
-	// Look up the existing idp
-	rawidp, err := tx.First("acl-identity-providers", index, value)
+func (s *Store) aclAuthMethodDeleteTxn(tx *memdb.Txn, idx uint64, value, index string) error {
+	// Look up the existing method
+	rawMethod, err := tx.First("acl-auth-methods", index, value)
 	if err != nil {
-		return fmt.Errorf("failed acl identity provider lookup: %v", err)
+		return fmt.Errorf("failed acl auth method lookup: %v", err)
 	}
 
-	if rawidp == nil {
+	if rawMethod == nil {
 		return nil
 	}
 
-	idp := rawidp.(*structs.ACLIdentityProvider)
+	method := rawMethod.(*structs.ACLAuthMethod)
 
-	if err := s.aclBindingRuleDeleteAllForIdentityProviderTxn(tx, idx, idp.Name); err != nil {
+	if err := s.aclBindingRuleDeleteAllForAuthMethodTxn(tx, idx, method.Name); err != nil {
 		return err
 	}
 
-	if err := s.aclTokenDeleteAllForIdentityProviderTxn(tx, idx, idp.Name); err != nil {
+	if err := s.aclTokenDeleteAllForAuthMethodTxn(tx, idx, method.Name); err != nil {
 		return err
 	}
 
-	if err := tx.Delete("acl-identity-providers", idp); err != nil {
-		return fmt.Errorf("failed deleting acl identity provider: %v", err)
+	if err := tx.Delete("acl-auth-methods", method); err != nil {
+		return fmt.Errorf("failed deleting acl auth method: %v", err)
 	}
 	return nil
 }
