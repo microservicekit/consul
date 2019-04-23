@@ -1537,14 +1537,6 @@ func TestACLResolver_LocalPoliciesAndRoles(t *testing.T) {
 		localTokens:   false,
 		localPolicies: true,
 		localRoles:    true,
-		// tokenReadFn: func(args *structs.ACLTokenGetRequest, reply *structs.ACLTokenResponse) error {
-		// 	_, token, err := testIdentityForToken(args.TokenID)
-
-		// 	if token != nil {
-		// 		reply.Token = token.(*structs.ACLToken)
-		// 	}
-		// 	return err
-		// },
 	}
 	delegate.tokenReadFn = delegate.plainTokenReadFn
 
