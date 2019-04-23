@@ -1053,7 +1053,7 @@ func (a *ACL) PolicyResolve(args *structs.ACLPolicyBatchGetRequest, reply *struc
 	}
 
 	// get full list of policies for this token
-	identity, policies, err := a.srv.acls.resolveTokenToIdentityAndPolicies(args.Token, false)
+	identity, policies, err := a.srv.acls.resolveTokenToIdentityAndPolicies(args.Token)
 	if err != nil {
 		return err
 	}

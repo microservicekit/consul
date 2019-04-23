@@ -287,7 +287,7 @@ func (r *ACLResolver) resolveTokenLegacy(token string) (acl.Authorizer, error) {
 	// done or the server is within the primary datacenter.
 	if done, identity, err := r.delegate.ResolveIdentityFromToken(token); done {
 		if err == nil && identity != nil {
-			policies, err := r.resolvePoliciesForIdentity(identity, true)
+			policies, err := r.resolvePoliciesForIdentity(identity)
 			if err != nil {
 				return nil, err
 			}
@@ -434,9 +434,7 @@ func (r *ACLResolver) fetchAndCachePoliciesForIdentity(identity structs.ACLIdent
 	if err == nil {
 		out := make(map[string]*structs.ACLPolicy)
 		for _, policy := range resp.Policies {
-			if policy.ID != "" { // omit synthetics in case they leak through
-				out[policy.ID] = policy
-			}
+			out[policy.ID] = policy
 		}
 
 		for _, policyID := range policyIDs {
@@ -577,17 +575,15 @@ func (r *ACLResolver) filterPoliciesByScope(policies structs.ACLPolicies) struct
 	return out
 }
 
-func (r *ACLResolver) resolvePoliciesForIdentity(identity structs.ACLIdentity, includeSynthetic bool) (structs.ACLPolicies, error) {
+func (r *ACLResolver) resolvePoliciesForIdentity(identity structs.ACLIdentity) (structs.ACLPolicies, error) {
 	policyIDs := identity.PolicyIDs()
 	roleIDs := identity.RoleIDs()
 	serviceIdentities := identity.ServiceIdentityList()
 
 	if len(policyIDs) == 0 && len(serviceIdentities) == 0 && len(roleIDs) == 0 {
-		if includeSynthetic {
-			policy := identity.EmbeddedPolicy()
-			if policy != nil {
-				return []*structs.ACLPolicy{policy}, nil
-			}
+		policy := identity.EmbeddedPolicy()
+		if policy != nil {
+			return []*structs.ACLPolicy{policy}, nil
 		}
 
 		// In this case the default policy will be all that is in effect.
@@ -613,10 +609,7 @@ func (r *ACLResolver) resolvePoliciesForIdentity(identity structs.ACLIdentity, i
 	serviceIdentities = dedupeServiceIdentities(serviceIdentities)
 
 	// Generate synthetic policies for all service identities in effect.
-	var syntheticPolicies []*structs.ACLPolicy
-	if includeSynthetic {
-		syntheticPolicies = r.synthesizePoliciesForServiceIdentities(serviceIdentities)
-	}
+	syntheticPolicies := r.synthesizePoliciesForServiceIdentities(serviceIdentities)
 
 	// For the new ACLs policy replication is mandatory for correct operation on servers. Therefore
 	// we only attempt to resolve policies locally
@@ -884,11 +877,11 @@ func (r *ACLResolver) collectRolesForIdentity(identity structs.ACLIdentity, role
 }
 
 func (r *ACLResolver) resolveTokenToPolicies(token string) (structs.ACLPolicies, error) {
-	_, policies, err := r.resolveTokenToIdentityAndPolicies(token, true)
+	_, policies, err := r.resolveTokenToIdentityAndPolicies(token)
 	return policies, err
 }
 
-func (r *ACLResolver) resolveTokenToIdentityAndPolicies(token string, includeSynthetic bool) (structs.ACLIdentity, structs.ACLPolicies, error) {
+func (r *ACLResolver) resolveTokenToIdentityAndPolicies(token string) (structs.ACLIdentity, structs.ACLPolicies, error) {
 	var lastErr error
 	var lastIdentity structs.ACLIdentity
 
@@ -905,7 +898,7 @@ func (r *ACLResolver) resolveTokenToIdentityAndPolicies(token string, includeSyn
 
 		lastIdentity = identity
 
-		policies, err := r.resolvePoliciesForIdentity(identity, includeSynthetic)
+		policies, err := r.resolvePoliciesForIdentity(identity)
 		if err == nil {
 			return identity, policies, nil
 		}
