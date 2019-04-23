@@ -193,7 +193,7 @@ node_prefix "" {
 			}
 
 			got := svcid.SyntheticPolicy()
-			require.Empty(t, got.ID)
+			require.NotEmpty(t, got.ID)
 			require.True(t, strings.HasPrefix(got.Name, "synthetic-policy-"))
 			// strip irrelevant fields before equality
 			got.ID = ""
