@@ -139,6 +139,26 @@ func testIdentityForToken(token string) (bool, structs.ACLIdentity, error) {
 				},
 			},
 		}, nil
+	case "found-synthetic-policy-1":
+		return true, &structs.ACLToken{
+			AccessorID: "f6c5a5fb-4da4-422b-9abf-2c942813fc71",
+			SecretID:   "55cb7d69-2bea-42c3-a68f-2a1443d2abbc",
+			ServiceIdentities: []*structs.ACLServiceIdentity{
+				&structs.ACLServiceIdentity{
+					ServiceName: "service1",
+				},
+			},
+		}, nil
+	case "found-synthetic-policy-2":
+		return true, &structs.ACLToken{
+			AccessorID: "7c87dfad-be37-446e-8305-299585677cb5",
+			SecretID:   "dfca9676-ac80-453a-837b-4c0cf923473c",
+			ServiceIdentities: []*structs.ACLServiceIdentity{
+				&structs.ACLServiceIdentity{
+					ServiceName: "service2",
+				},
+			},
+		}, nil
 	case "acl-ro":
 		return true, &structs.ACLToken{
 			AccessorID: "435a75af-1763-4980-89f4-f0951dda53b4",
@@ -1608,6 +1628,40 @@ func testACLResolver_variousTokens(t *testing.T, delegate *ACLResolverTestDelega
 		require.False(t, authz.ACLRead())
 		require.True(t, authz.NodeWrite("foo", nil))
 		require.True(t, authz.ServiceRead("bar"))
+	})
+
+	runTwiceAndReset("Synthetic Policies Independently Cache", func(t *testing.T) {
+		// We resolve both of these tokens in the same cache session
+		// to verify that the keys for caching synthetic policies don't bleed
+		// over between each other.
+		{
+			authz, err := r.ResolveToken("found-synthetic-policy-1")
+			require.NotNil(t, authz)
+			require.NoError(t, err)
+			// spot check some random perms
+			require.False(t, authz.ACLRead())
+			require.False(t, authz.NodeWrite("foo", nil))
+			// ensure we didn't bleed over to the other synthetic policy
+			require.False(t, authz.ServiceWrite("service2", nil))
+			// check our own synthetic policy
+			require.True(t, authz.ServiceWrite("service1", nil))
+			require.True(t, authz.ServiceRead("literally-anything"))
+			require.True(t, authz.NodeRead("any-node"))
+		}
+		{
+			authz, err := r.ResolveToken("found-synthetic-policy-2")
+			require.NotNil(t, authz)
+			require.NoError(t, err)
+			// spot check some random perms
+			require.False(t, authz.ACLRead())
+			require.False(t, authz.NodeWrite("foo", nil))
+			// ensure we didn't bleed over to the other synthetic policy
+			require.False(t, authz.ServiceWrite("service1", nil))
+			// check our own synthetic policy
+			require.True(t, authz.ServiceWrite("service2", nil))
+			require.True(t, authz.ServiceRead("literally-anything"))
+			require.True(t, authz.NodeRead("any-node"))
+		}
 	})
 
 	runTwiceAndReset("Anonymous", func(t *testing.T) {

@@ -189,8 +189,7 @@ func (s *ACLServiceIdentity) SyntheticPolicy() *ACLPolicy {
 	hashID := fmt.Sprintf("%x", hasher.Sum([]byte(rules)))
 
 	policy := &ACLPolicy{}
-	// TODO(rb): should we include an ID here?
-	// policy.ID = hashID
+	policy.ID = hashID
 	policy.Name = fmt.Sprintf("synthetic-policy-%s", hashID)
 	policy.Description = "synthetic policy"
 	policy.Rules = rules
