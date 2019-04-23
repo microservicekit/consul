@@ -4220,70 +4220,102 @@ func gatherIDs(t *testing.T, v interface{}) []string {
 }
 
 func TestValidateBindingRuleBindName(t *testing.T) {
-	for _, test := range []struct {
+	t.Parallel()
+
+	type testcase struct {
 		name     string
 		bindType string
 		bindName string
 		fields   string
 		valid    bool // valid HIL, invalid contents
 		err      bool // invalid HIL
-	}{
-		// ------------ misc --------------
+	}
+
+	for _, test := range []testcase{
 		{"no bind type",
 			"", "", "", false, false},
 		{"bad bind type",
 			"invalid", "blah", "", false, true},
-		// ------------ type:role --------------
-		// valid HIL, invalid role
+		// valid HIL, invalid name
 		{"empty",
-			"role", "", "", false, false},
+			"both", "", "", false, false},
 		{"just end",
-			"role", "}", "", false, false},
+			"both", "}", "", false, false},
 		{"var without start",
-			"role", " item }", "item", false, false},
+			"both", " item }", "item", false, false},
 		{"two vars missing second start",
-			"role", "before-${ item }after--more }", "item,more", false, false},
-		// valid HIL, valid role
+			"both", "before-${ item }after--more }", "item,more", false, false},
+		// names for the two types are validated differently
+		{"@ is disallowed",
+			"both", "bad@name", "", false, false},
+		{"leading dash",
+			"role", "-name", "", true, false},
+		{"leading dash",
+			"service", "-name", "", false, false},
+		{"trailing dash",
+			"role", "name-", "", true, false},
+		{"trailing dash",
+			"service", "name-", "", false, false},
+		{"inner dash",
+			"both", "name-end", "", true, false},
+		{"upper case",
+			"role", "NAME", "", true, false},
+		{"upper case",
+			"service", "NAME", "", false, false},
+		// valid HIL, valid name
 		{"no vars",
-			"role", "nothing", "", true, false},
+			"both", "nothing", "", true, false},
 		{"just var",
-			"role", "${item}", "item", true, false},
+			"both", "${item}", "item", true, false},
 		{"var in middle",
-			"role", "before-${item}after", "item", true, false},
+			"both", "before-${item}after", "item", true, false},
 		{"two vars",
-			"role", "before-${item}after-${more}", "item,more", true, false},
+			"both", "before-${item}after-${more}", "item,more", true, false},
 		// bad
 		{"no bind name",
-			"role", "", "", false, false},
+			"both", "", "", false, false},
 		{"just start",
-			"role", "${", "", false, true},
+			"both", "${", "", false, true},
 		{"backwards",
-			"role", "}${", "", false, true},
+			"both", "}${", "", false, true},
 		{"no varname",
-			"role", "${}", "", false, true},
+			"both", "${}", "", false, true},
 		{"missing map key",
-			"role", "${item}", "", false, true},
+			"both", "${item}", "", false, true},
 		{"var without end",
-			"role", "${ item ", "item", false, true},
+			"both", "${ item ", "item", false, true},
 		{"two vars missing first end",
-			"role", "before-${ item after-${ more }", "item,more", false, true},
-		// ------------ type:service --------------
-		// TODO: test service flavor
+			"both", "before-${ item after-${ more }", "item,more", false, true},
 	} {
-		t.Run(test.name+"--"+test.bindType, func(t *testing.T) {
-			valid, err := validateBindingRuleBindName(
-				test.bindType,
-				test.bindName,
-				strings.Split(test.fields, ","),
-			)
-			if test.err {
-				require.NotNil(t, err)
-				require.False(t, valid)
-			} else {
-				require.NoError(t, err)
-				require.Equal(t, test.valid, valid)
-			}
-		})
+		var cases []testcase
+		if test.bindType == "both" {
+			test1 := test
+			test1.bindType = "role"
+			test2 := test
+			test2.bindType = "service"
+			cases = []testcase{test1, test2}
+		} else {
+			cases = []testcase{test}
+		}
+
+		for _, test := range cases {
+			test := test
+			t.Run(test.bindType+"--"+test.name, func(t *testing.T) {
+				t.Parallel()
+				valid, err := validateBindingRuleBindName(
+					test.bindType,
+					test.bindName,
+					strings.Split(test.fields, ","),
+				)
+				if test.err {
+					require.NotNil(t, err)
+					require.False(t, valid)
+				} else {
+					require.NoError(t, err)
+					require.Equal(t, test.valid, valid)
+				}
+			})
+		}
 	}
 }
 
