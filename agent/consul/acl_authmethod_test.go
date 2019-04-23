@@ -46,17 +46,3 @@ func TestDoesBindingRuleMatch(t *testing.T) {
 		})
 	}
 }
-
-// mapify takes pairwise string fields and inserts them into a map
-//
-// example: mapify("a","b","c","d") => {"a":"b", "c":"d"}
-func mapify(kvs ...string) map[string]string {
-	if len(kvs)%2 != 0 {
-		panic("function takes an even number of args")
-	}
-	out := make(map[string]string)
-	for i := 0; i < len(kvs); i += 2 {
-		out[kvs[i]] = kvs[i+1]
-	}
-	return out
-}
