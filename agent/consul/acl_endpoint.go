@@ -1041,8 +1041,6 @@ func (a *ACL) PolicyList(args *structs.ACLPolicyListRequest, reply *structs.ACLP
 
 // PolicyResolve is used to retrieve a subset of the policies associated with a given token
 // The policy ids in the args simply act as a filter on the policy set assigned to the token
-//
-// This does not return synthetic policies.
 func (a *ACL) PolicyResolve(args *structs.ACLPolicyBatchGetRequest, reply *structs.ACLPolicyBatchResponse) error {
 	if err := a.aclPreCheck(); err != nil {
 		return err
