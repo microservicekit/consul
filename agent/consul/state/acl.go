@@ -1711,8 +1711,6 @@ func (s *Store) ACLBindingRuleBatchSet(idx uint64, rules structs.ACLBindingRules
 	defer tx.Abort()
 
 	for _, rule := range rules {
-		// this is only used when doing batch insertions for upgrades and replication. Therefore
-		// we take whatever those said.
 		if err := s.aclBindingRuleSetTxn(tx, idx, rule); err != nil {
 			return err
 		}
