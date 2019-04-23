@@ -315,11 +315,13 @@ func (t *ACLToken) PolicyIDs() []string {
 }
 
 func (t *ACLToken) RoleIDs() []string {
-	var ids []string
+	if len(t.Roles) == 0 {
+		return nil
+	}
+
+	ids := make([]string, 0, len(t.Roles))
 	for _, link := range t.Roles {
-		if link.ID != "" {
-			ids = append(ids, link.ID)
-		}
+		ids = append(ids, link.ID)
 	}
 	return ids
 }
